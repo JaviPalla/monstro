@@ -282,6 +282,20 @@ async function replyToThread(repoFullName, number, commentDatabaseId, body) {
   return rest("POST", `/repos/${repoFullName}/pulls/${number}/comments/${commentDatabaseId}/replies`, { body });
 }
 
+/**
+ * Publica de golpe una review con todos los borradores: comentarios inline +
+ * body general + veredicto (COMMENT / APPROVE / REQUEST_CHANGES).
+ */
+async function submitReview(repoFullName, number, { commitId, event, body, comments }) {
+  const payload = { event };
+  if (commitId) payload.commit_id = commitId;
+  if (body) payload.body = body;
+  if (comments?.length) {
+    payload.comments = comments.map((c) => ({ path: c.path, side: c.side, line: c.line, body: c.body }));
+  }
+  return rest("POST", `/repos/${repoFullName}/pulls/${number}/reviews`, payload);
+}
+
 /* ---------- acciones sobre el grafo ---------- */
 
 async function createBranch(repoFullName, branchName, sha) {
@@ -334,6 +348,7 @@ module.exports = {
   addIssueComment,
   addInlineComment,
   replyToThread,
+  submitReview,
   createBranch,
   forceUpdateBranch,
   revertPullRequest,

@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld("pulpo", {
   commentInline: (repo, number, comment) => ipcRenderer.invoke("pr:commentInline", { repo, number, comment }),
   replyThread: (repo, number, commentDatabaseId, body) =>
     ipcRenderer.invoke("pr:replyThread", { repo, number, commentDatabaseId, body }),
+  submitReview: (repo, number, review) => ipcRenderer.invoke("pr:submitReview", { repo, number, review }),
+  draftsList: (key) => ipcRenderer.invoke("drafts:list", { key }),
+  draftsSave: (key, items) => ipcRenderer.invoke("drafts:save", { key, items }),
   defaultBranch: (repo) => ipcRenderer.invoke("history:branches", { repo }),
   historyGraph: (repo, branchSpecs) => ipcRenderer.invoke("history:graph", { repo, branchSpecs }),
   createBranch: (repo, branch, sha) => ipcRenderer.invoke("git:createBranch", { repo, branch, sha }),

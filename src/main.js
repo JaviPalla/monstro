@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const { app, BrowserWindow, ipcMain, shell, nativeTheme } = require("electron");
 const config = require("./config");
+const drafts = require("./drafts");
 const github = require("./github");
 
 const SELFTEST = process.argv.includes("--selftest");
@@ -37,6 +38,7 @@ function createWindow() {
     query: {
       selftest: SELFTEST ? "1" : "0",
       selftest_route: routeArg ? routeArg.split("=")[1] : "list",
+      seed_draft: process.argv.includes("--seed-draft") ? "1" : "0",
     },
   });
 
@@ -94,6 +96,12 @@ function wireIpc() {
   ipcMain.handle("pr:replyThread", async (_event, { repo, number, commentDatabaseId, body }) =>
     github.replyToThread(repo, number, commentDatabaseId, body),
   );
+  ipcMain.handle("pr:submitReview", async (_event, { repo, number, review }) =>
+    github.submitReview(repo, number, review),
+  );
+
+  ipcMain.handle("drafts:list", (_event, { key }) => drafts.listFor(key));
+  ipcMain.handle("drafts:save", (_event, { key, items }) => drafts.saveFor(key, items));
 
   ipcMain.handle("history:branches", async (_event, { repo }) => github.defaultBranch(repo));
   ipcMain.handle("history:graph", async (_event, { repo, branchSpecs }) => github.branchHistories(repo, branchSpecs));

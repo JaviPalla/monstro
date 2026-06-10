@@ -18,6 +18,7 @@ const state = {
   detailPR: null,
   conversation: null,
   files: null,
+  drafts: [], // borradores locales del PR abierto (no tocan GitHub hasta publicar)
   search: "",
   loading: false,
   pollTimer: null,
@@ -77,6 +78,124 @@ function notifySelftestOnce() {
   if (!state.selftestNotified) {
     state.selftestNotified = true;
     window.pulpo.selftestRenderComplete();
+  }
+}
+
+/* ============ borradores ============ */
+function draftsKey() {
+  return `${state.repo}#${state.selected}`;
+}
+
+async function saveDrafts() {
+  state.drafts = await window.pulpo.draftsSave(draftsKey(), state.drafts);
+}
+
+async function addDraft(draft) {
+  const id = globalThis.crypto?.randomUUID?.() || `d-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  state.drafts.push({ id, createdAt: new Date().toISOString(), ...draft });
+  await saveDrafts();
+  toast("Borrador guardado (solo en tu Mac)", "ok");
+}
+
+async function removeDraft(id) {
+  state.drafts = state.drafts.filter((d) => d.id !== id);
+  await saveDrafts();
+}
+
+function draftCard(draft) {
+  const where = draft.kind === "inline"
+    ? `<code>${esc(draft.path)}</code> · línea ${draft.line} (${draft.side === "LEFT" ? "anterior" : "nueva"})`
+    : "comentario general";
+  return `
+    <div class="draft-card" data-draft="${draft.id}">
+      <div class="draft-head">📝 BORRADOR <span class="muted">· ${where}</span>
+        <button class="draft-del" title="Eliminar borrador">🗑</button>
+      </div>
+      <div class="draft-body">${esc(draft.body)}</div>
+    </div>`;
+}
+
+function wireDraftCards(container) {
+  container.querySelectorAll(".draft-card .draft-del").forEach((btn) =>
+    btn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await removeDraft(btn.closest(".draft-card").dataset.draft);
+      renderDetail();
+    }),
+  );
+}
+
+function draftsBar() {
+  if (!state.drafts.length) return "";
+  return `
+    <div class="drafts-bar">
+      <span>📝 <b>${state.drafts.length}</b> borrador${state.drafts.length > 1 ? "es" : ""} sin publicar</span>
+      <button class="btn" id="drafts-discard">Descartar todos</button>
+      <button class="btn btn-primary" id="drafts-publish">Publicar…</button>
+    </div>`;
+}
+
+function wireDraftsBar() {
+  $("#drafts-publish")?.addEventListener("click", openPublishModal);
+  $("#drafts-discard")?.addEventListener("click", async () => {
+    state.drafts = [];
+    await saveDrafts();
+    toast("Borradores descartados", "");
+    renderDetail();
+  });
+}
+
+function openPublishModal() {
+  const root = $("#modal-root");
+  const inline = state.drafts.filter((d) => d.kind === "inline");
+  const general = state.drafts.filter((d) => d.kind === "general");
+  root.innerHTML = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <h3>Publicar ${state.drafts.length} borrador${state.drafts.length > 1 ? "es" : ""} como review</h3>
+        <p class="muted">${inline.length} en línea · ${general.length} general${general.length === 1 ? "" : "es"} — se publican en una sola review.</p>
+        <div class="verdict">
+          <label><input type="radio" name="verdict" value="COMMENT" checked /> 💬 Comentar</label>
+          <label><input type="radio" name="verdict" value="APPROVE" /> ✅ Aprobar</label>
+          <label><input type="radio" name="verdict" value="REQUEST_CHANGES" /> ± Pedir cambios</label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" id="modal-cancel">Cancelar</button>
+          <button class="btn btn-primary" id="modal-confirm">Publicar en GitHub</button>
+        </div>
+      </div>
+    </div>`;
+  $("#modal-cancel").addEventListener("click", () => (root.innerHTML = ""));
+  $("#modal-backdrop").addEventListener("click", (event) => {
+    if (event.target.id === "modal-backdrop") root.innerHTML = "";
+  });
+  $("#modal-confirm").addEventListener("click", async () => {
+    const event = root.querySelector('input[name="verdict"]:checked').value;
+    root.innerHTML = "";
+    await publishDrafts(event);
+  });
+}
+
+async function publishDrafts(event) {
+  const pr = state.detailPR;
+  try {
+    // headRefOid fresco: si la rama avanzó, los comentarios se anclan al último commit
+    state.conversation = await window.pulpo.prConversation(state.repo, pr.number);
+    const inline = state.drafts.filter((d) => d.kind === "inline");
+    const general = state.drafts.filter((d) => d.kind === "general");
+    await window.pulpo.submitReview(state.repo, pr.number, {
+      commitId: state.conversation.headRefOid,
+      event,
+      body: general.map((d) => d.body).join("\n\n---\n\n") || undefined,
+      comments: inline,
+    });
+    state.drafts = [];
+    await saveDrafts();
+    toast(`Review publicada (${event === "APPROVE" ? "aprobada ✅" : event === "REQUEST_CHANGES" ? "cambios pedidos" : "comentarios"})`, "ok");
+    state.conversation = await window.pulpo.prConversation(state.repo, pr.number);
+    renderDetail();
+  } catch (err) {
+    toast(`No se pudo publicar (tus borradores siguen guardados): ${String(err.message || err)}`, "err");
   }
 }
 
@@ -228,12 +347,18 @@ async function openDetail(number, tab = "conv") {
   detailPane.classList.toggle("wide", tab === "changes");
   detailContent.innerHTML = `<div class="detail-inner"><div class="loading">Cargando #${number}…</div></div>`;
   try {
-    const [pr, conversation] = await Promise.all([
+    const [pr, conversation, drafts] = await Promise.all([
       window.pulpo.prDetail(state.repo, number),
       window.pulpo.prConversation(state.repo, number),
+      window.pulpo.draftsList(`${state.repo}#${number}`),
     ]);
     state.detailPR = pr;
     state.conversation = conversation;
+    state.drafts = drafts;
+    // seed visual para capturas de selftest: no se persiste
+    if (IS_SELFTEST && new URLSearchParams(location.search).get("seed_draft") === "1" && !state.drafts.length) {
+      state.drafts.push({ id: "seed", kind: "general", body: "Esto es un borrador local: no está en GitHub.", createdAt: new Date().toISOString() });
+    }
   } catch (err) {
     detailContent.innerHTML = `<div class="detail-inner"><div class="error-box">${esc(String(err.message || err))}</div></div>`;
     notifySelftestOnce();
@@ -273,16 +398,18 @@ function renderDetail() {
           Conversación <span class="count">${pr.comments?.totalCount ?? 0}</span>
         </button>
         <button class="tab ${state.detailTab === "changes" ? "active" : ""}" data-tab="changes">
-          Cambios <span class="count">${pr.changedFiles} ficheros · ${threadCount} hilos</span>
+          Cambios <span class="count">${pr.changedFiles} ficheros · ${threadCount} hilos${state.drafts.filter((d) => d.kind === "inline").length ? ` · 📝 ${state.drafts.filter((d) => d.kind === "inline").length}` : ""}</span>
         </button>
       </div>
 
       <div id="tab-body"></div>
+      ${draftsBar()}
     </div>`;
 
   $("#detail-close").addEventListener("click", closeDetail);
   $("#act-update").addEventListener("click", () => updateBranch(pr));
   $("#act-merge").addEventListener("click", () => confirmMerge(pr));
+  wireDraftsBar();
   detailContent.querySelectorAll(".tab").forEach((tabBtn) =>
     tabBtn.addEventListener("click", () => {
       state.detailTab = tabBtn.dataset.tab;
@@ -319,31 +446,26 @@ function renderConversationTab() {
   const pr = state.detailPR;
   const conv = state.conversation;
   const comments = conv?.comments?.nodes || [];
+  const generalDrafts = state.drafts.filter((d) => d.kind === "general");
   $("#tab-body").innerHTML = `
     <div class="section-h">Descripción</div>
     <div class="pr-body">${pr.bodyHTML || "<p class='muted'>Sin descripción.</p>"}</div>
     <div class="section-h">Comentarios (${comments.length})</div>
     ${comments.map(commentBlock).join("") || `<p class="muted">Nadie ha dicho nada todavía.</p>`}
+    ${generalDrafts.length ? `<div class="section-h">Tus borradores</div>${generalDrafts.map(draftCard).join("")}` : ""}
     <div class="composer">
-      <textarea id="new-comment" rows="3" placeholder="Escribe un comentario… (markdown soportado)"></textarea>
+      <textarea id="new-comment" rows="3" placeholder="Escribe un comentario… se guarda como borrador hasta que publiques"></textarea>
       <div class="composer-actions">
-        <button class="btn btn-accent" id="send-comment">Comentar</button>
+        <button class="btn btn-accent" id="send-comment">📝 Guardar borrador</button>
       </div>
     </div>`;
   wireExternalLinks();
+  wireDraftCards($("#tab-body"));
   $("#send-comment").addEventListener("click", async () => {
     const body = $("#new-comment").value.trim();
     if (!body) return;
-    $("#send-comment").disabled = true;
-    try {
-      await window.pulpo.commentIssue(state.repo, pr.number, body);
-      toast("Comentario publicado", "ok");
-      state.conversation = await window.pulpo.prConversation(state.repo, pr.number);
-      renderDetail();
-    } catch (err) {
-      toast(`No se pudo comentar: ${String(err.message || err)}`, "err");
-      $("#send-comment").disabled = false;
-    }
+    await addDraft({ kind: "general", body });
+    renderDetail();
   });
   notifySelftestOnce();
 }
@@ -414,12 +536,17 @@ function diffLineRow(file, line, anchored) {
     .map(threadBlock)
     .map((html) => `<tr class="diff-thread-row"><td colspan="3">${html}</td></tr>`)
     .join("");
+  const draftsHtml = state.drafts
+    .filter((d) => d.kind === "inline" && d.path === file.filename && d.side === side && d.line === commentLine)
+    .map(draftCard)
+    .map((html) => `<tr class="diff-thread-row"><td colspan="3">${html}</td></tr>`)
+    .join("");
   return `
     <tr class="diff-line ${cls}" data-path="${esc(file.filename)}" data-line="${commentLine ?? ""}" data-side="${side}">
       <td class="gutter">${line.old ?? ""}</td>
-      <td class="gutter">${line.new ?? ""}<button class="add-comment" title="Comentar esta línea">+</button></td>
+      <td class="gutter">${line.new ?? ""}<button class="add-comment" title="Comentar esta línea (borrador)">+</button></td>
       <td class="code"><span class="sign">${sign}</span>${esc(line.text)}</td>
-    </tr>${threadsHtml}`;
+    </tr>${threadsHtml}${draftsHtml}`;
 }
 
 function renderChangesTab() {
@@ -488,6 +615,7 @@ function renderChangesTab() {
     }),
   );
   wireExternalLinks();
+  wireDraftCards($("#tab-body"));
   notifySelftestOnce();
 }
 
@@ -500,11 +628,11 @@ function openInlineComposer(tr) {
   row.innerHTML = `
     <td colspan="3">
       <div class="composer inline">
-        <div class="muted" style="margin-bottom:6px">Comentando <code>${esc(path)}</code> línea ${esc(line)} (${side === "LEFT" ? "versión anterior" : "versión nueva"})</div>
+        <div class="muted" style="margin-bottom:6px">📝 Borrador en <code>${esc(path)}</code> línea ${esc(line)} (${side === "LEFT" ? "versión anterior" : "versión nueva"}) — no se publica hasta que tú lo digas</div>
         <textarea rows="3" placeholder="Tu comentario…"></textarea>
         <div class="composer-actions">
           <button class="btn cancel">Cancelar</button>
-          <button class="btn btn-accent send">Comentar</button>
+          <button class="btn btn-accent send">📝 Guardar borrador</button>
         </div>
       </div>
     </td>`;
@@ -514,22 +642,8 @@ function openInlineComposer(tr) {
   row.querySelector(".send").addEventListener("click", async () => {
     const body = row.querySelector("textarea").value.trim();
     if (!body) return;
-    row.querySelector(".send").disabled = true;
-    try {
-      await window.pulpo.commentInline(state.repo, state.detailPR.number, {
-        body,
-        commitId: state.conversation.headRefOid,
-        path,
-        side,
-        line: Number(line),
-      });
-      toast("Comentario publicado en la línea", "ok");
-      state.conversation = await window.pulpo.prConversation(state.repo, state.detailPR.number);
-      renderChangesTab();
-    } catch (err) {
-      toast(`No se pudo comentar: ${String(err.message || err)}`, "err");
-      row.querySelector(".send").disabled = false;
-    }
+    await addDraft({ kind: "inline", path, side, line: Number(line), body });
+    renderDetail();
   });
 }
 
