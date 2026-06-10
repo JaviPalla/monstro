@@ -14,6 +14,7 @@ const state = {
   prs: [],
   openPrs: [],
   selected: null,
+  detailRepo: null, // repo real del PR abierto (difiere de state.repo en la vista "Todos")
   detailTab: "conv", // "conv" | "changes"
   detailPR: null,
   conversation: null,
@@ -83,9 +84,15 @@ function notifySelftestOnce() {
   }
 }
 
+const ALL_REPOS = "__all__";
+
+function detailRepo() {
+  return state.detailRepo || state.repo;
+}
+
 /* ============ borradores ============ */
 function draftsKey() {
-  return `${state.repo}#${state.selected}`;
+  return `${detailRepo()}#${state.selected}`;
 }
 
 async function saveDrafts() {
@@ -182,10 +189,10 @@ async function publishDrafts(event) {
   const pr = state.detailPR;
   try {
     // headRefOid fresco: si la rama avanzó, los comentarios se anclan al último commit
-    state.conversation = await window.pulpo.prConversation(state.repo, pr.number);
+    state.conversation = await window.pulpo.prConversation(detailRepo(), pr.number);
     const inline = state.drafts.filter((d) => d.kind === "inline");
     const general = state.drafts.filter((d) => d.kind === "general");
-    await window.pulpo.submitReview(state.repo, pr.number, {
+    await window.pulpo.submitReview(detailRepo(), pr.number, {
       commitId: state.conversation.headRefOid,
       event,
       body: general.map((d) => d.body).join("\n\n---\n\n") || undefined,
@@ -194,7 +201,7 @@ async function publishDrafts(event) {
     state.drafts = [];
     await saveDrafts();
     toast(`Review publicada (${event === "APPROVE" ? "aprobada ✅" : event === "REQUEST_CHANGES" ? "cambios pedidos" : "comentarios"})`, "ok");
-    state.conversation = await window.pulpo.prConversation(state.repo, pr.number);
+    state.conversation = await window.pulpo.prConversation(detailRepo(), pr.number);
     renderDetail();
   } catch (err) {
     toast(`No se pudo publicar (tus borradores siguen guardados): ${String(err.message || err)}`, "err");
@@ -292,9 +299,10 @@ function renderList() {
   list.innerHTML = prs
     .map(
       (pr) => `
-      <article class="pr-row ${state.selected === pr.number ? "selected" : ""}" data-number="${pr.number}">
+      <article class="pr-row ${state.selected === pr.number ? "selected" : ""}" data-number="${pr.number}" data-repo="${esc(pr.repository?.nameWithOwner || state.repo)}">
         <img class="avatar" src="${esc(pr.author?.avatarUrl || "")}" alt="" />
         <div class="pr-title-line">
+          ${state.repo === ALL_REPOS ? `<span class="label-pill repo-pill">${esc(pr.repository?.nameWithOwner || "")}</span>` : ""}
           <span class="pr-title">${esc(pr.title)} <span class="pr-number">#${pr.number}</span></span>
           ${labelPills(pr)}
         </div>
@@ -313,7 +321,7 @@ function renderList() {
     )
     .join("");
   list.querySelectorAll(".pr-row").forEach((row) =>
-    row.addEventListener("click", () => openDetail(Number(row.dataset.number))),
+    row.addEventListener("click", () => openDetail(Number(row.dataset.number), "conv", row.dataset.repo)),
   );
 
   if (IS_SELFTEST && !state.selftestOpenedDetail && prs.length && (SELFTEST_ROUTE === "list" || SELFTEST_ROUTE === "changes")) {
@@ -339,8 +347,9 @@ function mergeBlockReason(pr) {
   return "";
 }
 
-async function openDetail(number, tab = "conv") {
+async function openDetail(number, tab = "conv", repoOverride = null) {
   state.selected = number;
+  state.detailRepo = repoOverride && repoOverride !== ALL_REPOS ? repoOverride : state.repo;
   state.detailTab = tab;
   state.files = null;
   state.conversation = null;
@@ -350,9 +359,9 @@ async function openDetail(number, tab = "conv") {
   detailContent.innerHTML = `<div class="detail-inner"><div class="loading">Cargando #${number}…</div></div>`;
   try {
     const [pr, conversation, drafts] = await Promise.all([
-      window.pulpo.prDetail(state.repo, number),
-      window.pulpo.prConversation(state.repo, number),
-      window.pulpo.draftsList(`${state.repo}#${number}`),
+      window.pulpo.prDetail(detailRepo(), number),
+      window.pulpo.prConversation(detailRepo(), number),
+      window.pulpo.draftsList(`${detailRepo()}#${number}`),
     ]);
     state.detailPR = pr;
     state.conversation = conversation;
@@ -555,7 +564,7 @@ function renderChangesTab() {
   const files = state.files;
   if (!files) {
     $("#tab-body").innerHTML = `<div class="loading">Cargando diff…</div>`;
-    window.pulpo.prFiles(state.repo, state.detailPR.number).then((loaded) => {
+    window.pulpo.prFiles(detailRepo(), state.detailPR.number).then((loaded) => {
       state.files = loaded;
       if (state.detailTab === "changes") renderChangesTab();
     }).catch((err) => {
@@ -606,7 +615,7 @@ function renderChangesTab() {
       if (!body || !btn.dataset.reply) return;
       btn.disabled = true;
       try {
-        await window.pulpo.replyThread(state.repo, state.detailPR.number, Number(btn.dataset.reply), body);
+        await window.pulpo.replyThread(detailRepo(), state.detailPR.number, Number(btn.dataset.reply), body);
         toast("Respuesta publicada", "ok");
         state.conversation = await window.pulpo.prConversation(state.repo, state.detailPR.number);
         renderChangesTab();
@@ -700,7 +709,7 @@ function confirmMerge(pr) {
     root.innerHTML = "";
     try {
       const res = await window.pulpo.mergePR({
-        repo: state.repo,
+        repo: detailRepo(),
         number: pr.number,
         deleteBranch,
         headRefName: pr.headRefName,
@@ -717,6 +726,10 @@ function confirmMerge(pr) {
 
 /* ============ vista histórico ============ */
 async function enterHistory() {
+  if (state.repo === ALL_REPOS) {
+    toast("El histórico es por repositorio: elige uno en el selector", "");
+    return;
+  }
   state.view = "history";
   closeDetail();
   document.querySelectorAll(".bucket").forEach((b) => b.classList.remove("active"));
@@ -1019,7 +1032,9 @@ async function refresh() {
   state.loading = true;
   renderList();
   try {
-    const prs = await window.pulpo.listPRs(state.repo, bucketStates());
+    const prs = state.repo === ALL_REPOS
+      ? await window.pulpo.searchPRs(state.config.repos, bucketStates())
+      : await window.pulpo.listPRs(state.repo, bucketStates());
     state.prs = prs;
     if (bucketStates()[0] === "OPEN") {
       state.openPrs = prs;
@@ -1119,7 +1134,11 @@ function openSettings() {
 /* ============ arranque ============ */
 function renderRepoSelect() {
   const select = $("#repo-select");
-  select.innerHTML = (state.config?.repos || [])
+  const repos = state.config?.repos || [];
+  const allOption = repos.length > 1
+    ? `<option value="${ALL_REPOS}" ${state.repo === ALL_REPOS ? "selected" : ""}>⭐ Todos los repos</option>`
+    : "";
+  select.innerHTML = allOption + repos
     .map((r) => `<option value="${esc(r)}" ${r === state.repo ? "selected" : ""}>${esc(r)}</option>`)
     .join("");
 }
@@ -1149,12 +1168,13 @@ async function boot() {
 $("#refresh").addEventListener("click", refresh);
 $("#settings-btn").addEventListener("click", openSettings);
 $("#repo-select").addEventListener("change", (event) => {
-  state.repo = event.target.value;
-  state.openPrs = [];
-  state.history = { branches: [], enabled: new Set(), layout: null, rows: [], loading: false, selectedOid: null };
-  closeDetail();
-  if (state.view === "history") loadHistory();
-  else refresh();
+  if (event.target.value === ALL_REPOS && state.view === "history") {
+    state.view = "prs";
+    document.querySelectorAll(".bucket").forEach((b) => b.classList.remove("active"));
+    document.querySelector('[data-bucket="open"]')?.classList.add("active");
+    state.bucket = "open";
+  }
+  switchRepo(event.target.value);
 });
 $("#search").addEventListener("input", (event) => {
   state.search = event.target.value;
@@ -1184,6 +1204,9 @@ function paletteEntries() {
   entries.push({ label: "Ir a: Histórico", hint: "grafo de ramas", run: enterHistory });
   for (const [bucket, label] of [["open", "Abiertas"], ["mine", "Mías"], ["review", "Para revisar"], ["draft", "Borradores"], ["merged", "Fusionadas"], ["closed", "Cerradas"]]) {
     entries.push({ label: `Ir a: ${label}`, hint: "bucket", run: () => switchBucket(bucket) });
+  }
+  if ((state.config?.repos || []).length > 1) {
+    entries.push({ label: "Repo: ⭐ Todos los repos", hint: "vista agregada", run: () => switchRepo(ALL_REPOS) });
   }
   for (const repo of state.config?.repos || []) {
     entries.push({ label: `Repo: ${repo}`, hint: "cambiar repositorio", run: () => switchRepo(repo) });

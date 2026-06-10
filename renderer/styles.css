@@ -520,6 +520,7 @@ body {
 .palette-item span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .palette-item.active, .palette-item:hover { background: var(--branch-bg); color: var(--branch-text); }
 .pr-row.cursor { border-color: var(--accent); }
+.repo-pill { background: var(--purple-bg); color: var(--purple); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 
 #settings-root { position: fixed; inset: 0; z-index: 40; background: var(--bg); overflow-y: auto; }
 #settings-root.hidden { display: none; }

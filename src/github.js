@@ -81,6 +81,7 @@ async function rest(method, path, body) {
 const PR_LIST_FIELDS = `
   id number title url isDraft state createdAt updatedAt
   baseRefName headRefName isCrossRepository
+  repository { nameWithOwner }
   headRepository { nameWithOwner }
   author { login avatarUrl }
   mergeable mergeStateStatus reviewDecision
@@ -113,6 +114,21 @@ async function listPRs(repoFullName, states) {
   );
   if (!data.repository) throw new Error(`Repo no accesible: ${repoFullName}`);
   return data.repository.pullRequests.nodes;
+}
+
+/** PRs agregadas de varios repos (vista "Todos") vía search. */
+async function searchPRs(repoFullNames, states) {
+  const stateQualifier = { OPEN: "is:open", MERGED: "is:merged", CLOSED: "is:closed is:unmerged" }[states[0]] || "is:open";
+  const repoQualifiers = repoFullNames.map((r) => `repo:${r}`).join(" ");
+  const data = await gql(
+    `query ($q: String!) {
+       search(query: $q, type: ISSUE, first: 50) {
+         nodes { ... on PullRequest { ${PR_LIST_FIELDS} } }
+       }
+     }`,
+    { q: `is:pr ${stateQualifier} ${repoQualifiers} sort:updated-desc` },
+  );
+  return data.search.nodes.filter((n) => n && n.number);
 }
 
 async function prDetail(repoFullName, number) {
@@ -338,6 +354,7 @@ module.exports = {
   invalidateTokenCache,
   viewer,
   listPRs,
+  searchPRs,
   prDetail,
   mergePR,
   updateBranchRebase,

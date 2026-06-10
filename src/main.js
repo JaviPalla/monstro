@@ -79,6 +79,7 @@ function wireIpc() {
   });
 
   ipcMain.handle("prs:list", async (_event, { repo, states }) => github.listPRs(repo, states));
+  ipcMain.handle("prs:search", async (_event, { repos, states }) => github.searchPRs(repos, states));
   ipcMain.handle("pr:detail", async (_event, { repo, number }) => github.prDetail(repo, number));
   ipcMain.handle("pr:merge", async (_event, { repo, number, deleteBranch, headRefName, isCrossRepository }) =>
     github.mergePR(repo, number, { deleteBranch, headRefName, isCrossRepository }),
