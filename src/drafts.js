@@ -34,4 +34,8 @@ function saveFor(key, items) {
   return items;
 }
 
-module.exports = { listFor, saveFor };
+function allKeys() {
+  return Object.keys(loadAll());
+}
+
+module.exports = { listFor, saveFor, allKeys };

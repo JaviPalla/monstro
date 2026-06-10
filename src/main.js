@@ -74,6 +74,8 @@ function wireIpc() {
       allowed.token = partial.token.trim() || null;
       github.invalidateTokenCache();
     }
+    if (typeof partial.lastRepo === "string") allowed.lastRepo = partial.lastRepo;
+    if (typeof partial.lastBucket === "string") allowed.lastBucket = partial.lastBucket;
     const { token, ...rest } = config.save(allowed);
     return { ...rest, hasManualToken: Boolean(token) };
   });
@@ -103,6 +105,7 @@ function wireIpc() {
 
   ipcMain.handle("drafts:list", (_event, { key }) => drafts.listFor(key));
   ipcMain.handle("drafts:save", (_event, { key, items }) => drafts.saveFor(key, items));
+  ipcMain.handle("drafts:keys", () => drafts.allKeys());
 
   ipcMain.handle("history:branches", async (_event, { repo }) => github.defaultBranch(repo));
   ipcMain.handle("history:graph", async (_event, { repo, branchSpecs }) => github.branchHistories(repo, branchSpecs));

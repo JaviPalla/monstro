@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("pulpo", {
   submitReview: (repo, number, review) => ipcRenderer.invoke("pr:submitReview", { repo, number, review }),
   draftsList: (key) => ipcRenderer.invoke("drafts:list", { key }),
   draftsSave: (key, items) => ipcRenderer.invoke("drafts:save", { key, items }),
+  draftsKeys: () => ipcRenderer.invoke("drafts:keys"),
   defaultBranch: (repo) => ipcRenderer.invoke("history:branches", { repo }),
   historyGraph: (repo, branchSpecs) => ipcRenderer.invoke("history:graph", { repo, branchSpecs }),
   createBranch: (repo, branch, sha) => ipcRenderer.invoke("git:createBranch", { repo, branch, sha }),

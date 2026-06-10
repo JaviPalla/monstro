@@ -28,6 +28,7 @@ const state = {
   history: { branches: [], enabled: new Set(), layout: null, rows: [], loading: false, selectedOid: null },
   prSnapshot: null, // nº → {reviewDecision, checks, reviewMe} para detectar cambios y notificar
   cursor: -1, // selección con teclado (j/k) en la lista
+  draftKeys: new Set(), // "owner/repo#n" con borradores guardados → badge 📝 en la lista
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -97,6 +98,7 @@ function draftsKey() {
 
 async function saveDrafts() {
   state.drafts = await window.pulpo.draftsSave(draftsKey(), state.drafts);
+  state.draftKeys = new Set(await window.pulpo.draftsKeys());
 }
 
 async function addDraft(draft) {
@@ -315,7 +317,7 @@ function renderList() {
             <span class="arrow">→</span>
             <span class="branch" title="${esc(pr.baseRefName)}">${esc(pr.baseRefName)}</span>
           </span>
-          <span class="meta-mini">${esc(pr.author?.login || "?")} · ${timeAgo(pr.updatedAt)} · 💬 ${pr.comments?.totalCount ?? 0}</span>
+          <span class="meta-mini">${esc(pr.author?.login || "?")} · ${timeAgo(pr.updatedAt)} · 💬 ${pr.comments?.totalCount ?? 0}${state.draftKeys.has(`${pr.repository?.nameWithOwner || state.repo}#${pr.number}`) ? " · 📝 borradores" : ""}</span>
         </div>
       </article>`,
     )
@@ -1048,10 +1050,32 @@ async function refresh() {
     state.loading = false;
     renderCounts();
     renderList();
+    refreshOpenDetailSilently();
   } catch (err) {
     state.loading = false;
     list.innerHTML = `<div class="error-box">No pude cargar ${esc(state.repo)}:<br>${esc(String(err.message || err))}</div>`;
     notifySelftestOnce();
+  }
+}
+
+/** Refresca el detalle abierto en cada poll, sin pisar nada si estás escribiendo. */
+async function refreshOpenDetailSilently() {
+  if (!state.selected || !state.detailPR || state.view !== "prs") return;
+  const typing = ["TEXTAREA", "INPUT"].includes(document.activeElement?.tagName) ||
+    detailContent.querySelector(".inline-composer-row");
+  if (typing) return;
+  try {
+    const [pr, conversation] = await Promise.all([
+      window.pulpo.prDetail(detailRepo(), state.selected),
+      window.pulpo.prConversation(detailRepo(), state.selected),
+    ]);
+    const changed = JSON.stringify([pr.mergeStateStatus, pr.reviewDecision, checksStateOf(pr), conversation.comments.totalCount]) !==
+      JSON.stringify([state.detailPR.mergeStateStatus, state.detailPR.reviewDecision, checksStateOf(state.detailPR), state.conversation?.comments?.totalCount]);
+    state.detailPR = pr;
+    state.conversation = conversation;
+    if (changed) renderDetail();
+  } catch {
+    /* el siguiente poll lo reintenta */
   }
 }
 
@@ -1145,7 +1169,17 @@ function renderRepoSelect() {
 
 async function boot() {
   state.config = await window.pulpo.getConfig();
-  state.repo = state.repo && state.config.repos.includes(state.repo) ? state.repo : state.config.repos[0] || null;
+  const remembered = state.config.lastRepo;
+  state.repo =
+    (state.repo && state.config.repos.includes(state.repo) && state.repo) ||
+    (remembered === ALL_REPOS && state.config.repos.length > 1 && ALL_REPOS) ||
+    (state.config.repos.includes(remembered) && remembered) ||
+    state.config.repos[0] ||
+    null;
+  if (state.config.lastBucket && !IS_SELFTEST) state.bucket = state.config.lastBucket;
+  document.querySelectorAll(".bucket").forEach((b) => b.classList.remove("active"));
+  document.querySelector(`[data-bucket="${state.bucket}"]`)?.classList.add("active");
+  state.draftKeys = new Set(await window.pulpo.draftsKeys().catch(() => []));
   renderRepoSelect();
 
   const auth = await window.pulpo.authStatus();
@@ -1181,14 +1215,7 @@ $("#search").addEventListener("input", (event) => {
   renderList();
 });
 document.querySelectorAll(".bucket[data-bucket]").forEach((btn) =>
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".bucket").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    state.view = "prs";
-    state.bucket = btn.dataset.bucket;
-    closeDetail();
-    refresh();
-  }),
+  btn.addEventListener("click", () => switchBucket(btn.dataset.bucket)),
 );
 $("#bucket-history").addEventListener("click", enterHistory);
 /* ============ paleta de comandos (⌘K) ============ */
@@ -1219,6 +1246,7 @@ function paletteEntries() {
 function switchBucket(bucket) {
   state.view = "prs";
   state.bucket = bucket;
+  window.pulpo.setConfig({ lastBucket: bucket }).catch(() => {});
   document.querySelectorAll(".bucket").forEach((b) => b.classList.remove("active"));
   document.querySelector(`[data-bucket="${bucket}"]`)?.classList.add("active");
   closeDetail();
@@ -1227,6 +1255,7 @@ function switchBucket(bucket) {
 
 function switchRepo(repo) {
   state.repo = repo;
+  window.pulpo.setConfig({ lastRepo: repo }).catch(() => {});
   state.openPrs = [];
   state.prSnapshot = null;
   state.history = { branches: [], enabled: new Set(), layout: null, rows: [], loading: false, selectedOid: null };

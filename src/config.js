@@ -7,6 +7,8 @@ const { app } = require("electron");
 const DEFAULTS = {
   repos: ["Uriach/zinc"],
   pollSeconds: 60,
+  lastRepo: null,
+  lastBucket: null,
   // Token manual SOLO como último recurso; lo normal es gh CLI o GITHUB_TOKEN.
   token: null,
 };
