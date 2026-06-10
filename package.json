@@ -1,0 +1,15 @@
+{
+  "name": "pulpo",
+  "productName": "Pulpo",
+  "version": "0.1.0",
+  "description": "GitHub PRs para Mac, estilo Bitbucket. Merge commit siempre, squash jamás.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "selftest": "electron . --selftest"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^42.4.0"
+  }
+}

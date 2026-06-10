@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src https: data:; font-src 'self'" />
+  <title>Pulpo</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header id="topbar">
+    <div class="traffic-pad"></div>
+    <div class="brand">🐙 <strong>Pulpo</strong></div>
+    <select id="repo-select" title="Repositorio"></select>
+    <input id="search" type="search" placeholder="Filtrar por título, rama o autor…" />
+    <button id="refresh" class="icon-btn" title="Refrescar (R)">⟳</button>
+    <button id="settings-btn" class="icon-btn" title="Ajustes">⚙</button>
+    <div id="me" class="me"></div>
+  </header>
+
+  <div id="layout">
+    <nav id="sidebar">
+      <div class="nav-section">Pull requests</div>
+      <button class="bucket active" data-bucket="open"><span class="dot dot-open"></span>Abiertas <span class="count" id="count-open"></span></button>
+      <button class="bucket" data-bucket="mine"><span class="dot dot-mine"></span>Mías <span class="count" id="count-mine"></span></button>
+      <button class="bucket" data-bucket="review"><span class="dot dot-review"></span>Para revisar <span class="count" id="count-review"></span></button>
+      <button class="bucket" data-bucket="draft"><span class="dot dot-draft"></span>Borradores <span class="count" id="count-draft"></span></button>
+      <div class="nav-section">Historial</div>
+      <button class="bucket" data-bucket="merged"><span class="dot dot-merged"></span>Fusionadas</button>
+      <button class="bucket" data-bucket="closed"><span class="dot dot-closed"></span>Cerradas</button>
+      <div class="sidebar-foot">
+        <div class="rule">pull → <b>rebase</b></div>
+        <div class="rule">merge → <b>merge commit</b></div>
+        <div class="rule no">squash → <b>jamás</b></div>
+      </div>
+    </nav>
+
+    <main id="list-pane">
+      <div id="pr-list"></div>
+    </main>
+
+    <aside id="detail-pane" class="hidden">
+      <div id="detail-content"></div>
+    </aside>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+  <div id="settings-root" class="hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
