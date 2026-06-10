@@ -1,63 +1,98 @@
-# 🐙 Pulpo
+<p align="center">
+  <img src="assets/icon-1024.png" width="128" alt="Pulpo" />
+</p>
 
-Cliente de GitHub para Mac centrado en pull requests, con un listado al estilo Bitbucket:
-estado, `rama-origen → rama-destino`, checks, revisiones y acciones de un clic.
+<h1 align="center">🐙 Pulpo</h1>
 
-**Reglas de la casa (no configurables, a propósito):**
+<p align="center">
+  <b>Cliente de GitHub para Mac centrado en pull requests.</b><br/>
+  Listado estilo Bitbucket · diffs y comentarios nativos · grafo de ramas · borradores de review.<br/>
+  <i>A macOS GitHub PR client: Bitbucket-style list, native diffs &amp; review drafts, branch graph.</i>
+</p>
+
+---
+
+## Reglas de la casa
+
+No configurables. A propósito.
 
 | Operación | Método |
 |---|---|
 | Update branch | **rebase** |
 | Merge | **merge commit** |
-| Squash | **jamás** (no existe en la UI ni en el código) |
+| Squash | **jamás** — no existe en la UI ni en el código |
 
-## Ejecutar
+## Capturas
 
-```bash
-cd pulpo
-npm install        # primera vez (descarga Electron)
-npm start
-```
-
-## Token de GitHub
-
-La app no guarda tu token salvo que tú lo pidas. Orden de resolución:
-
-1. Variable de entorno `GITHUB_TOKEN`
-2. `gh auth token` (GitHub CLI — lo habitual)
-3. Token manual guardado desde Ajustes ⚙ (en `~/Library/Application Support/pulpo/config.json`, permisos 600)
+| PRs + detalle | Diff con borradores | Histórico (grafo) |
+|---|---|---|
+| ![Lista](docs/screenshot-list.png) | ![Cambios](docs/screenshot-changes.png) | ![Histórico](docs/screenshot-history.png) |
 
 ## Qué hace
 
-- **Listado de PRs** por repositorio (configurable en Ajustes; por defecto `Uriach/zinc`):
-  título, autor, `head → base`, estado (Abierta/Borrador/Fusionada/Cerrada), decisión de
-  revisión (Aprobada / Cambios pedidos / Falta revisión), checks (✓/✗/●), rama atrasada o
-  con conflictos, comentarios y antigüedad.
-- **Buckets**: Abiertas · Mías · Para revisar · Borradores · Fusionadas · Cerradas. Búsqueda libre.
-- **Detalle**: descripción renderizada (HTML de GitHub), checks con enlace, revisores y su estado,
-  +/− y ficheros tocados.
-- **Cambios (diff nativo)**: pestaña *Cambios* con el diff completo por fichero (hunks, numeración
-  old/new, colapsables), comentarios **inline** en cualquier línea (botón `+` al pasar el ratón),
-  hilos de revisión existentes anclados a su línea con respuesta directa, y pestaña *Conversación*
-  con los comentarios de la PR y caja para comentar. Sin salir de la app.
-- **Histórico (grafo)**: sección *Histórico* con el grafo de commits estilo GitKraken — las ramas
-  yendo y viniendo entre `develop`/`main` y las ramas de PR (activables por chips). Cada commit:
-  mensaje, autor, sha, PR asociada (clic → detalle). Acciones sobre un commit: copiar SHA, crear
-  rama desde ahí, **mover una rama a ese commit** (force, con confirmación escrita) y **revertir
-  una PR fusionada** (crea PR de revert).
-- **Acciones de PR**: *Update branch (rebase)* y *Merge (merge commit)* con confirmación y opción
-  de borrar la rama.
-- Refresco automático (60 s por defecto) y manual (`R` o ⟳). Modo claro/oscuro según el sistema.
+- **Listado de PRs estilo Bitbucket** — estado (Abierta/Borrador/Fusionada/Cerrada),
+  `rama-origen → rama-destino`, decisión de review, checks del CI (✓/✗/●), rama atrasada o con
+  conflictos, labels, autor, comentarios y antigüedad. Buckets: *Abiertas · Mías · Para revisar ·
+  Borradores · Fusionadas · Cerradas* con contadores, y búsqueda instantánea.
+- **Diffs nativos** — pestaña *Cambios* con el diff completo (hunks, numeración old/new,
+  colapsable por fichero). Sin saltar al navegador.
+- **Borradores de review** 📝 — los comentarios (inline en una línea o generales) se guardan
+  **localmente** y no tocan GitHub hasta que pulsas *Publicar…*, que los envía todos en **una sola
+  review** con veredicto: 💬 Comentar · ✅ Aprobar · ± Pedir cambios. Los hilos existentes aparecen
+  anclados a su línea, con respuesta directa.
+- **Histórico** 📈 — grafo de commits (estilo GitKraken) con las ramas yendo y viniendo entre
+  `develop`/`main` y las ramas de PR (activables). Acciones sobre cualquier commit: copiar SHA,
+  crear rama, **mover una rama a ese commit** (force, con confirmación escrita) o **revertir una
+  PR fusionada** (crea PR de revert).
+- **Acciones de PR** — *Update branch (rebase)* y *Merge (merge commit)* con confirmación y
+  borrado opcional de la rama. El merge se deshabilita solo (conflictos, checks, rama atrasada)
+  explicando el motivo.
+- **Notificaciones nativas** 🔔 — te avisa cuando te piden review, cuando tu PR es aprobada o le
+  piden cambios, y cuando sus checks se ponen en rojo. El Dock muestra cuántas PRs esperan tu
+  review.
+- **Multi-repo** — varios repositorios y una vista agregada *⭐ Todos los repos*.
+- **Teclado** — `⌘K` paleta de comandos · `j/k` + `Enter` navegar y abrir · `1–6` buckets ·
+  `h` histórico · `R` refrescar · `Esc` cerrar.
+- Modo claro/oscuro según el sistema. UI en español.
 
-## Selftest
-
-`npm run selftest` arranca la app, espera el primer render con datos reales, guarda una captura
-en `/tmp/pulpo-selftest.png` y sale. Útil para verificar la app sin interacción.
-
-## Empaquetar como .app (opcional)
-
-No es necesario para el uso diario (`npm start` basta). Si quieres un `.app` en Aplicaciones:
+## Instalar y ejecutar
 
 ```bash
-npx electron-packager . Pulpo --platform=darwin --arch=arm64 --out=dist
+git clone https://github.com/JesusGR4/pulpo && cd pulpo
+npm install
+npm start
 ```
+
+### Token de GitHub
+
+Pulpo no guarda tu token salvo que tú lo pidas. Orden de resolución:
+
+1. Variable de entorno `GITHUB_TOKEN`
+2. `gh auth token` (GitHub CLI — lo habitual)
+3. Token manual desde Ajustes ⚙ (queda en `~/Library/Application Support/pulpo/config.json`, permisos 600)
+
+El token vive solo en el proceso principal: el renderer va sandboxed con CSP estricta y habla por IPC.
+
+### Empaquetar como .app (opcional)
+
+```bash
+npx electron-packager . Pulpo --platform=darwin --arch=arm64 --icon=build/icon.icns --out=dist
+```
+
+## Arquitectura
+
+```
+src/main.js      ventana, IPC, notificaciones, selftest (--selftest[-route=list|changes|history])
+src/github.js    GraphQL (listado/detalle/grafo/update-branch) + REST (merge, diff, reviews)
+src/drafts.js    borradores locales (userData/drafts.json)
+src/config.js    repos, polling, token manual opcional
+renderer/        vanilla JS + CSS — sin frameworks, sin bundler
+scripts/         make-icon.js (el icono se renderiza con el propio Electron)
+```
+
+`npm run selftest` arranca la app contra la API real, captura la pantalla en
+`/tmp/pulpo-selftest.png` y sale — así se verifican los cambios de UI.
+
+## Licencia
+
+MIT

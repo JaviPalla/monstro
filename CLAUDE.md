@@ -17,7 +17,14 @@ Mac (Electron) GitHub PR client for Jesús. Bitbucket-style PR list + detail pan
 
 ## Commands
 - `npm start` — run the app.
-- `npm run selftest` — headed run that screenshots the first rendered state and exits (use this to verify changes; Read the PNG).
+- `npm run selftest` — headed run that screenshots the first rendered state and exits (use this to verify changes; Read the PNG). Routes: `--selftest-route=list|changes|history`, `--seed-draft` seeds an in-memory draft for captures.
+- `npm run icon` — regenerate assets/icon-1024.png (then sips/iconutil for build/icon.icns).
+
+## Feature invariants
+- **Review drafts**: comments (inline + general) are saved locally via `src/drafts.js` and only published when the user clicks Publicar — ONE review (POST /pulls/N/reviews) with verdict COMMENT/APPROVE/REQUEST_CHANGES. Never auto-publish.
+- **Notifications** (`detectAndNotify`): first poll never notifies; only state *changes* do. Dock badge = PRs awaiting my review.
+- **Multi-repo**: `state.repo === "__all__"` aggregates via GraphQL search; detail/drafts/merge must use `detailRepo()` (the PR's own repo), never `state.repo` directly.
+- History graph layout lives in `renderer/graph.js` (lane algorithm) — keep it dependency-free.
 
 ## Conventions
 - Modern JS, double quotes, no semicolon omission, descriptive names; comments only where the why isn't obvious.

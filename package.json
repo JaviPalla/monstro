@@ -6,8 +6,12 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "selftest": "electron . --selftest"
+    "selftest": "electron . --selftest",
+    "icon": "electron scripts/make-icon.js"
   },
+  "author": "Jesús García (JesusGR4)",
+  "repository": { "type": "git", "url": "https://github.com/JesusGR4/pulpo" },
+  "keywords": ["github", "pull-requests", "macos", "electron", "code-review", "git-graph"],
   "license": "MIT",
   "devDependencies": {
     "electron": "^42.4.0"
