@@ -138,6 +138,7 @@ async function prDetail(repoFullName, number) {
        repository(owner: $owner, name: $name) {
          pullRequest(number: $number) {
            ${PR_LIST_FIELDS}
+           body
            bodyHTML
            commits(last: 1) {
              nodes { commit { statusCheckRollup { state contexts(first: 30) { nodes {

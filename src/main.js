@@ -3,6 +3,7 @@
 const path = require("path");
 const fs = require("fs");
 const { app, BrowserWindow, ipcMain, shell, nativeTheme, Notification } = require("electron");
+const ai = require("./ai");
 const config = require("./config");
 const drafts = require("./drafts");
 const github = require("./github");
@@ -102,6 +103,8 @@ function wireIpc() {
   ipcMain.handle("pr:submitReview", async (_event, { repo, number, review }) =>
     github.submitReview(repo, number, review),
   );
+
+  ipcMain.handle("ai:review", async (_event, { title, body, files }) => ai.generateReview({ title, body, files }));
 
   ipcMain.handle("drafts:list", (_event, { key }) => drafts.listFor(key));
   ipcMain.handle("drafts:save", (_event, { key, items }) => drafts.saveFor(key, items));

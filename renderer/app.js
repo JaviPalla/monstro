@@ -118,12 +118,83 @@ function draftCard(draft) {
     ? `<code>${esc(draft.path)}</code> · línea ${draft.line} (${draft.side === "LEFT" ? "anterior" : "nueva"})`
     : "comentario general";
   return `
-    <div class="draft-card" data-draft="${draft.id}">
-      <div class="draft-head">📝 BORRADOR <span class="muted">· ${where}</span>
+    <div class="draft-card ${draft.ai ? "ai" : ""}" data-draft="${draft.id}">
+      <div class="draft-head">${draft.ai ? "🤖 BORRADOR (IA)" : "📝 BORRADOR"} <span class="muted">· ${where}</span>
         <button class="draft-del" title="Eliminar borrador">🗑</button>
       </div>
       <div class="draft-body">${esc(draft.body)}</div>
     </div>`;
+}
+
+/* ============ review con IA ============ */
+function commentableAnchors() {
+  const anchors = new Set();
+  for (const file of state.files || []) {
+    if (!file.patch) continue;
+    for (const line of parsePatch(file.patch)) {
+      if (line.type === "add" || line.type === "ctx") anchors.add(`${file.filename}::RIGHT::${line.new}`);
+      if (line.type === "del" || line.type === "ctx") anchors.add(`${file.filename}::LEFT::${line.old}`);
+    }
+  }
+  return anchors;
+}
+
+async function generateAiReview(pr) {
+  const btn = $("#act-ai");
+  btn.disabled = true;
+  btn.textContent = "🤖 Generando review…";
+  toast("Generando review con IA… esto puede tardar un par de minutos", "");
+  try {
+    if (!state.files) state.files = await window.pulpo.prFiles(detailRepo(), pr.number);
+    const { review, backend } = await window.pulpo.aiReview(pr.title, pr.body || "", state.files);
+
+    const anchors = commentableAnchors();
+    let anchoredCount = 0;
+    const orphaned = [];
+    for (const comment of review.comments) {
+      if (anchors.has(`${comment.path}::${comment.side}::${comment.line}`)) {
+        state.drafts.push({
+          id: `ai-${Date.now()}-${anchoredCount}`,
+          createdAt: new Date().toISOString(),
+          kind: "inline",
+          ai: true,
+          path: comment.path,
+          side: comment.side,
+          line: comment.line,
+          body: comment.body,
+        });
+        anchoredCount++;
+      } else {
+        orphaned.push(comment);
+      }
+    }
+    const summaryParts = [];
+    if (review.summary) summaryParts.push(review.summary);
+    if (orphaned.length) {
+      summaryParts.push(
+        "Comments that could not be anchored to a diff line:\n" +
+          orphaned.map((c) => `- **${c.path}:${c.line}** — ${c.body}`).join("\n"),
+      );
+    }
+    if (summaryParts.length) {
+      state.drafts.push({
+        id: `ai-${Date.now()}-summary`,
+        createdAt: new Date().toISOString(),
+        kind: "general",
+        ai: true,
+        body: summaryParts.join("\n\n---\n\n"),
+      });
+    }
+    await saveDrafts();
+    toast(`IA (${backend}): ${anchoredCount} comentario(s) en línea + resumen, todo en borradores`, "ok");
+    state.detailTab = "changes";
+    renderDetail();
+  } catch (err) {
+    toast(`Review con IA falló: ${String(err.message || err)}`, "err");
+  } finally {
+    btn.disabled = pr.state !== "OPEN";
+    btn.textContent = "🤖 Review con IA";
+  }
 }
 
 function wireDraftCards(container) {
@@ -403,6 +474,8 @@ function renderDetail() {
                 title="Actualiza la rama con la base usando rebase">⤴ Update branch (rebase)</button>
         <button class="btn btn-primary" id="act-merge" ${canMerge(pr) ? "" : "disabled"}
                 title="${esc(blockReason || "Merge con merge commit")}">⇅ Merge (merge commit)</button>
+        <button class="btn btn-ai" id="act-ai" ${pr.state === "OPEN" ? "" : "disabled"}
+                title="Genera comentarios de review (en inglés) como borradores: nada se publica hasta que tú lo digas">🤖 Review con IA</button>
       </div>
       ${blockReason && pr.state === "OPEN" ? `<p class="muted">⚠️ ${esc(blockReason)}</p>` : ""}
 
@@ -422,6 +495,7 @@ function renderDetail() {
   $("#detail-close").addEventListener("click", closeDetail);
   $("#act-update").addEventListener("click", () => updateBranch(pr));
   $("#act-merge").addEventListener("click", () => confirmMerge(pr));
+  $("#act-ai").addEventListener("click", () => generateAiReview(pr));
   wireDraftsBar();
   detailContent.querySelectorAll(".tab").forEach((tabBtn) =>
     tabBtn.addEventListener("click", () => {

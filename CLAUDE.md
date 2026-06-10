@@ -22,6 +22,7 @@ Mac (Electron) GitHub PR client for Jesús. Bitbucket-style PR list + detail pan
 
 ## Feature invariants
 - **Review drafts**: comments (inline + general) are saved locally via `src/drafts.js` and only published when the user clicks Publicar — ONE review (POST /pulls/N/reviews) with verdict COMMENT/APPROVE/REQUEST_CHANGES. Never auto-publish.
+- **AI review** (`src/ai.js`): generates English review comments from the PR diff as DRAFTS only (ai:true, purple cards) — never publishes. Backend order: `ANTHROPIC_API_KEY` → official Anthropic SDK (`claude-opus-4-8`, structured outputs via `output_config.format`) → fallback to the user's authenticated Claude Code CLI (`claude -p --output-format json`, parse `.result`). Anchors are validated against commentable diff lines in the renderer; unanchorable comments fold into the general summary draft.
 - **Notifications** (`detectAndNotify`): first poll never notifies; only state *changes* do. Dock badge = PRs awaiting my review.
 - **Multi-repo**: `state.repo === "__all__"` aggregates via GraphQL search; detail/drafts/merge must use `detailRepo()` (the PR's own repo), never `state.repo` directly.
 - History graph layout lives in `renderer/graph.js` (lane algorithm) — keep it dependency-free.

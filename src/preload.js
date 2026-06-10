@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("pulpo", {
   replyThread: (repo, number, commentDatabaseId, body) =>
     ipcRenderer.invoke("pr:replyThread", { repo, number, commentDatabaseId, body }),
   submitReview: (repo, number, review) => ipcRenderer.invoke("pr:submitReview", { repo, number, review }),
+  aiReview: (title, body, files) => ipcRenderer.invoke("ai:review", { title, body, files }),
   draftsList: (key) => ipcRenderer.invoke("drafts:list", { key }),
   draftsSave: (key, items) => ipcRenderer.invoke("drafts:save", { key, items }),
   draftsKeys: () => ipcRenderer.invoke("drafts:keys"),

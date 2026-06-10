@@ -40,6 +40,10 @@ No configurables. A propósito.
   **localmente** y no tocan GitHub hasta que pulsas *Publicar…*, que los envía todos en **una sola
   review** con veredicto: 💬 Comentar · ✅ Aprobar · ± Pedir cambios. Los hilos existentes aparecen
   anclados a su línea, con respuesta directa.
+- **Review con IA** 🤖 — un botón analiza el diff de la PR con Claude y genera comentarios de
+  review **en inglés**, anclados a sus líneas, **como borradores**: los revisas, borras los que no
+  te convenzan y publicas solo lo que tú decidas. Backend: la API de Anthropic (`ANTHROPIC_API_KEY`,
+  con structured outputs) o, si no hay clave, tu CLI de Claude Code ya autenticado (`claude -p`).
 - **Histórico** 📈 — grafo de commits (estilo GitKraken) con las ramas yendo y viniendo entre
   `develop`/`main` y las ramas de PR (activables). Acciones sobre cualquier commit: copiar SHA,
   crear rama, **mover una rama a ese commit** (force, con confirmación escrita) o **revertir una
