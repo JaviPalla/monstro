@@ -339,6 +339,22 @@ async function revertPullRequest(prNodeId) {
   return data.revertPullRequest.revertPullRequest;
 }
 
+/** Alterna una PR entre borrador y lista para review. */
+async function setPrDraft(prNodeId, toDraft) {
+  if (toDraft) {
+    const data = await gql(
+      `mutation ($id: ID!) { convertPullRequestToDraft(input: { pullRequestId: $id }) { pullRequest { number isDraft } } }`,
+      { id: prNodeId },
+    );
+    return data.convertPullRequestToDraft.pullRequest;
+  }
+  const data = await gql(
+    `mutation ($id: ID!) { markPullRequestReadyForReview(input: { pullRequestId: $id }) { pullRequest { number isDraft } } }`,
+    { id: prNodeId },
+  );
+  return data.markPullRequestReadyForReview.pullRequest;
+}
+
 async function prNodeId(repoFullName, number) {
   const [owner, name] = repoFullName.split("/");
   const data = await gql(
@@ -370,5 +386,6 @@ module.exports = {
   createBranch,
   forceUpdateBranch,
   revertPullRequest,
+  setPrDraft,
   prNodeId,
 };

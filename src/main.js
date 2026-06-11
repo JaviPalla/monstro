@@ -127,6 +127,7 @@ function wireIpc() {
     const nodeId = await github.prNodeId(repo, number);
     return github.revertPullRequest(nodeId);
   });
+  ipcMain.handle("pr:setDraft", async (_event, { nodeId, toDraft }) => github.setPrDraft(nodeId, Boolean(toDraft)));
 
   ipcMain.handle("shell:open", (_event, url) => {
     if (typeof url === "string" && /^https:\/\//.test(url)) shell.openExternal(url);

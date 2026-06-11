@@ -31,6 +31,7 @@ const state = {
   draftKeys: new Set(), // "owner/repo#n" con borradores guardados → badge 📝 en la lista
   aiGenerating: null, // nº de PR con review IA en curso → el botón persiste en loading entre pestañas
   draftNavIndex: -1, // navegación ↑↓ entre borradores
+  editingDraftId: null, // borrador en edición → su tarjeta se pinta como editor
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -119,9 +120,21 @@ function draftCard(draft) {
   const where = draft.kind === "inline"
     ? `<code>${esc(draft.path)}</code> · línea ${draft.line} (${draft.side === "LEFT" ? "anterior" : "nueva"})`
     : "comentario general";
+  if (state.editingDraftId === draft.id) {
+    return `
+      <div class="draft-card ${draft.ai ? "ai" : ""} editing" data-draft="${draft.id}">
+        <div class="draft-head">✏️ EDITANDO <span class="muted">· ${where}</span></div>
+        <textarea class="draft-editor" rows="5">${esc(draft.body)}</textarea>
+        <div class="composer-actions">
+          <button class="btn draft-edit-cancel">Cancelar</button>
+          <button class="btn btn-accent draft-edit-save">Guardar</button>
+        </div>
+      </div>`;
+  }
   return `
     <div class="draft-card ${draft.ai ? "ai" : ""}" data-draft="${draft.id}">
       <div class="draft-head">${draft.ai ? "🤖 BORRADOR (IA)" : "📝 BORRADOR"} <span class="muted">· ${where}</span>
+        <button class="draft-edit" title="Editar borrador">✏️</button>
         <button class="draft-pub" title="Publicar solo este borrador en GitHub">↗ Publicar</button>
         <button class="draft-del" title="Eliminar borrador">🗑</button>
       </div>
@@ -223,6 +236,32 @@ function wireDraftCards(container) {
       if (draft) confirmPublishSingle(draft);
     }),
   );
+  container.querySelectorAll(".draft-card .draft-edit").forEach((btn) =>
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      state.editingDraftId = btn.closest(".draft-card").dataset.draft;
+      renderDetail();
+      detailContent.querySelector(".draft-editor")?.focus();
+    }),
+  );
+  container.querySelectorAll(".draft-card.editing").forEach((card) => {
+    const id = card.dataset.draft;
+    card.querySelector(".draft-edit-cancel").addEventListener("click", () => {
+      state.editingDraftId = null;
+      renderDetail();
+    });
+    card.querySelector(".draft-edit-save").addEventListener("click", async () => {
+      const body = card.querySelector(".draft-editor").value.trim();
+      const draft = state.drafts.find((d) => d.id === id);
+      if (draft && body) {
+        draft.body = body;
+        await saveDrafts();
+        toast("Borrador actualizado", "ok");
+      }
+      state.editingDraftId = null;
+      renderDetail();
+    });
+  });
 }
 
 function confirmPublishSingle(draft) {
@@ -352,6 +391,7 @@ function openDraftsViewer() {
               <div class="viewer-body">${esc(d.body.length > 220 ? `${d.body.slice(0, 220)}…` : d.body)}</div>
               <div class="viewer-actions">
                 <button class="btn viewer-go" data-id="${d.id}">Ir ↗</button>
+                <button class="btn viewer-edit" data-id="${d.id}" title="Editar borrador">✏️</button>
                 <button class="btn viewer-pub" data-id="${d.id}" title="Publicar solo este borrador">Publicar</button>
                 <button class="btn viewer-del" data-id="${d.id}">🗑</button>
               </div>
@@ -391,6 +431,13 @@ function openDraftsViewer() {
       const draft = state.drafts.find((d) => d.id === btn.dataset.id);
       close();
       if (draft) confirmPublishSingle(draft);
+    }),
+  );
+  root.querySelectorAll(".viewer-edit").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      close();
+      state.editingDraftId = btn.dataset.id;
+      scrollToDraft(btn.dataset.id);
     }),
   );
   root.querySelectorAll(".viewer-del").forEach((btn) =>
@@ -680,6 +727,9 @@ function renderDetail() {
                 title="Genera comentarios de review (en inglés) como borradores: nada se publica hasta que tú lo digas">🤖 Review con IA</button>`}
         <button class="btn" id="act-approve" ${pr.state === "OPEN" && pr.author?.login !== state.me?.login ? "" : "disabled"}
                 title="${pr.author?.login === state.me?.login ? "No puedes aprobar tu propia PR" : "Aprobar sin comentarios (pide confirmación)"}">✅ Aprobar</button>
+        ${pr.state === "OPEN" && pr.author?.login === state.me?.login
+          ? `<button class="btn" id="act-draft-toggle" title="${pr.isDraft ? "Marca la PR como lista: notifica a los reviewers" : "Convierte la PR en borrador: deja de pedir reviews"}">${pr.isDraft ? "🚀 Marcar lista para review" : "↩︎ Convertir a borrador"}</button>`
+          : ""}
       </div>
       <div class="copy-row">
         <button class="mini-btn" id="copy-branch" title="Copiar nombre de la rama">📋 ${esc(pr.headRefName)}</button>
@@ -706,6 +756,19 @@ function renderDetail() {
   $("#act-merge").addEventListener("click", () => confirmMerge(pr));
   $("#act-ai").addEventListener("click", () => generateAiReview(pr));
   $("#act-approve").addEventListener("click", () => confirmApprove(pr));
+  $("#act-draft-toggle")?.addEventListener("click", async () => {
+    const btn = $("#act-draft-toggle");
+    btn.disabled = true;
+    try {
+      const result = await window.pulpo.setPrDraft(pr.id, !pr.isDraft);
+      toast(result.isDraft ? `#${pr.number} convertida a borrador` : `#${pr.number} lista para review 🚀`, "ok");
+      await refresh();
+      openDetail(pr.number, state.detailTab);
+    } catch (err) {
+      toast(`No se pudo cambiar el estado: ${String(err.message || err)}`, "err");
+      btn.disabled = false;
+    }
+  });
   $("#copy-branch").addEventListener("click", () => copyText(pr.headRefName));
   $("#copy-checkout").addEventListener("click", () => copyText(`gh pr checkout ${pr.number}`));
   $("#copy-url").addEventListener("click", () => copyText(pr.url));

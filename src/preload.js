@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld("pulpo", {
   createBranch: (repo, branch, sha) => ipcRenderer.invoke("git:createBranch", { repo, branch, sha }),
   forceUpdateBranch: (repo, branch, sha) => ipcRenderer.invoke("git:forceUpdate", { repo, branch, sha }),
   revertPR: (repo, number) => ipcRenderer.invoke("pr:revert", { repo, number }),
+  setPrDraft: (nodeId, toDraft) => ipcRenderer.invoke("pr:setDraft", { nodeId, toDraft }),
   openExternal: (url) => ipcRenderer.invoke("shell:open", url),
   notify: (title, body) => ipcRenderer.invoke("notify", { title, body }),
   dockBadge: (text) => ipcRenderer.invoke("dock:badge", text),
