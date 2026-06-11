@@ -105,6 +105,9 @@ function wireIpc() {
   ipcMain.handle("pr:submitReview", async (_event, { repo, number, review }) =>
     github.submitReview(repo, number, review),
   );
+  ipcMain.handle("pr:dismissReview", async (_event, { repo, number, reviewId, message }) =>
+    github.dismissReview(repo, number, reviewId, String(message || "")),
+  );
 
   ipcMain.handle("ai:review", async (_event, { title, body, files }) => ai.generateReview({ title, body, files }));
   ipcMain.handle("ai:status", () => ai.backendStatus());

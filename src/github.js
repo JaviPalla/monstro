@@ -91,7 +91,7 @@ const PR_LIST_FIELDS = `
   reviewRequests(first: 10) {
     nodes { requestedReviewer { __typename ... on User { login } ... on Team { name } } }
   }
-  latestReviews(first: 10) { nodes { author { login avatarUrl } state } }
+  latestReviews(first: 10) { nodes { databaseId author { login avatarUrl } state } }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 `;
 
@@ -333,6 +333,11 @@ async function submitReview(repoFullName, number, { commitId, event, body, comme
   return rest("POST", `/repos/${repoFullName}/pulls/${number}/reviews`, payload);
 }
 
+/** Descarta una review publicada (quitar tu aprobación). GitHub exige un mensaje. */
+async function dismissReview(repoFullName, number, reviewId, message) {
+  return rest("PUT", `/repos/${repoFullName}/pulls/${number}/reviews/${reviewId}/dismissals`, { message });
+}
+
 /* ---------- acciones sobre el grafo ---------- */
 
 async function createBranch(repoFullName, branchName, sha) {
@@ -404,6 +409,7 @@ module.exports = {
   addInlineComment,
   replyToThread,
   submitReview,
+  dismissReview,
   createBranch,
   forceUpdateBranch,
   revertPullRequest,

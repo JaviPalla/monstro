@@ -725,8 +725,11 @@ function renderDetail() {
           ? `<button class="btn btn-ai" id="act-ai" disabled><span class="spinner"></span> Generando review…</button>`
           : `<button class="btn btn-ai" id="act-ai" ${pr.state === "OPEN" ? "" : "disabled"}
                 title="Genera comentarios de review (en inglés) como borradores: nada se publica hasta que tú lo digas">🤖 Review con IA</button>`}
-        <button class="btn" id="act-approve" ${pr.state === "OPEN" && pr.author?.login !== state.me?.login ? "" : "disabled"}
-                title="${pr.author?.login === state.me?.login ? "No puedes aprobar tu propia PR" : "Aprobar sin comentarios (pide confirmación)"}">✅ Aprobar</button>
+        ${myApprovedReview(pr) && pr.state === "OPEN"
+          ? `<button class="btn" id="act-unapprove"
+                title="Descarta tu review aprobada (GitHub lo registra en la PR con el motivo)">↩︎ Quitar aprobación</button>`
+          : `<button class="btn" id="act-approve" ${pr.state === "OPEN" && pr.author?.login !== state.me?.login ? "" : "disabled"}
+                title="${pr.author?.login === state.me?.login ? "No puedes aprobar tu propia PR" : "Aprobar sin comentarios (pide confirmación)"}">✅ Aprobar</button>`}
         ${pr.state === "OPEN" && pr.author?.login === state.me?.login
           ? `<button class="btn" id="act-draft-toggle" title="${pr.isDraft ? "Marca la PR como lista: notifica a los reviewers" : "Convierte la PR en borrador: deja de pedir reviews"}">${pr.isDraft ? "🚀 Marcar lista para review" : "↩︎ Convertir a borrador"}</button>`
           : ""}
@@ -755,7 +758,8 @@ function renderDetail() {
   $("#act-update").addEventListener("click", () => updateBranch(pr));
   $("#act-merge").addEventListener("click", () => confirmMerge(pr));
   $("#act-ai").addEventListener("click", () => generateAiReview(pr));
-  $("#act-approve").addEventListener("click", () => confirmApprove(pr));
+  $("#act-approve")?.addEventListener("click", () => confirmApprove(pr));
+  $("#act-unapprove")?.addEventListener("click", () => confirmUnapprove(pr));
   $("#act-draft-toggle")?.addEventListener("click", async () => {
     const btn = $("#act-draft-toggle");
     btn.disabled = true;
@@ -1048,6 +1052,50 @@ async function updateBranch(pr) {
     btn.disabled = false;
     btn.textContent = "⤴ Update branch (rebase)";
   }
+}
+
+/** Mi review APPROVED más reciente en la PR, si existe (para poder retirarla). */
+function myApprovedReview(pr) {
+  return (
+    (pr.latestReviews?.nodes || []).find(
+      (review) => review.author?.login === state.me?.login && review.state === "APPROVED",
+    ) || null
+  );
+}
+
+function confirmUnapprove(pr) {
+  const review = myApprovedReview(pr);
+  if (!review?.databaseId) return toast("No encuentro tu review aprobada (refresca e inténtalo)", "err");
+  const root = $("#modal-root");
+  root.innerHTML = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <h3>↩︎ Quitar aprobación de #${pr.number}</h3>
+        <p>${esc(pr.title)}</p>
+        <p class="muted">Tu review aprobada se descarta: la PR deja de contar con tu ✓. GitHub lo registra en la conversación junto al motivo.</p>
+        <input type="text" id="dismiss-reason" placeholder="Motivo (opcional)" style="width:100%;margin-top:8px" class="modal-input" />
+        <div class="modal-actions">
+          <button class="btn" id="modal-cancel">Cancelar</button>
+          <button class="btn btn-primary" id="modal-confirm">Quitar aprobación</button>
+        </div>
+      </div>
+    </div>`;
+  $("#modal-cancel").addEventListener("click", () => (root.innerHTML = ""));
+  $("#modal-backdrop").addEventListener("click", (event) => {
+    if (event.target.id === "modal-backdrop") root.innerHTML = "";
+  });
+  $("#modal-confirm").addEventListener("click", async () => {
+    const message = $("#dismiss-reason").value.trim() || "Aprobación retirada desde Pulpo";
+    root.innerHTML = "";
+    try {
+      await window.pulpo.dismissReview(detailRepo(), pr.number, review.databaseId, message);
+      toast(`Aprobación retirada de #${pr.number}`, "ok");
+      await refresh();
+      openDetail(pr.number, state.detailTab);
+    } catch (err) {
+      toast(`No se pudo retirar: ${String(err.message || err)}`, "err");
+    }
+  });
 }
 
 function confirmApprove(pr) {
