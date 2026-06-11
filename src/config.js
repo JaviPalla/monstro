@@ -5,12 +5,16 @@ const path = require("path");
 const { app } = require("electron");
 
 const DEFAULTS = {
+  // Proveedor: "github" | "gitlab". null = el onboarding aún no ha preguntado.
+  provider: null,
+  // Base de la API de GitLab (gitlab.com o instancia self-hosted). Solo se usa con provider "gitlab".
+  gitlabBaseUrl: "https://gitlab.com",
   // Sin repos de fábrica: el onboarding ofrece los repos accesibles del usuario.
   repos: [],
   pollSeconds: 60,
   lastRepo: null,
   lastBucket: null,
-  // Token manual SOLO como último recurso; lo normal es gh CLI o GITHUB_TOKEN.
+  // Token manual SOLO como último recurso; lo normal es el CLI (gh/glab) o la env var.
   token: null,
 };
 

@@ -46,6 +46,13 @@ function esc(text) {
   return div.innerHTML;
 }
 
+/* ============ proveedor (GitHub | GitLab) ============ */
+const isGitlab = () => state.config?.provider === "gitlab";
+const providerName = () => (isGitlab() ? "GitLab" : "GitHub");
+// GitLab admite paths anidados (group/sub/project); GitHub solo owner/repo.
+const repoRe = () => (isGitlab() ? /^[\w.-]+(\/[\w.-]+)+$/ : /^[\w.-]+\/[\w.-]+$/);
+const repoPlaceholder = () => (isGitlab() ? "group/subgroup/project" : "owner/repo");
+
 function timeAgo(iso) {
   const seconds = Math.max(1, (Date.now() - new Date(iso).getTime()) / 1000);
   const units = [[31536000, "a"], [2592000, "mes"], [604800, "sem"], [86400, "d"], [3600, "h"], [60, "min"]];
@@ -1265,7 +1272,7 @@ function openCommitPanel(oid) {
         <button class="btn" id="cp-copy">📋 Copiar SHA</button>
         <button class="btn" id="cp-branch">🌱 Crear rama desde aquí…</button>
         <button class="btn" id="cp-reset">⏪ Mover una rama a este commit…</button>
-        ${pr && pr.state === "MERGED" ? `<button class="btn btn-danger" id="cp-revert">↩️ Revertir PR #${pr.number} (crea PR de revert)</button>` : ""}
+        ${pr && pr.state === "MERGED" ? `<button class="btn btn-danger" id="cp-revert">↩️ Revertir #${pr.number} (${isGitlab() ? "commit de revert" : "crea PR de revert"})</button>` : ""}
       </div>
       <p class="muted">“Mover una rama” reescribe la punta de la rama (force). Pulpo te pedirá confirmación escrita; aún así, úsalo sabiendo lo que haces.</p>
     </div>`;
@@ -1347,14 +1354,19 @@ function resetBranchModal(commit) {
 
 function revertPRModal(pr) {
   const root = $("#modal-root");
+  // GitLab no abre MR de revert: crea un commit de revert directo en la rama destino.
+  const gitlab = isGitlab();
+  const desc = gitlab
+    ? "Crea un <b>commit de revert</b> directo en la rama destino (GitLab no abre una MR de revert)."
+    : "Crea una <b>PR de revert</b> (no toca la rama directamente). La revisas y la fusionas como cualquier otra.";
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>↩️ Revertir PR #${pr.number}</h3>
-        <p>Crea una <b>PR de revert</b> (no toca la rama directamente). La revisas y la fusionas como cualquier otra.</p>
+        <h3>↩️ Revertir #${pr.number}</h3>
+        <p>${desc}</p>
         <div class="modal-actions">
           <button class="btn" id="modal-cancel">Cancelar</button>
-          <button class="btn btn-danger" id="modal-confirm">Crear PR de revert</button>
+          <button class="btn btn-danger" id="modal-confirm">${gitlab ? "Crear commit de revert" : "Crear PR de revert"}</button>
         </div>
       </div>
     </div>`;
@@ -1363,8 +1375,13 @@ function revertPRModal(pr) {
     root.innerHTML = "";
     try {
       const revert = await window.pulpo.revertPR(state.repo, pr.number);
-      toast(`PR de revert creada: #${revert.number}`, "ok");
-      exitHistoryToPR(revert.number);
+      if (revert.number) {
+        toast(`PR de revert creada: #${revert.number}`, "ok");
+        exitHistoryToPR(revert.number);
+      } else {
+        toast("Commit de revert creado", "ok");
+        if (revert.url) window.pulpo.openExternal(revert.url);
+      }
     } catch (err) {
       toast(`Revert falló: ${String(err.message || err)}`, "err");
     }
@@ -1490,20 +1507,32 @@ function openSettings() {
       <button class="btn" id="settings-back">← Volver</button>
       <h2 style="margin-top:14px">Ajustes</h2>
       <div class="settings-card">
+        <h4>Proveedor</h4>
+        <p class="muted">Actual: <b>${providerName()}</b>${isGitlab() ? ` · <code>${esc(cfg.gitlabBaseUrl || "https://gitlab.com")}</code>` : ""}.</p>
+        ${isGitlab() ? `<div class="add-repo">
+          <input type="text" id="gitlab-base" placeholder="URL base (self-hosted)" value="${esc(cfg.gitlabBaseUrl || "https://gitlab.com")}" />
+          <button class="btn" id="save-gitlab-base">Guardar URL</button>
+        </div>` : ""}
+        <div class="add-repo">
+          <button class="btn" id="switch-provider" data-target="${isGitlab() ? "github" : "gitlab"}">Cambiar a ${isGitlab() ? "GitHub 🐙" : "GitLab 🦊"}</button>
+        </div>
+        <p class="muted">Cambiar de proveedor reinicia el onboarding (repos y token se piden de nuevo).</p>
+      </div>
+      <div class="settings-card">
         <h4>Repositorios</h4>
         <div id="repo-lines">
           ${cfg.repos.map((r) => `<div class="repo-line">${esc(r)} <button class="btn" data-del="${esc(r)}">Quitar</button></div>`).join("")}
         </div>
         <div class="add-repo">
-          <input type="text" id="new-repo" placeholder="owner/repo" />
+          <input type="text" id="new-repo" placeholder="${repoPlaceholder()}" />
           <button class="btn btn-accent" id="add-repo">Añadir</button>
         </div>
       </div>
       <div class="settings-card">
-        <h4>Token de GitHub</h4>
-        <p class="muted">Origen actual: <b>${esc(state.authSource || "ninguno")}</b>. Orden: <code>GITHUB_TOKEN</code> → <code>gh auth token</code> → token manual.</p>
+        <h4>Token de ${providerName()}</h4>
+        <p class="muted">Origen actual: <b>${esc(state.authSource || "ninguno")}</b>. Orden: <code>${isGitlab() ? "GITLAB_TOKEN" : "GITHUB_TOKEN"}</code> → <code>${isGitlab() ? "glab CLI" : "gh auth token"}</code> → token manual.</p>
         <div class="add-repo">
-          <input type="password" id="manual-token" placeholder="${cfg.hasManualToken ? "•••••••• (guardado)" : "ghp_… (opcional)"}" />
+          <input type="password" id="manual-token" placeholder="${cfg.hasManualToken ? "•••••••• (guardado)" : isGitlab() ? "glpat-… (opcional)" : "ghp_… (opcional)"}" />
           <button class="btn" id="save-token">Guardar</button>
         </div>
       </div>
@@ -1538,10 +1567,26 @@ function openSettings() {
   });
   $("#add-repo").addEventListener("click", async () => {
     const value = $("#new-repo").value.trim();
-    if (!/^[\w.-]+\/[\w.-]+$/.test(value)) return toast("Formato esperado: owner/repo", "err");
+    if (!repoRe().test(value)) return toast(`Formato esperado: ${repoPlaceholder()}`, "err");
     state.config = await window.pulpo.setConfig({ repos: [...cfg.repos, value] });
     renderRepoSelect();
     openSettings();
+  });
+  $("#switch-provider")?.addEventListener("click", async () => {
+    const target = $("#switch-provider").dataset.target;
+    // Cambiar de proveedor vacía repos y token: el onboarding los pedirá de nuevo.
+    state.config = await window.pulpo.setConfig({ provider: target, repos: [] });
+    state.repo = null;
+    root.classList.add("hidden");
+    root.innerHTML = "";
+    boot();
+  });
+  $("#save-gitlab-base")?.addEventListener("click", async () => {
+    const base = $("#gitlab-base").value.trim();
+    if (!/^https:\/\/[\w.-]+/.test(base)) return toast("URL no válida (https://…)", "err");
+    state.config = await window.pulpo.setConfig({ gitlabBaseUrl: base });
+    toast("URL base guardada", "ok");
+    boot();
   });
   root.querySelectorAll("[data-del]").forEach((btn) =>
     btn.addEventListener("click", async () => {
@@ -1580,9 +1625,64 @@ function openSettings() {
 }
 
 /* ============ bienvenida / onboarding ============ */
+
+/** Primer paso del onboarding: elegir proveedor (GitHub o GitLab). */
+async function renderProviderChooser() {
+  list.innerHTML = `
+    <div class="welcome">
+      <div class="welcome-logo">🐙</div>
+      <h2>¿Con qué trabajas?</h2>
+      <p class="muted">Elige tu proveedor. Podrás cambiarlo luego en Ajustes ⚙.</p>
+      <div class="provider-choice">
+        <button class="repo-option provider-option" data-provider="github">
+          <span class="repo-name">🐙 GitHub</span>
+        </button>
+        <button class="repo-option provider-option" data-provider="gitlab">
+          <span class="repo-name">🦊 GitLab</span>
+        </button>
+      </div>
+      <div class="add-repo picker-manual" id="gitlab-base-row" style="display:none">
+        <input type="text" id="gitlab-base-input" placeholder="URL de GitLab (self-hosted): https://gitlab.miempresa.com" />
+      </div>
+      <div class="welcome-actions">
+        <button class="btn btn-accent" id="provider-continue" disabled>Continuar</button>
+      </div>
+    </div>`;
+
+  let chosen = null;
+  const baseRow = $("#gitlab-base-row");
+  const continueBtn = $("#provider-continue");
+  list.querySelectorAll("[data-provider]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      chosen = btn.dataset.provider;
+      list.querySelectorAll(".provider-option").forEach((b) => b.classList.toggle("selected", b === btn));
+      baseRow.style.display = chosen === "gitlab" ? "" : "none";
+      continueBtn.disabled = false;
+    }),
+  );
+  continueBtn.addEventListener("click", async () => {
+    if (!chosen) return;
+    const partial = { provider: chosen };
+    if (chosen === "gitlab") {
+      const base = $("#gitlab-base-input").value.trim();
+      if (base) {
+        if (!/^https:\/\/[\w.-]+/.test(base)) return toast("URL no válida (https://…)", "err");
+        partial.gitlabBaseUrl = base;
+      }
+    }
+    state.config = await window.pulpo.setConfig(partial);
+    boot();
+  });
+  notifySelftestOnce();
+}
+
 async function renderWelcome() {
   const aiStatus = await window.pulpo.aiStatus().catch(() => ({ backend: null, detail: "" }));
   const aiOk = Boolean(aiStatus.backend);
+  const gitlab = isGitlab();
+  const cliCmd = gitlab ? "brew install glab && glab auth login" : "brew install gh && gh auth login";
+  const cliName = gitlab ? "CLI oficial de GitLab (glab)" : "CLI oficial de GitHub";
+  const envVar = gitlab ? "GITLAB_TOKEN" : "GITHUB_TOKEN";
   list.innerHTML = `
     <div class="welcome">
       <div class="welcome-logo">🐙</div>
@@ -1592,10 +1692,10 @@ async function renderWelcome() {
       <div class="setup-step bad">
         <div class="setup-mark">1</div>
         <div>
-          <b>Conecta GitHub</b> <span class="chip chip-closed">pendiente</span>
-          <p class="muted">La vía fácil es el CLI oficial de GitHub — Pulpo coge el token de ahí:</p>
-          <pre class="setup-cmd">brew install gh && gh auth login</pre>
-          <p class="muted">Alternativas: exporta <code>GITHUB_TOKEN</code>, o pega un token en Ajustes ⚙.</p>
+          <b>Conecta ${providerName()}</b> <span class="chip chip-closed">pendiente</span>
+          <p class="muted">La vía fácil es el ${cliName} — Pulpo coge el token de ahí:</p>
+          <pre class="setup-cmd">${cliCmd}</pre>
+          <p class="muted">Alternativas: exporta <code>${envVar}</code>, o pega un token en Ajustes ⚙.</p>
         </div>
       </div>
 
@@ -1636,7 +1736,7 @@ async function renderRepoPicker() {
       <p class="muted">Conectado como <b>${esc(state.me?.login || "?")}</b>. Marca los repos que Pulpo vigilará — podrás cambiarlos cuando quieras en Ajustes ⚙.</p>
       <div id="repo-picker" class="repo-picker"><div class="empty">Buscando tus repositorios…</div></div>
       <div class="add-repo picker-manual">
-        <input type="text" id="picker-manual-input" placeholder="¿Falta alguno? Escríbelo: owner/repo" />
+        <input type="text" id="picker-manual-input" placeholder="¿Falta alguno? Escríbelo: ${repoPlaceholder()}" />
         <button class="btn" id="picker-manual-add">Añadir</button>
       </div>
       <div class="welcome-actions">
@@ -1687,7 +1787,7 @@ async function renderRepoPicker() {
   const addManual = () => {
     const input = $("#picker-manual-input");
     const value = input.value.trim();
-    if (!/^[\w.-]+\/[\w.-]+$/.test(value)) return toast("Formato esperado: owner/repo", "err");
+    if (!repoRe().test(value)) return toast(`Formato esperado: ${repoPlaceholder()}`, "err");
     selected.add(value);
     input.value = "";
     renderRows();
@@ -1720,6 +1820,12 @@ function renderRepoSelect() {
 
 async function boot() {
   state.config = await window.pulpo.getConfig();
+  // Instalación nueva (sin proveedor ni repos): primero elegimos GitHub o GitLab.
+  // Los instalados de antes (con repos pero sin provider) siguen en GitHub por defecto.
+  if (!state.config.provider && !state.config.repos.length) {
+    await renderProviderChooser();
+    return;
+  }
   const remembered = state.config.lastRepo;
   state.repo =
     (state.repo && state.config.repos.includes(state.repo) && state.repo) ||

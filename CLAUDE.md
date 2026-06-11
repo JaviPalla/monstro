@@ -1,19 +1,29 @@
 # CLAUDE.md — Pulpo
 
-Mac (Electron) GitHub PR client for Jesús. Bitbucket-style PR list + detail pane.
+Mac (Electron) PR/MR client for Jesús — supports **GitHub and GitLab** (one provider per install, chosen in onboarding). Bitbucket-style PR list + detail pane.
 
 ## Hard rules (product decisions, never change without being asked)
-- Update branch = **rebase** (`updatePullRequestBranch` with `updateMethod: REBASE`).
-- Merge = **merge commit** (`merge_method: "merge"`). **Squash must never be offered or implemented.**
-- The token is never hardcoded, committed, or sent to the renderer. Resolution: `GITHUB_TOKEN` env → `gh auth token` → manual token in userData config (0600).
+- Update branch = **rebase** (GitHub: `updatePullRequestBranch` REBASE; GitLab: `PUT .../rebase`).
+- Merge = **merge commit** (GitHub: `merge_method: "merge"`; GitLab: `squash: false`). **Squash must never be offered or implemented.**
+- The token is never hardcoded, committed, or sent to the renderer. Resolution per provider: GitHub `GITHUB_TOKEN` → `gh auth token` → manual; GitLab `GITLAB_TOKEN` → `glab` CLI → manual. Manual token in userData config (0600).
+- **Provider is one-per-install** (`config.provider`). Switching providers clears the token (it belonged to the other provider). Never mix repos from both.
 
 ## Stack & layout
 - Electron (no bundler, no framework): vanilla JS renderer.
-- `src/main.js` — window, IPC handlers, `--selftest` (screenshot to /tmp/pulpo-selftest.png then quit).
-- `src/github.js` — GraphQL (list/detail/update-branch) + REST (merge, delete ref). All GitHub calls live in the main process.
-- `src/config.js` — config.json in `app.getPath("userData")` (repos[], pollSeconds, optional manual token).
+- `src/main.js` — window, IPC handlers (all routed through the provider, never a hardcoded backend), `--selftest` (screenshot to /tmp/pulpo-selftest.png then quit).
+- `src/provider.js` — router: `current()` returns the github or gitlab module based on `config.provider` (resolved per call, not cached).
+- `src/github.js` / `src/gitlab.js` — the two provider implementations. **Same public interface** (22 functions); both normalize to the **GitHub data shape** the renderer consumes. The renderer must stay provider-agnostic.
+- `src/config.js` — config.json in `app.getPath("userData")` (`provider`, `gitlabBaseUrl`, repos[], pollSeconds, optional manual token).
 - `src/preload.js` — contextBridge API (`window.pulpo.*`); renderer is sandboxed, contextIsolation on, CSP strict (no remote scripts; images https only).
 - `renderer/` — index.html + styles.css + app.js. UI text in Spanish.
+
+## Provider abstraction (GitHub ⇄ GitLab)
+- `gitlab.js` maps Merge Requests → PR shape. **Critical: the renderer branches on exact enum literals**, not shape. Emit GitHub tokens exactly: `state` OPEN/MERGED/CLOSED, `reviewDecision` APPROVED/CHANGES_REQUESTED/REVIEW_REQUIRED, `mergeable` MERGEABLE/CONFLICTING, `mergeStateStatus` CLEAN/UNSTABLE/HAS_HOOKS/BEHIND/BLOCKED/DIRTY, `commits.nodes[0].commit.statusCheckRollup.state` SUCCESS/FAILURE/ERROR/PENDING/EXPECTED.
+- Mutations: the renderer passes `pr.id` (a node id). GitLab encodes it as `gl:<projectEnc>#<iid>`; `updateBranchRebase`/`setPrDraft`/`revertPullRequest` decode it.
+- GitLab caveats (API ≠ GitHub): **no force-update ref** → `forceUpdateBranch` does delete+recreate (non-atomic: checks the SHA exists first and reports it if recreate fails; still fails on protected/open-MR branches); **revert** creates a direct commit, not an MR (`{number:null, url}`); **REQUEST_CHANGES** has no universal verdict → posts a note; list rows omit per-MR additions/deletions and pipeline status (only the detail view fetches them).
+- **`submitReview` is not atomic** on GitLab (no single-POST review like GitHub's `/reviews`): it posts N inline discussions + a note + approve in sequence. If it fails mid-way, published comments stay AND the local draft is intact → a retry can duplicate. Future fix: GitLab `draft_notes/bulk_publish`.
+- **`listPRs` does N+1 on GitLab** (one `/approvals` call per open MR, every poll) to populate the facepile + review decision. Fine for small projects; watch rate limits on large self-hosted instances.
+- GitLab notes are markdown (no sanitized HTML): `gitlab.js` escapes them into safe HTML. Do not inject GitLab note/description text unescaped.
 
 ## Commands
 - `npm start` — run the app.
@@ -24,7 +34,7 @@ Mac (Electron) GitHub PR client for Jesús. Bitbucket-style PR list + detail pan
 - **Review drafts**: comments (inline + general) are saved locally via `src/drafts.js` and only published when the user clicks Publicar — ONE review (POST /pulls/N/reviews) with verdict COMMENT/APPROVE/REQUEST_CHANGES. Never auto-publish.
 - **AI review** (`src/ai.js`): generates English review comments from the PR diff as DRAFTS only (ai:true, purple cards) — never publishes. Backend order: `ANTHROPIC_API_KEY` → official Anthropic SDK (`claude-opus-4-8`, structured outputs via `output_config.format`) → fallback to the user's authenticated Claude Code CLI (`claude -p --output-format json`, parse `.result`). Anchors are validated against commentable diff lines in the renderer; unanchorable comments fold into the general summary draft.
 - **Notifications** (`detectAndNotify`): first poll never notifies; only state *changes* do. Dock badge = PRs awaiting my review.
-- **Multi-repo**: `state.repo === "__all__"` aggregates via GraphQL search; detail/drafts/merge must use `detailRepo()` (the PR's own repo), never `state.repo` directly.
+- **Multi-repo**: `state.repo === "__all__"` aggregates across repos (GitHub: GraphQL search; GitLab: per-project list); detail/drafts/merge must use `detailRepo()` (the PR's own repo), never `state.repo` directly.
 - History graph layout lives in `renderer/graph.js` (lane algorithm) — keep it dependency-free.
 
 ## Conventions

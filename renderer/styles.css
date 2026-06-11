@@ -534,6 +534,9 @@ body {
 .repo-check { width: 16px; flex: 0 0 16px; color: var(--green); font-weight: 700; }
 .repo-option .repo-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-manual { margin-top: 0; }
+.provider-choice { display: flex; gap: 10px; margin: 8px 0 12px; }
+.provider-option { flex: 1; justify-content: center; padding: 18px 12px; font-size: 16px; }
+.provider-option.selected { border-color: var(--accent); background: var(--bg-hover); }
 .picker-manual input { flex: 1; }
 
 /* ---------- copy row + cheatsheet ---------- */
