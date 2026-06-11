@@ -17,7 +17,16 @@ const { execFileSync } = require("child_process");
 
 const MODEL = "claude-opus-4-8";
 const MAX_DIFF_CHARS = 70_000;
-const CLI_TIMEOUT_MS = 5 * 60 * 1000;
+const CLI_TIMEOUT_MS = 12 * 60 * 1000;
+// Sin MCP servers ni persistencia de sesión: arranque más rápido y sin tocar
+// el historial de Claude Code del usuario. La review es un one-shot sin tools.
+const CLI_ARGS = [
+  "-p",
+  "--output-format", "json",
+  "--strict-mcp-config",
+  "--mcp-config", '{"mcpServers":{}}',
+  "--no-session-persistence",
+];
 
 const REVIEW_SCHEMA = {
   type: "object",
@@ -115,16 +124,31 @@ function claudeCliPath() {
 
 function generateViaCli(prompt, cliPath) {
   return new Promise((resolve, reject) => {
-    const child = spawn(cliPath, ["-p", "--output-format", "json"], {
-      stdio: ["pipe", "pipe", "pipe"],
-      timeout: CLI_TIMEOUT_MS,
-    });
+    const child = spawn(cliPath, CLI_ARGS, { stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGTERM");
+    }, CLI_TIMEOUT_MS);
+
     child.stdout.on("data", (d) => (stdout += d));
     child.stderr.on("data", (d) => (stderr += d));
-    child.on("error", reject);
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
     child.on("close", (code) => {
+      clearTimeout(timer);
+      if (timedOut) {
+        return reject(
+          new Error(
+            `La review tardó más de ${CLI_TIMEOUT_MS / 60000} min y se canceló (PR muy grande). ` +
+              "Reintenta, o exporta ANTHROPIC_API_KEY para usar la API directa (más rápida).",
+          ),
+        );
+      }
       if (code !== 0) return reject(new Error(`claude CLI exited ${code}: ${stderr.slice(0, 300)}`));
       try {
         const envelope = JSON.parse(stdout);
