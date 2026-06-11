@@ -91,7 +91,7 @@ const PR_LIST_FIELDS = `
   reviewRequests(first: 10) {
     nodes { requestedReviewer { __typename ... on User { login } ... on Team { name } } }
   }
-  latestReviews(first: 10) { nodes { author { login } state } }
+  latestReviews(first: 10) { nodes { author { login avatarUrl } state } }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 `;
 

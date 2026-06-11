@@ -497,6 +497,30 @@ function checksIcon(pr) {
   return icon ? `<span class="checks ${cls}" title="${title}">${icon}</span>` : "";
 }
 
+/** Avatares con tick verde de quienes han aprobado (estilo Bitbucket). */
+function approvalFaces(pr) {
+  const approvers = [];
+  const seen = new Set();
+  for (const review of pr.latestReviews?.nodes || []) {
+    if (review.state !== "APPROVED" || !review.author || seen.has(review.author.login)) continue;
+    seen.add(review.author.login);
+    approvers.push(review.author);
+  }
+  if (!approvers.length) return "";
+  const MAX_FACES = 4;
+  const shown = approvers.slice(0, MAX_FACES);
+  const extra = approvers.length - shown.length;
+  return `
+    <span class="facepile" title="Aprobada por ${esc(approvers.map((a) => a.login).join(", "))}">
+      ${shown.map((a) => `
+        <span class="face">
+          <img src="${esc(a.avatarUrl)}" alt="${esc(a.login)}" />
+          <span class="face-tick">✓</span>
+        </span>`).join("")}
+      ${extra > 0 ? `<span class="face face-more">+${extra}</span>` : ""}
+    </span>`;
+}
+
 function labelPills(pr) {
   return (pr.labels?.nodes || [])
     .map((l) => `<span class="label-pill" style="background:#${l.color}22;color:#${l.color}">${esc(l.name)}</span>`)
@@ -556,7 +580,7 @@ function renderList() {
           ${labelPills(pr)}
         </div>
         <div class="pr-right">
-          ${checksIcon(pr)} ${reviewChip(pr)} ${mergeStateChip(pr)} ${stateChip(pr)}
+          ${approvalFaces(pr)} ${checksIcon(pr)} ${reviewChip(pr)} ${mergeStateChip(pr)} ${stateChip(pr)}
         </div>
         <div class="pr-sub">
           <span class="branches">
@@ -1357,6 +1381,8 @@ async function refresh() {
     state.loading = false;
     renderCounts();
     renderList();
+    // la ruta merged del selftest notifica aquí: con los datos del bucket ya pintados
+    if (IS_SELFTEST && SELFTEST_ROUTE === "merged" && state.bucket === "merged") notifySelftestOnce();
     refreshOpenDetailSilently();
   } catch (err) {
     state.loading = false;
@@ -1575,6 +1601,7 @@ async function boot() {
   await refresh();
   schedulePoll();
   if (IS_SELFTEST && SELFTEST_ROUTE === "history") enterHistory();
+  if (IS_SELFTEST && SELFTEST_ROUTE === "merged") switchBucket("merged");
 }
 
 $("#refresh").addEventListener("click", refresh);
@@ -1624,7 +1651,7 @@ function paletteEntries() {
 function switchBucket(bucket) {
   state.view = "prs";
   state.bucket = bucket;
-  window.pulpo.setConfig({ lastBucket: bucket }).catch(() => {});
+  if (!IS_SELFTEST) window.pulpo.setConfig({ lastBucket: bucket }).catch(() => {});
   document.querySelectorAll(".bucket").forEach((b) => b.classList.remove("active"));
   document.querySelector(`[data-bucket="${bucket}"]`)?.classList.add("active");
   closeDetail();
@@ -1633,7 +1660,7 @@ function switchBucket(bucket) {
 
 function switchRepo(repo) {
   state.repo = repo;
-  window.pulpo.setConfig({ lastRepo: repo }).catch(() => {});
+  if (!IS_SELFTEST) window.pulpo.setConfig({ lastRepo: repo }).catch(() => {});
   state.openPrs = [];
   state.prSnapshot = null;
   state.history = { branches: [], enabled: new Set(), layout: null, rows: [], loading: false, selectedOid: null };
