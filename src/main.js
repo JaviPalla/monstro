@@ -96,6 +96,19 @@ function wireIpc() {
     }
     if (typeof partial.lastRepo === "string") allowed.lastRepo = partial.lastRepo;
     if (typeof partial.lastBucket === "string") allowed.lastBucket = partial.lastBucket;
+    if (partial.milestones && typeof partial.milestones === "object") {
+      const m = partial.milestones;
+      const next = { ...current.milestones };
+      if (typeof m.group === "string") next.group = m.group.trim() || null;
+      else if (m.group === null) next.group = null;
+      if (Array.isArray(m.statusLabels)) {
+        next.statusLabels = m.statusLabels.filter((l) => typeof l === "string" && l.trim());
+      }
+      if (Array.isArray(m.doneLabels)) {
+        next.doneLabels = m.doneLabels.filter((l) => typeof l === "string" && l.trim());
+      }
+      allowed.milestones = next;
+    }
     const { token, ...rest } = config.save(allowed);
     return { ...rest, hasManualToken: Boolean(token) };
   });
@@ -149,6 +162,11 @@ function wireIpc() {
     return gh().revertPullRequest(nodeId);
   });
   ipcMain.handle("pr:setDraft", async (_event, { nodeId, toDraft }) => gh().setPrDraft(nodeId, Boolean(toDraft)));
+
+  ipcMain.handle("milestones:list", async () => gh().listMilestones());
+  ipcMain.handle("milestones:issues", async (_event, { title, includeClosed }) =>
+    gh().milestoneIssues(title, { includeClosed: Boolean(includeClosed) }),
+  );
 
   ipcMain.handle("shell:open", (_event, url) => {
     if (typeof url === "string" && /^https:\/\//.test(url)) shell.openExternal(url);

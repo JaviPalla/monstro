@@ -9,7 +9,7 @@ const state = {
   me: null,
   authSource: null,
   repo: null,
-  view: "prs", // "prs" | "history"
+  view: "prs", // "prs" | "history" | "milestones"
   bucket: "open",
   prs: [],
   openPrs: [],
@@ -26,6 +26,9 @@ const state = {
   selftestNotified: false,
   selftestOpenedDetail: false,
   history: { branches: [], enabled: new Set(), layout: null, rows: [], loading: false, selectedOid: null },
+  // Vista de Milestones (solo GitLab): tareas (issues) del milestone agrupadas por persona.
+  // filters.status: Map<label, "include"|"exclude"> (chip tri-estado); se siembra con doneLabels en "exclude".
+  milestones: { list: [], selectedTitle: null, issues: [], loading: false, filters: { status: new Map(), showClosed: false, seeded: false } },
   prSnapshot: null, // nº → {reviewDecision, checks, reviewMe} para detectar cambios y notificar
   cursor: -1, // selección con teclado (j/k) en la lista
   draftKeys: new Set(), // "owner/repo#n" con borradores guardados → badge 📝 en la lista
@@ -1806,6 +1809,232 @@ async function renderRepoPicker() {
   notifySelftestOnce();
 }
 
+/* ============ vista milestones (solo GitLab) ============ */
+async function enterMilestones() {
+  if (!isGitlab()) {
+    toast("La vista de Milestones solo está disponible en GitLab", "");
+    return;
+  }
+  state.view = "milestones";
+  closeDetail();
+  document.querySelectorAll(".bucket").forEach((b) => b.classList.remove("active"));
+  $("#bucket-milestones")?.classList.add("active");
+  await loadMilestones();
+}
+
+async function loadMilestones() {
+  const m = state.milestones;
+  // Por defecto, las labels "terminada no cerrada" arrancan ocultas (chip en "excluir").
+  if (!m.filters.seeded) {
+    for (const label of state.config?.milestones?.doneLabels || []) m.filters.status.set(label, "exclude");
+    m.filters.seeded = true;
+  }
+  m.loading = true;
+  renderMilestones();
+  try {
+    if (!m.list.length) m.list = await window.pulpo.listMilestones();
+    if (!m.selectedTitle && m.list.length) m.selectedTitle = pickCurrentMilestone(m.list);
+    // Solo traemos cerradas si el usuario las pide: en grupos activos son miles y
+    // no deben desplazar a las abiertas dentro del límite de paginación.
+    m.issues = m.selectedTitle ? await window.pulpo.milestoneIssues(m.selectedTitle, m.filters.showClosed) : [];
+    m.loading = false;
+    renderMilestones();
+  } catch (err) {
+    m.loading = false;
+    list.innerHTML = `<div class="error-box">${esc(String(err.message || err))}</div>`;
+    notifySelftestOnce();
+  }
+}
+
+// Milestone "vigente": descartamos los claramente futuros (empiezan después de hoy) y
+// pasados (vencieron antes de hoy); entre los que quedan, el que contiene hoy en su rango,
+// si no el primero vigente, y como último recurso el primero de la lista. Fechas ISO
+// (YYYY-MM-DD) se comparan como string sin problema.
+function pickCurrentMilestone(list) {
+  const today = new Date().toISOString().slice(0, 10);
+  const live = list.filter((ms) => {
+    if (ms.startDate && ms.startDate > today) return false; // futuro
+    if (ms.dueDate && ms.dueDate < today) return false; // pasado
+    return true;
+  });
+  const containing = live.find((ms) => (!ms.startDate || ms.startDate <= today) && (!ms.dueDate || ms.dueDate >= today));
+  return (containing || live[0] || list[0])?.title || null;
+}
+
+// Reparte cada issue en sus asignados (un issue con N asignados aparece en N personas:
+// cada quien ve su tarea pendiente). Los huérfanos caen en "Sin asignar".
+function groupIssuesByAssignee(issues) {
+  const UNASSIGNED = "__unassigned__";
+  const groups = new Map();
+  for (const iss of issues) {
+    const targets = iss.assignees.length ? iss.assignees : [{ username: UNASSIGNED, name: "Sin asignar", avatarUrl: null }];
+    for (const a of targets) {
+      if (!groups.has(a.username)) groups.set(a.username, { ...a, issues: [] });
+      groups.get(a.username).issues.push(iss);
+    }
+  }
+  return [...groups.values()].sort((a, b) => {
+    if (a.username === UNASSIGNED) return 1;
+    if (b.username === UNASSIGNED) return -1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function milestoneCard(iss, statusSet) {
+  const chips = iss.labels
+    .map((l) => {
+      const isStatus = statusSet.has(l.name);
+      const style = l.color ? `style="background:${l.color};color:${l.textColor || "#fff"}"` : "";
+      return `<span class="ms-label ${isStatus ? "status" : ""}" ${style}>${esc(l.name)}</span>`;
+    })
+    .join("");
+  return `
+    <div class="ms-task ${iss.state === "closed" ? "closed" : ""}">
+      <button class="ms-task-title" data-url="${esc(iss.webUrl)}" title="Abrir en GitLab">
+        ${esc(iss.title)} <span class="ms-iid">#${iss.iid}</span>
+      </button>
+      ${chips ? `<div class="ms-task-labels">${chips}</div>` : ""}
+      ${iss.hasDescription ? `<div class="ms-task-desc">${iss.descriptionHtml}</div>` : ""}
+    </div>`;
+}
+
+// Métricas sobre un conjunto de issues ABIERTOS (independientes de los filtros de la vista):
+//  - "sin programar": abierto sin ninguna etiqueta de estado (no se ha planificado todavía).
+//  - "en comprobar": terminada pero no cerrada (lleva alguna doneLabel).
+function milestoneMetrics(openIssues, statusSet, doneSet) {
+  const total = openIssues.length;
+  let unscheduled = 0;
+  let checking = 0;
+  for (const iss of openIssues) {
+    const names = iss.labels.map((l) => l.name);
+    if (!names.some((n) => statusSet.has(n))) unscheduled++;
+    if (names.some((n) => doneSet.has(n))) checking++;
+  }
+  const pct = (x) => (total ? Math.round((100 * x) / total) : 0);
+  return { total, unscheduled, checking, unschedPct: pct(unscheduled), checkPct: pct(checking) };
+}
+
+function metricsBadges(mm, cls) {
+  return `
+    <span class="ms-metric ${cls}" title="Abiertas sin etiqueta de estado (sin programar)">📋 ${mm.unschedPct}% <span class="muted">(${mm.unscheduled}/${mm.total})</span></span>
+    <span class="ms-metric ${cls}" title="Terminadas pero no cerradas (en comprobar)">🔍 ${mm.checkPct}% <span class="muted">(${mm.checking}/${mm.total})</span></span>`;
+}
+
+function renderMilestones() {
+  if (state.view !== "milestones") return;
+  const m = state.milestones;
+  if (m.loading) {
+    list.innerHTML = `<div class="loading">Cargando milestone…</div>`;
+    return;
+  }
+
+  const statusLabels = state.config?.milestones?.statusLabels || [];
+  const statusSet = new Set(statusLabels);
+  const doneSet = new Set(state.config?.milestones?.doneLabels || []);
+  const search = state.search.trim().toLowerCase();
+
+  // Filtros tri-estado: incluir (solo estas) y excluir (ocultar estas).
+  const includes = [];
+  const excludes = new Set();
+  for (const [label, mode] of m.filters.status) {
+    if (mode === "include") includes.push(label);
+    else if (mode === "exclude") excludes.add(label);
+  }
+
+  const visible = m.issues.filter((iss) => {
+    if (!m.filters.showClosed && iss.state === "closed") return false;
+    const names = iss.labels.map((l) => l.name);
+    if (excludes.size && names.some((n) => excludes.has(n))) return false;
+    if (includes.length && !names.some((n) => includes.includes(n))) return false;
+    if (search && !`${iss.title} ${names.join(" ")}`.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  // Las métricas se calculan SIEMPRE sobre las abiertas completas, no sobre lo filtrado:
+  // ocultar "en comprobar" no debe poner ese % a cero.
+  const openIssues = m.issues.filter((iss) => iss.state === "opened");
+  const openByMember = new Map(groupIssuesByAssignee(openIssues).map((g) => [g.username, g.issues]));
+  const milestoneMM = milestoneMetrics(openIssues, statusSet, doneSet);
+
+  const msOptions = m.list
+    .map((ms) => `<option value="${esc(ms.title)}" ${ms.title === m.selectedTitle ? "selected" : ""}>${esc(ms.title)}${ms.dueDate ? ` · vence ${esc(ms.dueDate)}` : ""}</option>`)
+    .join("");
+  const statusChips = statusLabels
+    .map((label) => {
+      const mode = m.filters.status.get(label);
+      const cls = mode === "include" ? "on" : mode === "exclude" ? "off" : "";
+      const hint = mode === "include" ? "Solo estas · clic: ocultar" : mode === "exclude" ? "Ocultas · clic: quitar filtro" : "Clic: solo estas";
+      return `<button class="ms-status-chip ${cls}" data-label="${esc(label)}" title="${hint}">${esc(label)}</button>`;
+    })
+    .join("");
+
+  const groups = groupIssuesByAssignee(visible);
+  const boardHtml = groups.length
+    ? groups
+        .map((g) => {
+          const gm = milestoneMetrics(openByMember.get(g.username) || [], statusSet, doneSet);
+          return `
+        <section class="ms-group">
+          <header class="ms-group-head">
+            ${g.avatarUrl ? `<img class="ms-avatar" src="${esc(g.avatarUrl)}" alt="" />` : `<span class="ms-avatar ph">∅</span>`}
+            <span class="ms-group-name">${esc(g.name)}</span>
+            <span class="ms-group-count">${g.issues.length}</span>
+          </header>
+          <div class="ms-group-metrics">${metricsBadges(gm, "mini")}</div>
+          <div class="ms-tasks">${g.issues.map((iss) => milestoneCard(iss, statusSet)).join("")}</div>
+        </section>`;
+        })
+        .join("")
+    : `<div class="empty">No hay tareas que mostrar con estos filtros.</div>`;
+
+  list.innerHTML = `
+    <div class="ms-toolbar">
+      <select id="ms-select" class="ms-select" title="Milestone">${msOptions || `<option>Sin milestones activos</option>`}</select>
+      <label class="ms-closed-toggle"><input type="checkbox" id="ms-show-closed" ${m.filters.showClosed ? "checked" : ""} /> Mostrar cerradas</label>
+      <span class="ms-counter">${visible.length} tarea${visible.length === 1 ? "" : "s"}</span>
+      <button class="icon-btn" id="ms-refresh" title="Recargar">⟳</button>
+    </div>
+    <div class="ms-summary">
+      <span class="ms-summary-label">Milestone:</span>
+      ${metricsBadges(milestoneMM, "")}
+      <span class="muted">· ${milestoneMM.total} abiertas</span>
+    </div>
+    ${statusChips ? `<div class="ms-status-bar"><span class="ms-status-hint">Estado:</span>${statusChips}</div>` : ""}
+    <div class="ms-board">${boardHtml}</div>`;
+
+  $("#ms-select")?.addEventListener("change", (event) => {
+    m.selectedTitle = event.target.value;
+    m.issues = [];
+    loadMilestones();
+  });
+  $("#ms-show-closed")?.addEventListener("change", (event) => {
+    m.filters.showClosed = event.target.checked;
+    // El alcance abiertas/todas se decide en el fetch, así que recargamos.
+    m.issues = [];
+    loadMilestones();
+  });
+  $("#ms-refresh")?.addEventListener("click", () => {
+    m.list = [];
+    m.issues = [];
+    loadMilestones();
+  });
+  list.querySelectorAll(".ms-status-chip").forEach((chip) =>
+    chip.addEventListener("click", () => {
+      // Ciclo tri-estado: neutro → incluir → excluir → neutro.
+      const label = chip.dataset.label;
+      const mode = m.filters.status.get(label);
+      if (!mode) m.filters.status.set(label, "include");
+      else if (mode === "include") m.filters.status.set(label, "exclude");
+      else m.filters.status.delete(label);
+      renderMilestones();
+    }),
+  );
+  list.querySelectorAll(".ms-task-title").forEach((btn) =>
+    btn.addEventListener("click", () => window.pulpo.openExternal(btn.dataset.url)),
+  );
+  notifySelftestOnce();
+}
+
 /* ============ arranque ============ */
 function renderRepoSelect() {
   const select = $("#repo-select");
@@ -1838,6 +2067,11 @@ async function boot() {
   document.querySelector(`[data-bucket="${state.bucket}"]`)?.classList.add("active");
   state.draftKeys = new Set(await window.pulpo.draftsKeys().catch(() => []));
   renderRepoSelect();
+  // La vista de Milestones es solo GitLab: no pintar una entrada muerta en GitHub.
+  if (!isGitlab()) {
+    $("#nav-milestones-section")?.classList.add("hidden");
+    $("#bucket-milestones")?.classList.add("hidden");
+  }
 
   const auth = await window.pulpo.authStatus();
   state.authSource = auth.source;
@@ -1858,6 +2092,7 @@ async function boot() {
   schedulePoll();
   if (IS_SELFTEST && SELFTEST_ROUTE === "history") enterHistory();
   if (IS_SELFTEST && SELFTEST_ROUTE === "merged") switchBucket("merged");
+  if (IS_SELFTEST && SELFTEST_ROUTE === "milestones") enterMilestones();
 }
 
 $("#refresh").addEventListener("click", refresh);
@@ -1873,12 +2108,14 @@ $("#repo-select").addEventListener("change", (event) => {
 });
 $("#search").addEventListener("input", (event) => {
   state.search = event.target.value;
-  renderList();
+  if (state.view === "milestones") renderMilestones();
+  else renderList();
 });
 document.querySelectorAll(".bucket[data-bucket]").forEach((btn) =>
   btn.addEventListener("click", () => switchBucket(btn.dataset.bucket)),
 );
 $("#bucket-history").addEventListener("click", enterHistory);
+$("#bucket-milestones").addEventListener("click", enterMilestones);
 /* ============ paleta de comandos (⌘K) ============ */
 function paletteEntries() {
   const entries = [];
@@ -1890,6 +2127,7 @@ function paletteEntries() {
     });
   }
   entries.push({ label: "Ir a: Histórico", hint: "grafo de ramas", run: enterHistory });
+  if (isGitlab()) entries.push({ label: "Ir a: Milestones", hint: "tareas por persona", run: enterMilestones });
   for (const [bucket, label] of [["open", "Abiertas"], ["mine", "Mías"], ["review", "Para revisar"], ["draft", "Borradores"], ["merged", "Fusionadas"], ["closed", "Cerradas"]]) {
     entries.push({ label: `Ir a: ${label}`, hint: "bucket", run: () => switchBucket(bucket) });
   }
@@ -1923,7 +2161,8 @@ function switchRepo(repo) {
   renderRepoSelect();
   closeDetail();
   if (state.view === "history") loadHistory();
-  else refresh();
+  // Milestones es de grupo (global), no por repo: el cambio de repo no la afecta.
+  else if (state.view !== "milestones") refresh();
 }
 
 function openPalette() {
@@ -1994,6 +2233,7 @@ function openCheatsheet() {
     ["Enter", "Abrir la PR seleccionada"],
     ["1 – 6", "Abiertas · Mías · Para revisar · Borradores · Fusionadas · Cerradas"],
     ["h", "Histórico (grafo de ramas)"],
+    ["m", "Milestones (tareas por persona · GitLab)"],
     ["r", "Refrescar"],
     ["Esc", "Cerrar el panel"],
     ["?", "Esta chuleta"],
@@ -2031,6 +2271,7 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key === "h") return enterHistory();
+  if (event.key === "m" && isGitlab()) return enterMilestones();
   const bucketByDigit = { 1: "open", 2: "mine", 3: "review", 4: "draft", 5: "merged", 6: "closed" };
   if (bucketByDigit[event.key]) switchBucket(bucketByDigit[event.key]);
 });

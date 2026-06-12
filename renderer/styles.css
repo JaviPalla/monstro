@@ -464,6 +464,73 @@ body {
   border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
 }
 
+/* ---------- milestones (tareas por persona) ---------- */
+.dot-milestone { background: linear-gradient(135deg, var(--green), var(--accent)); }
+.ms-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.ms-select {
+  font: inherit; color: var(--text); background: var(--bg-raised);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; max-width: 320px;
+}
+.ms-closed-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; }
+.ms-counter { font-size: 12px; color: var(--text-muted); }
+.ms-toolbar .icon-btn { margin-left: auto; }
+.ms-status-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.ms-status-chip {
+  font-size: 11px; color: var(--text-muted); background: var(--gray-bg);
+  border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; cursor: pointer;
+}
+.ms-status-chip.on { color: var(--branch-text); background: var(--branch-bg); border-color: var(--branch-text); }
+.ms-status-chip.off { color: var(--red); background: var(--red-bg); border-color: var(--red); text-decoration: line-through; }
+.ms-status-hint, .ms-summary-label { font-size: 11px; color: var(--text-muted); align-self: center; margin-right: 2px; }
+.ms-summary {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 12px; padding: 8px 12px;
+  background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px;
+}
+.ms-metric { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.ms-metric .muted { font-weight: 400; }
+.ms-metric.mini { font-size: 11px; font-weight: 500; }
+.ms-group-metrics { display: flex; gap: 10px; flex-wrap: wrap; padding: 6px 12px; border-bottom: 1px solid var(--border); background: var(--bg); }
+.ms-board {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px; align-items: start;
+}
+.ms-group {
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+}
+.ms-group-head {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+  border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-raised); z-index: 1;
+}
+.ms-avatar { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; object-fit: cover; }
+.ms-avatar.ph { display: grid; place-items: center; background: var(--gray-bg); color: var(--text-muted); font-size: 12px; }
+.ms-group-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-group-count {
+  margin-left: auto; flex-shrink: 0; font-size: 11px; font-weight: 600;
+  color: var(--text-muted); background: var(--gray-bg); border-radius: 999px; padding: 1px 9px;
+}
+.ms-tasks { padding: 8px; display: flex; flex-direction: column; gap: 8px; max-height: 70vh; overflow-y: auto; }
+.ms-task { background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 9px 10px; }
+.ms-task.closed { opacity: 0.62; }
+.ms-task-title {
+  display: block; width: 100%; text-align: left; font: inherit; font-weight: 500;
+  color: var(--text); background: none; border: none; padding: 0; cursor: pointer; line-height: 1.35;
+}
+.ms-task-title:hover { color: var(--accent); }
+.ms-iid { color: var(--text-muted); font-weight: 400; font-size: 11px; }
+.ms-task-labels { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
+.ms-label {
+  font-size: 10.5px; line-height: 1.6; border-radius: 999px; padding: 0 8px;
+  background: var(--gray-bg); color: var(--text-muted); border: 1px solid var(--border);
+}
+.ms-label.status { font-weight: 600; border: none; }
+.ms-task-desc {
+  margin-top: 7px; font-size: 12px; color: var(--text-muted); line-height: 1.45;
+  max-height: 7.5em; overflow: hidden; position: relative;
+}
+.ms-task-desc p { margin: 0; }
+
 /* ---------- borradores ---------- */
 .draft-card {
   border: 1px dashed var(--yellow);
