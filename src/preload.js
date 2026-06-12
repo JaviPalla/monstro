@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld("pulpo", {
   historyGraph: (repo, branchSpecs) => ipcRenderer.invoke("history:graph", { repo, branchSpecs }),
   createBranch: (repo, branch, sha) => ipcRenderer.invoke("git:createBranch", { repo, branch, sha }),
   forceUpdateBranch: (repo, branch, sha) => ipcRenderer.invoke("git:forceUpdate", { repo, branch, sha }),
+  cherryPick: (repo, sha, branch, dryRun) => ipcRenderer.invoke("pr:cherryPick", { repo, sha, branch, dryRun }),
   revertPR: (repo, number) => ipcRenderer.invoke("pr:revert", { repo, number }),
   setPrDraft: (nodeId, toDraft) => ipcRenderer.invoke("pr:setDraft", { nodeId, toDraft }),
   openExternal: (url) => ipcRenderer.invoke("shell:open", url),

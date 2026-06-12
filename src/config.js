@@ -16,6 +16,16 @@ const DEFAULTS = {
   lastBucket: null,
   // Token manual SOLO como último recurso; lo normal es el CLI (gh/glab) o la env var.
   token: null,
+  // Cherry-pick de hotfix tras merge (solo GitLab). Las MR de hotfix/* van a la release branch;
+  // su contenido se replica a otras ramas (development + la rama hermana -mx, derivada del destino).
+  cherryPick: {
+    // Prefijo de rama origen que dispara el ofrecimiento de cherry-pick.
+    prefix: "hotfix/",
+    // Ramas destino fijas que siempre se proponen.
+    branches: ["development"],
+    // Además, proponer la rama hermana de la release branch destino (mx ⇄ sin mx).
+    siblingMx: true,
+  },
 };
 
 function configPath() {
@@ -25,7 +35,11 @@ function configPath() {
 function load() {
   try {
     const raw = fs.readFileSync(configPath(), "utf8");
-    return { ...DEFAULTS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    const cfg = { ...DEFAULTS, ...parsed };
+    // Merge profundo de cherryPick: un guardado parcial no debe pisar los defaults del resto de claves.
+    cfg.cherryPick = { ...DEFAULTS.cherryPick, ...(parsed.cherryPick || {}) };
+    return cfg;
   } catch {
     return { ...DEFAULTS };
   }
