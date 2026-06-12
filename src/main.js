@@ -105,6 +105,7 @@ function wireIpc() {
       if (Array.isArray(cp.branches)) next.branches = cp.branches.filter((b) => typeof b === "string" && branchRe.test(b));
       if (typeof cp.siblingMx === "boolean") next.siblingMx = cp.siblingMx;
       allowed.cherryPick = next;
+    }
     if (partial.milestones && typeof partial.milestones === "object") {
       const m = partial.milestones;
       const next = { ...current.milestones };
