@@ -71,6 +71,7 @@ function wireIpc() {
     const allowed = {};
     if (Array.isArray(partial.repos)) allowed.repos = partial.repos.filter((r) => /^[\w.-]+\/[\w.-]+$/.test(r));
     if (Number.isInteger(partial.pollSeconds) && partial.pollSeconds >= 15) allowed.pollSeconds = partial.pollSeconds;
+    if (["one-dark", "dracula", "github-light"].includes(partial.theme)) allowed.theme = partial.theme;
     if (typeof partial.token === "string") {
       allowed.token = partial.token.trim() || null;
       github.invalidateTokenCache();
