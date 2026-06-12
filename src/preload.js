@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld("pulpo", {
   replyThread: (repo, number, commentDatabaseId, body) =>
     ipcRenderer.invoke("pr:replyThread", { repo, number, commentDatabaseId, body }),
   submitReview: (repo, number, review) => ipcRenderer.invoke("pr:submitReview", { repo, number, review }),
+  dismissReview: (repo, number, reviewId, message) =>
+    ipcRenderer.invoke("pr:dismissReview", { repo, number, reviewId, message }),
   aiReview: (title, body, files) => ipcRenderer.invoke("ai:review", { title, body, files }),
   aiStatus: () => ipcRenderer.invoke("ai:status"),
   aiPing: () => ipcRenderer.invoke("ai:ping"),
@@ -31,6 +33,8 @@ contextBridge.exposeInMainWorld("pulpo", {
   forceUpdateBranch: (repo, branch, sha) => ipcRenderer.invoke("git:forceUpdate", { repo, branch, sha }),
   revertPR: (repo, number) => ipcRenderer.invoke("pr:revert", { repo, number }),
   setPrDraft: (nodeId, toDraft) => ipcRenderer.invoke("pr:setDraft", { nodeId, toDraft }),
+  listMilestones: () => ipcRenderer.invoke("milestones:list"),
+  milestoneIssues: (title, includeClosed) => ipcRenderer.invoke("milestones:issues", { title, includeClosed }),
   openExternal: (url) => ipcRenderer.invoke("shell:open", url),
   notify: (title, body) => ipcRenderer.invoke("notify", { title, body }),
   dockBadge: (text) => ipcRenderer.invoke("dock:badge", text),
