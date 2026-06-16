@@ -193,6 +193,10 @@ function wireIpc() {
   ipcMain.handle("issues:update", async (_event, { projectId, iid, patch }) =>
     gh().updateIssue(projectId, iid, patch || {}),
   );
+  ipcMain.handle("milestones:summary", async (_event, { milestoneTitle, issues }) => {
+    const items = await gh().collapseMilestoneEpics(issues || []);
+    return ai.summarizeMilestone({ milestoneTitle, items });
+  });
 
   ipcMain.handle("shell:open", (_event, url) => {
     if (typeof url === "string" && /^https:\/\//.test(url)) shell.openExternal(url);

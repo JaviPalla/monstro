@@ -93,6 +93,20 @@ function copyText(text) {
   );
 }
 
+// Copia HTML enriquecido (para pegar en Gmail/Outlook con enlaces vivos) con fallback a texto
+// plano si el navegador no permite ClipboardItem.
+function copyRich(html, plain) {
+  try {
+    const item = new ClipboardItem({
+      "text/html": new Blob([html], { type: "text/html" }),
+      "text/plain": new Blob([plain], { type: "text/plain" }),
+    });
+    navigator.clipboard.write([item]).then(() => toast("Copiado para el correo", "ok"), () => copyText(plain));
+  } catch {
+    copyText(plain);
+  }
+}
+
 function notifySelftestOnce() {
   if (!state.selftestNotified) {
     state.selftestNotified = true;
@@ -2485,6 +2499,7 @@ function renderMilestones() {
         <label class="ms-closed-toggle"><input type="checkbox" id="ms-show-closed" ${m.filters.showClosed ? "checked" : ""} /> Mostrar cerradas</label>
         <label class="ms-closed-toggle"><input type="checkbox" id="ms-show-unassigned" ${m.filters.showUnassigned ? "checked" : ""} /> Mostrar sin asignar</label>
         <span class="ms-counter">${visible.length} tarea${visible.length === 1 ? "" : "s"}</span>
+        <button class="btn" id="ms-email-summary" title="Generar con IA un resumen de novedades para enviar por correo al equipo">✉ Resumen</button>
         <button class="icon-btn" id="ms-refresh" title="Recargar">⟳</button>
       </div>
     </div>
@@ -2520,6 +2535,7 @@ function renderMilestones() {
     m.issues = [];
     loadMilestones();
   });
+  $("#ms-email-summary")?.addEventListener("click", openMilestoneSummaryModal);
   list.querySelectorAll(".ms-status-chip").forEach((chip) =>
     chip.addEventListener("click", () => {
       // Ciclo tri-estado: neutro → incluir → excluir → neutro.
@@ -2583,6 +2599,68 @@ async function applyIssuePatch(keys, patchOrFn) {
   await loadMilestones();
   if (fail) toast(`${ok} aplicada${ok === 1 ? "" : "s"}, ${fail} fallaron`, "err");
   else if (ok) toast(`${ok} tarea${ok === 1 ? "" : "s"} actualizada${ok === 1 ? "" : "s"}`, "ok");
+}
+
+// Resumen para correo: pasa las issues ASIGNADAS (las de la vista de tareas por persona, estén
+// terminadas, pending check o lo que sea) al backend, que colapsa epics y deja que la IA elija
+// las más relevantes con un titular no técnico. Modal con vista previa + copiar HTML al correo.
+async function openMilestoneSummaryModal() {
+  const m = state.milestones;
+  const title = m.selectedTitle || "";
+  const assigned = m.issues.filter((iss) => iss.assignees.length);
+  if (!assigned.length) {
+    toast("No hay tareas asignadas en este milestone", "");
+    return;
+  }
+  const root = $("#modal-root");
+  root.innerHTML = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal modal-wide">
+        <h3>Resumen para correo · ${esc(title)}</h3>
+        <div id="ms-sum-body"><div class="loading">Analizando ${assigned.length} tareas con IA…</div></div>
+        <div class="modal-actions" id="ms-sum-actions">
+          <button class="btn" id="modal-cancel">Cerrar</button>
+        </div>
+      </div>
+    </div>`;
+  const close = () => (root.innerHTML = "");
+  $("#modal-backdrop").addEventListener("click", (event) => {
+    if (event.target.id === "modal-backdrop") close();
+  });
+  $("#modal-cancel").addEventListener("click", close);
+
+  const payload = assigned.map((iss) => ({
+    projectId: iss.projectId,
+    iid: iss.iid,
+    title: iss.title,
+    webUrl: iss.webUrl,
+    state: iss.state,
+    descriptionHtml: iss.descriptionHtml,
+    labels: iss.labels.map((l) => ({ name: l.name })),
+  }));
+
+  try {
+    const { highlights } = await window.pulpo.summarizeMilestone(title, payload);
+    if (!highlights.length) {
+      $("#ms-sum-body").innerHTML = `<div class="empty">La IA no encontró novedades relevantes que destacar.</div>`;
+      return;
+    }
+    const heading = `Novedades — ${title}`;
+    const itemHtml = (h) => `<li>${h.kind === "epic" ? "📦 " : ""}<a href="${esc(h.url)}">${esc(h.headline)}</a></li>`;
+    // HTML para el portapapeles (pegar en el correo): autocontenido, sin clases del tema.
+    const richHtml = `<h3>${esc(heading)}</h3>\n<ul>\n${highlights.map((h) => "  " + itemHtml(h)).join("\n")}\n</ul>`;
+    const plain = `${heading}\n\n${highlights.map((h) => `• ${h.headline}\n  ${h.url}`).join("\n")}`;
+    $("#ms-sum-body").innerHTML = `
+      <p class="muted">${highlights.length} novedad${highlights.length === 1 ? "" : "es"} · revísalas antes de enviar.</p>
+      <div class="ms-sum-preview"><h4>${esc(heading)}</h4><ul>${highlights.map(itemHtml).join("")}</ul></div>`;
+    const copy = document.createElement("button");
+    copy.className = "btn btn-primary";
+    copy.textContent = "Copiar para el correo";
+    copy.addEventListener("click", () => copyRich(richHtml, plain));
+    $("#ms-sum-actions").appendChild(copy);
+  } catch (err) {
+    $("#ms-sum-body").innerHTML = `<div class="empty">Error generando el resumen: ${esc(String(err.message || err))}</div>`;
+  }
 }
 
 function wireMilestoneDragDrop(list) {

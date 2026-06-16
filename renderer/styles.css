@@ -657,7 +657,16 @@ body {
   24% { transform: scale(1); }
 }
 .ms-toggles { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-top: 2px; border-top: 1px solid var(--border); }
-.ms-toggles .icon-btn { margin-left: auto; }
+.ms-toggles #ms-email-summary { margin-left: auto; }
+.ms-toggles .icon-btn { margin-left: 0; }
+
+/* Vista previa del resumen para correo en el modal. */
+.ms-sum-preview { margin-top: 10px; padding: 14px 16px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px; overflow-y: auto; }
+.ms-sum-preview h4 { margin: 0 0 8px; }
+.ms-sum-preview ul { margin: 0; padding-left: 20px; }
+.ms-sum-preview li { margin: 5px 0; line-height: 1.45; }
+.ms-sum-preview a { color: var(--accent); text-decoration: none; }
+.ms-sum-preview a:hover { text-decoration: underline; }
 /* Chips de filtro de estado: color (borde/relleno) vía estilo inline con el color real del label.
    El texto se calcula dinámico (readableText) para leerse siempre. */
 .ms-status-chip {

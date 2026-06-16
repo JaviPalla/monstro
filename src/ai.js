@@ -123,13 +123,13 @@ function buildDiffText(files) {
 
 /* ---------- backend 1: SDK oficial (requiere ANTHROPIC_API_KEY) ---------- */
 
-async function generateViaSdk(prompt, model, effort) {
+async function generateViaSdk(prompt, model, effort, schema) {
   const Anthropic = require("@anthropic-ai/sdk").default;
   const client = new Anthropic();
   const request = {
     model,
     max_tokens: 16000,
-    output_config: { format: { type: "json_schema", schema: REVIEW_SCHEMA } },
+    output_config: { format: { type: "json_schema", schema } },
     messages: [{ role: "user", content: prompt }],
   };
   if (AI_MODELS[model].efforts.length) {
@@ -205,24 +205,33 @@ function extractJson(text) {
   return JSON.parse(candidate.slice(start, end + 1));
 }
 
+/* ---------- dispatch común ---------- */
+
+// Lanza el prompt contra el backend disponible (SDK si hay API key, si no el CLI) y devuelve
+// el JSON ya parseado + qué backend/modelo se usó. El schema solo lo aplica el SDK; el CLI
+// lo cumple por el prompt y se parsea de forma tolerante (extractJson).
+async function runStructured(prompt, schema) {
+  const { model, effort } = aiSettings();
+  if (process.env.ANTHROPIC_API_KEY) {
+    return { data: await generateViaSdk(prompt, model, effort, schema), backend: "anthropic-sdk", model, effort };
+  }
+  const cliPath = claudeCliPath();
+  if (cliPath) {
+    return { data: await generateViaCli(prompt, cliPath, model, effort), backend: "claude-cli", model, effort };
+  }
+  throw new Error(
+    "Sin backend de IA: exporta ANTHROPIC_API_KEY o instala/loguea el CLI de Claude Code (`claude`).",
+  );
+}
+
 /* ---------- API pública ---------- */
 
 async function generateReview({ title, body, files }) {
   const { diffText, truncated } = buildDiffText(files);
   if (!diffText) throw new Error("La PR no tiene diff revisable (¿binarios?)");
   const prompt = buildPrompt({ title, body, diffText, truncated });
-
-  const { model, effort } = aiSettings();
-  if (process.env.ANTHROPIC_API_KEY) {
-    return { review: normalize(await generateViaSdk(prompt, model, effort)), backend: "anthropic-sdk", model, effort };
-  }
-  const cliPath = claudeCliPath();
-  if (cliPath) {
-    return { review: normalize(await generateViaCli(prompt, cliPath, model, effort)), backend: "claude-cli", model, effort };
-  }
-  throw new Error(
-    "Sin backend de IA: exporta ANTHROPIC_API_KEY o instala/loguea el CLI de Claude Code (`claude`).",
-  );
+  const { data, backend, model, effort } = await runStructured(prompt, REVIEW_SCHEMA);
+  return { review: normalize(data), backend, model, effort };
 }
 
 function normalize(review) {
@@ -233,6 +242,73 @@ function normalize(review) {
       .map((c) => ({ path: c.path, line: c.line, side: c.side === "LEFT" ? "LEFT" : "RIGHT", body: c.body }))
       .slice(0, 12),
   };
+}
+
+/* ---------- resumen de milestone para correo ---------- */
+
+const SUMMARY_SCHEMA = {
+  type: "object",
+  properties: {
+    highlights: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          index: { type: "integer", description: "Index (in brackets) of the source item this refers to." },
+          headline: { type: "string", description: "Short non-technical title in Spanish." },
+        },
+        required: ["index", "headline"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["highlights"],
+  additionalProperties: false,
+};
+
+function stripHtml(html) {
+  return String(html || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function buildSummaryPrompt(milestoneTitle, items) {
+  const lines = items.map((it, i) => {
+    if (it.kind === "epic") {
+      const kids = (it.children || []).slice(0, 12).join("; ");
+      return `[${i}] (EPIC) ${it.title}${kids ? ` — incluye: ${kids}` : ""}`;
+    }
+    const labels = (it.labels || []).join(", ");
+    const desc = stripHtml(it.desc).slice(0, 400);
+    return `[${i}] ${it.title}${labels ? ` (etiquetas: ${labels})` : ""}${desc ? ` — ${desc}` : ""}`;
+  });
+  return `Eres un asistente que prepara un resumen de novedades de un milestone para enviarlo por CORREO a todo el equipo, incluida gente NO técnica.
+
+Te paso una lista numerada de tareas (issues) y epics del milestone "${milestoneTitle}". Cada línea empieza por su índice entre corchetes.
+
+Tu trabajo:
+- Selecciona SOLO las más relevantes para el equipo: novedades, mejoras o cambios visibles. Descarta lo trivial e interno (chores, refactors menores, typos, mantenimiento sin impacto).
+- Para cada una escribe un "headline" corto y claro en ESPAÑOL, en lenguaje que entienda alguien no técnico (qué cambia o mejora, no el detalle técnico).
+- Una EPIC representa un conjunto de tareas: resúmela como UNA sola novedad, sin desglosar sus hijas.
+- Devuelve el índice original de cada item seleccionado.
+
+Responde SOLO con un objeto JSON con esta forma (sin prosa ni cercos):
+{"highlights": [{"index": number, "headline": string}]}
+
+# Items
+${lines.join("\n")}`;
+}
+
+// Recibe los items ya con las epics colapsadas (gitlab.collapseMilestoneEpics) y devuelve los
+// más relevantes con un titular no técnico + el enlace a GitLab del item correspondiente.
+async function summarizeMilestone({ milestoneTitle, items }) {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) throw new Error("No hay tareas asignadas que resumir en este milestone.");
+  const prompt = buildSummaryPrompt(milestoneTitle || "", list);
+  const { data, backend, model, effort } = await runStructured(prompt, SUMMARY_SCHEMA);
+  const highlights = (Array.isArray(data.highlights) ? data.highlights : [])
+    .map((h) => ({ index: Number(h.index), headline: typeof h.headline === "string" ? h.headline.trim() : "" }))
+    .filter((h) => Number.isInteger(h.index) && list[h.index] && h.headline)
+    .map((h) => ({ headline: h.headline, url: list[h.index].url, kind: list[h.index].kind }));
+  return { highlights, backend, model, effort };
 }
 
 /** Estado del backend de IA, para onboarding y ajustes. */
@@ -290,4 +366,4 @@ function isAiEffort(level) {
   return ALL_EFFORTS.includes(level);
 }
 
-module.exports = { generateReview, backendStatus, ping, isAiModel, isAiEffort };
+module.exports = { generateReview, summarizeMilestone, backendStatus, ping, isAiModel, isAiEffort };

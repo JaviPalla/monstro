@@ -664,6 +664,58 @@ async function updateIssue(projectId, iid, patch) {
   return mapIssue(updated);
 }
 
+// Las Epics viven como issues en el proyecto "Epics" del grupo, y las issues normales se
+// enlazan a ellas vía "issues relacionadas" (linked items). Detectamos la Epic por el último
+// segmento del path del proyecto enlazado.
+// ponytail: nombre de proyecto "epics" hardcodeado; si vuestra instancia lo llama distinto,
+// parametrizar en config.milestones.epicsProject.
+function isEpicRef(refFull, webUrl) {
+  const path = refFull ? refFull.replace(/#\d+$/, "") : (webUrl || "").replace(/\/-\/issues\/\d+.*$/, "");
+  return path.split("/").pop()?.toLowerCase() === "epics";
+}
+
+async function issueEpic(issue) {
+  try {
+    const links = await api("GET", `/projects/${issue.projectId}/issues/${issue.iid}/links`);
+    const epic = (Array.isArray(links) ? links : []).find((l) => isEpicRef(l.references?.full, l.web_url));
+    return epic ? { id: `${epic.project_id}#${epic.iid}`, title: epic.title, url: epic.web_url } : null;
+  } catch {
+    return null; // sin permiso de links / epics deshabilitado: la tratamos como suelta
+  }
+}
+
+// Colapsa epics: las issues que pertenecen a una misma Epic se sustituyen por un único item
+// Epic (con los títulos de sus hijas como contexto); el resto quedan como item suelto. Solo
+// GitLab (github tiene stub de paridad). ponytail: N+1 (un GET /links por issue) en paralelo,
+// aceptable para un milestone; si crece mucho, trocear el Promise.all.
+async function collapseMilestoneEpics(issues) {
+  const list = Array.isArray(issues) ? issues : [];
+  const epics = await Promise.all(list.map(issueEpic));
+  const byEpic = new Map();
+  const items = [];
+  list.forEach((iss, i) => {
+    const epic = epics[i];
+    if (epic) {
+      let item = byEpic.get(epic.id);
+      if (!item) {
+        item = { kind: "epic", title: epic.title, url: epic.url, children: [] };
+        byEpic.set(epic.id, item);
+        items.push(item);
+      }
+      item.children.push(iss.title);
+    } else {
+      items.push({
+        kind: "issue",
+        title: iss.title,
+        url: iss.webUrl,
+        labels: (iss.labels || []).map((l) => (typeof l === "string" ? l : l.name)),
+        desc: iss.descriptionHtml || "",
+      });
+    }
+  });
+  return items;
+}
+
 module.exports = {
   resolveToken,
   invalidateTokenCache,
@@ -694,4 +746,5 @@ module.exports = {
   milestoneIssues,
   groupLabels,
   updateIssue,
+  collapseMilestoneEpics,
 };
