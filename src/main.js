@@ -13,7 +13,9 @@ const gh = () => provider.current();
 
 const SELFTEST = process.argv.includes("--selftest");
 const SELFTEST_SHOT = "/tmp/pulpo-selftest.png";
-const SELFTEST_TIMEOUT_MS = 20000;
+const SELFTEST_ROUTE = (process.argv.find((a) => a.startsWith("--selftest-route=")) || "").split("=")[1] || "list";
+// La ruta de resumen espera a una llamada de IA (puede tardar bastante con Opus): timeout amplio.
+const SELFTEST_TIMEOUT_MS = SELFTEST_ROUTE === "milestones-summary" ? 240000 : 20000;
 
 let win = null;
 
@@ -37,11 +39,10 @@ function createWindow() {
       backgroundThrottling: false,
     },
   });
-  const routeArg = process.argv.find((a) => a.startsWith("--selftest-route="));
   win.loadFile(path.join(__dirname, "..", "renderer", "index.html"), {
     query: {
       selftest: SELFTEST ? "1" : "0",
-      selftest_route: routeArg ? routeArg.split("=")[1] : "list",
+      selftest_route: SELFTEST_ROUTE,
       seed_draft: process.argv.includes("--seed-draft") ? "1" : "0",
     },
   });

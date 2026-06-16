@@ -3065,6 +3065,29 @@ async function boot() {
   if (IS_SELFTEST && SELFTEST_ROUTE === "history") enterHistory();
   if (IS_SELFTEST && SELFTEST_ROUTE === "merged") switchBucket("merged");
   if (IS_SELFTEST && SELFTEST_ROUTE === "milestones") enterMilestones();
+  if (IS_SELFTEST && SELFTEST_ROUTE === "milestones-summary") runMilestonesSummarySelftest();
+}
+
+// Selftest E2E del resumen: abre Milestones, cambia a la pestaña Resumen, dispara la generación
+// con IA (real) y solo captura cuando termina. Bloquea el notify automático de renderMilestones
+// poniendo selftestNotified=true hasta que el resumen está pintado.
+async function runMilestonesSummarySelftest() {
+  state.selftestNotified = true; // suprime el notify temprano del board/loading
+  try {
+    await enterMilestones();
+    const m = state.milestones;
+    m.tab = "summary";
+    // Reutiliza el resumen ya persistido si existe (no re-gasta tokens al repetir el selftest).
+    if (m.selectedTitle && !loadSummary(m.selectedTitle)) await generateMilestoneSummary(m.selectedTitle);
+    renderMilestones();
+    // Lleva la vista previa del correo al viewport para que entre en la captura.
+    list.querySelector(".ms-sum-preview-wrap")?.scrollIntoView({ block: "end" });
+  } catch (err) {
+    console.error("[selftest] summary failed:", err);
+  } finally {
+    state.selftestNotified = false;
+    notifySelftestOnce(); // captura pase lo que pase
+  }
 }
 
 $("#refresh").addEventListener("click", refresh);
