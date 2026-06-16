@@ -122,6 +122,23 @@ function wireIpc() {
       }
       allowed.milestones = next;
     }
+    if (partial.releases && typeof partial.releases === "object") {
+      const r = partial.releases;
+      const next = { ...current.releases };
+      const branchRe = /^[\w./-]{1,200}$/;
+      if (typeof r.sourceBranch === "string" && branchRe.test(r.sourceBranch.trim())) next.sourceBranch = r.sourceBranch.trim();
+      if (typeof r.branchPrefix === "string" && /^[\w./-]{0,40}$/.test(r.branchPrefix)) next.branchPrefix = r.branchPrefix;
+      if (Array.isArray(r.projects)) {
+        next.projects = r.projects
+          .filter((p) => p && (typeof p.id === "string" || typeof p.id === "number") && typeof p.name === "string" && p.name.trim())
+          .map((p) => {
+            const out = { id: String(p.id), name: p.name.trim() };
+            if (typeof p.note === "string" && p.note.trim()) out.note = p.note.trim();
+            return out;
+          });
+      }
+      allowed.releases = next;
+    }
     const { token, ...rest } = config.save(allowed);
     return { ...rest, hasManualToken: Boolean(token) };
   });
@@ -198,6 +215,23 @@ function wireIpc() {
   ipcMain.handle("milestones:summary", async (_event, { milestoneTitle, issues }) => {
     const items = await gh().collapseMilestoneEpics(issues || []);
     return ai.summarizeMilestone({ milestoneTitle, items });
+  });
+
+  ipcMain.handle("releases:defaults", async () => gh().releaseDefaults());
+  ipcMain.handle("releases:generate", async (_event, { version, sourceBranch, projectIds }) => {
+    const { branchPrefix, sourceBranch: defSource, projects } = await gh().releaseDefaults();
+    const v = typeof version === "string" ? version.trim() : "";
+    if (!v) throw new Error("Falta el nombre de versión");
+    // Validamos el nombre de rama FINAL (prefijo + versión) con la misma regla que el resto de ramas.
+    if (!BRANCH_RE.test(`${branchPrefix}${v}`)) throw new Error("Nombre de versión no válido");
+    const src = typeof sourceBranch === "string" && sourceBranch.trim() ? sourceBranch.trim() : defSource;
+    if (!BRANCH_RE.test(src)) throw new Error("Rama origen no válida");
+    // El renderer solo elige CUÁLES de los proyectos configurados ejecutar; nunca proyectos
+    // arbitrarios. Filtramos por el set de config (ids como string) para no crear ramas fuera de él.
+    const want = new Set((projectIds || []).map((id) => String(id)));
+    const selected = projects.filter((p) => want.has(String(p.id)));
+    if (!selected.length) throw new Error("No hay proyectos seleccionados");
+    return gh().generateReleaseBranches({ projects: selected, version: v, sourceBranch: src });
   });
 
   ipcMain.handle("shell:open", (_event, url) => {

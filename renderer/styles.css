@@ -370,6 +370,7 @@ body {
 }
 .toast.ok { border-left-color: var(--green); }
 .toast.err { border-left-color: var(--red); }
+.toast.warn { border-left-color: #bf8700; }
 @keyframes slide-up { from { opacity: 0; transform: translateY(8px); } }
 
 /* ---------- tabs ---------- */
@@ -1099,3 +1100,70 @@ body {
 .repo-line button { margin-left: auto; }
 .add-repo { display: flex; gap: 8px; margin-top: 10px; }
 .muted { color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+
+/* ---------- releases (generar release branches) ---------- */
+.dot-release { background: linear-gradient(135deg, var(--orange, #bf8700), var(--red)); }
+.rel-view { max-width: 720px; margin: 0 auto; padding: 8px 4px 40px; }
+.rel-head h2 { margin-bottom: 4px; }
+.rel-sub { color: var(--text-muted); font-size: 13px; line-height: 1.5; }
+.rel-view code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+  background: var(--gray-bg); padding: 1px 5px; border-radius: 5px;
+}
+.rel-form {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px;
+  align-items: end; margin: 18px 0 8px;
+}
+.rel-field { display: flex; flex-direction: column; gap: 5px; }
+.rel-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.rel-field input[type="text"] {
+  font: inherit; color: var(--text); background: var(--gray-bg);
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; width: 100%;
+}
+.rel-field input:focus { outline: none; border-color: var(--accent); }
+.rel-preview-box { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; }
+.rel-branch-preview { font-size: 13px !important; font-weight: 600; }
+.rel-branch-preview.invalid { color: var(--red); background: var(--red-bg); }
+
+.rel-projects-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 22px 0 8px; font-weight: 600; font-size: 13px;
+}
+.rel-count { color: var(--text-muted); font-weight: 500; margin-left: 4px; }
+.rel-projects { display: flex; flex-direction: column; gap: 6px; }
+.rel-proj {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border: 1px solid var(--border); border-radius: 9px; background: var(--bg-raised);
+  cursor: pointer; transition: border-color 0.12s, background 0.12s;
+}
+.rel-proj:hover { background: var(--bg-hover); }
+.rel-proj.on { border-color: var(--accent); }
+.rel-proj input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none; margin: 0; flex-shrink: 0; cursor: pointer;
+  width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--border);
+  position: relative; transition: background 0.12s, border-color 0.12s;
+}
+.rel-proj input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+.rel-proj input[type="checkbox"]:checked::after {
+  content: "✓"; position: absolute; inset: 0; color: #fff; font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+}
+.rel-proj-main { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.rel-proj-name { font-weight: 600; font-size: 13px; }
+.rel-proj-id { font-size: 11px; color: var(--text-muted); font-family: ui-monospace, Menlo, monospace; }
+.rel-proj-note { font-size: 11px; color: #bf8700; margin-left: auto; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rel-res { margin-left: auto; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.rel-proj-note + .rel-res { margin-left: 10px; }
+.rel-res.ok { color: var(--green); text-decoration: none; }
+.rel-res.ok:hover { text-decoration: underline; }
+.rel-res.err { color: var(--red); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.rel-summary { margin: 18px 0 4px; padding: 10px 12px; border-radius: 9px; font-size: 13px; border: 1px solid var(--border); }
+.rel-summary.ok { background: var(--green-bg); border-color: var(--green); }
+.rel-summary.warn { background: #fff8e1; border-color: #bf8700; }
+.rel-summary.err { background: var(--red-bg); border-color: var(--red); }
+.rel-actions { margin-top: 22px; }
+
+.rel-confirm-list { margin: 10px 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+.rel-confirm-notes { margin: 8px 0; display: flex; flex-direction: column; gap: 6px; }
+.rel-confirm-note { font-size: 12px; color: #bf8700; background: #fff8e1; padding: 6px 9px; border-radius: 7px; }

@@ -9,7 +9,7 @@ const state = {
   me: null,
   authSource: null,
   repo: null,
-  view: "prs", // "prs" | "history" | "milestones"
+  view: "prs", // "prs" | "history" | "milestones" | "releases"
   bucket: "open",
   prs: [],
   openPrs: [],
@@ -29,6 +29,10 @@ const state = {
   // Vista de Milestones (solo GitLab): tareas (issues) del milestone agrupadas por persona.
   // filters.status: Map<label, "include"|"exclude"> (chip tri-estado); se siembra con doneLabels en "exclude".
   milestones: { list: [], selectedTitle: null, issues: [], loading: false, labels: [], selected: new Set(), filters: { status: new Map(), showClosed: false, showUnassigned: false, seeded: false }, tab: "tasks", summaryLoading: false, summaryPreviewExpanded: false, projects: null },
+  // Vista de Releases (solo GitLab): genera la release branch rb/<version> en el set de proyectos
+  // configurado. `defaults` = {branchPrefix, sourceBranch, projects[]} del backend; `selected` =
+  // ids de proyecto elegidos para ejecutar; `results` = reporte por-proyecto de la última generación.
+  releases: { defaults: null, loading: false, running: false, selected: new Set(), version: "", sourceBranch: "", results: null },
   prSnapshot: null, // nº → {reviewDecision, checks, reviewMe} para detectar cambios y notificar
   cursor: -1, // selección con teclado (j/k) en la lista
   draftKeys: new Set(), // "owner/repo#n" con borradores guardados → badge 📝 en la lista
@@ -3183,6 +3187,236 @@ function openBulkMilestoneModal() {
   );
 }
 
+/* ============ vista releases (solo GitLab) ============ */
+async function enterReleases() {
+  if (!isGitlab()) {
+    toast("La vista de Releases solo está disponible en GitLab", "");
+    return;
+  }
+  state.view = "releases";
+  closeDetail();
+  document.querySelectorAll(".bucket").forEach((b) => b.classList.remove("active"));
+  $("#bucket-releases")?.classList.add("active");
+  await loadReleases();
+}
+
+async function loadReleases() {
+  const r = state.releases;
+  r.loading = true;
+  renderReleases();
+  try {
+    if (!r.defaults) r.defaults = await window.pulpo.releasesDefaults();
+    // De fábrica seleccionamos TODOS los proyectos configurados (el usuario deselecciona los que no quiera).
+    if (!r.selected.size) for (const p of r.defaults.projects) r.selected.add(String(p.id));
+    if (!r.sourceBranch) r.sourceBranch = r.defaults.sourceBranch || "development";
+    r.loading = false;
+    renderReleases();
+  } catch (err) {
+    r.loading = false;
+    list.innerHTML = `<div class="error-box">${esc(String(err.message || err))}</div>`;
+    notifySelftestOnce();
+  }
+}
+
+// Sugerencia de versión: MMAAAA del mes actual (p.ej. 062026). El usuario suele añadir el sufijo
+// "-mx" para la rama hermana; no lo prefijamos para no crear ramas equivocadas sin querer.
+function suggestedReleaseVersion() {
+  const now = new Date();
+  return `${String(now.getMonth() + 1).padStart(2, "0")}${now.getFullYear()}`;
+}
+
+// Nombre de rama final válido (prefijo + versión) con la misma regla que valida el backend.
+function releaseBranchValid(version) {
+  const prefix = state.releases.defaults?.branchPrefix || "rb/";
+  return Boolean(version) && BRANCH_RE.test(`${prefix}${version}`);
+}
+
+function renderReleases() {
+  if (state.view !== "releases") return;
+  const r = state.releases;
+  if (r.loading || !r.defaults) {
+    list.innerHTML = `<div class="loading">Cargando configuración de releases…</div>`;
+    if (!r.loading) notifySelftestOnce();
+    return;
+  }
+  const prefix = r.defaults.branchPrefix || "rb/";
+  const projects = r.defaults.projects || [];
+  const resultsById = new Map((r.results?.results || []).map((res) => [String(res.id), res]));
+
+  const rowsHtml = projects
+    .map((p) => {
+      const id = String(p.id);
+      const checked = r.selected.has(id);
+      const res = resultsById.get(id);
+      const resHtml = res
+        ? res.ok
+          ? `<a class="rel-res ok" href="${esc(res.webUrl || "#")}" data-url="${esc(res.webUrl || "")}" title="Abrir la rama en GitLab">✓ creada</a>`
+          : `<span class="rel-res err" title="${esc(res.error || "")}">✕ ${esc(res.error || "error")}</span>`
+        : "";
+      return `
+        <label class="rel-proj ${checked ? "on" : ""}">
+          <input type="checkbox" class="rel-proj-check" data-id="${esc(id)}" ${checked ? "checked" : ""} ${r.running ? "disabled" : ""} />
+          <span class="rel-proj-main">
+            <span class="rel-proj-name">${esc(p.name || id)}</span>
+            <span class="rel-proj-id">#${esc(id)}</span>
+          </span>
+          ${p.note ? `<span class="rel-proj-note" title="${esc(p.note)}">⚠️ ${esc(p.note)}</span>` : ""}
+          ${resHtml}
+        </label>`;
+    })
+    .join("");
+
+  const selCount = projects.filter((p) => r.selected.has(String(p.id))).length;
+  const allOn = selCount === projects.length && projects.length > 0;
+  const valid = releaseBranchValid(r.version);
+  const canRun = valid && selCount > 0 && !r.running;
+  const branchPreview = `${prefix}${r.version || ""}`;
+
+  const summaryHtml = r.results
+    ? (() => {
+        const ok = r.results.results.filter((x) => x.ok).length;
+        const fail = r.results.results.length - ok;
+        const cls = fail ? (ok ? "warn" : "err") : "ok";
+        return `<div class="rel-summary ${cls}">Rama <code>${esc(r.results.branch)}</code> desde <code>${esc(r.results.ref)}</code> · ${ok} creada${ok === 1 ? "" : "s"}${fail ? ` · ${fail} con error` : ""}</div>`;
+      })()
+    : "";
+
+  list.innerHTML = `
+    <div class="rel-view">
+      <header class="rel-head">
+        <h2>Generar release branches</h2>
+        <p class="rel-sub">Crea la rama <code>${esc(prefix)}&lt;versión&gt;</code> en los proyectos seleccionados, a partir de una rama origen. Réplica del script <code>auto-rb-branches.py</code>.</p>
+      </header>
+
+      <div class="rel-form">
+        <label class="rel-field">
+          <span class="rel-label">Versión</span>
+          <input type="text" id="rel-version" value="${esc(r.version)}" placeholder="p.ej. ${esc(suggestedReleaseVersion())}-mx" ${r.running ? "disabled" : ""} autocomplete="off" />
+        </label>
+        <label class="rel-field">
+          <span class="rel-label">Rama origen</span>
+          <input type="text" id="rel-source" value="${esc(r.sourceBranch)}" placeholder="development" ${r.running ? "disabled" : ""} autocomplete="off" />
+        </label>
+        <div class="rel-preview-box">
+          <span class="rel-label">Rama a crear</span>
+          <code class="rel-branch-preview ${valid ? "" : "invalid"}" id="rel-branch-preview">${esc(branchPreview)}</code>
+        </div>
+      </div>
+
+      <div class="rel-projects-head">
+        <span>Proyectos <span class="rel-count" id="rel-sel-count">${selCount}/${projects.length}</span></span>
+        <button class="btn ghost" id="rel-toggle-all" ${r.running ? "disabled" : ""}>${allOn ? "Ninguno" : "Todos"}</button>
+      </div>
+      <div class="rel-projects">${rowsHtml}</div>
+
+      ${summaryHtml}
+
+      <div class="rel-actions">
+        <button class="btn btn-primary" id="rel-generate" ${canRun ? "" : "disabled"}>${r.running ? "Generando…" : "Generar release branches"}</button>
+      </div>
+    </div>`;
+
+  const versionInput = $("#rel-version");
+  const sourceInput = $("#rel-source");
+  const preview = $("#rel-branch-preview");
+  const genBtn = $("#rel-generate");
+  const syncControls = () => {
+    const v = releaseBranchValid(r.version);
+    const sel = projects.filter((p) => r.selected.has(String(p.id))).length;
+    preview.textContent = `${prefix}${r.version || ""}`;
+    preview.classList.toggle("invalid", !v);
+    $("#rel-sel-count").textContent = `${sel}/${projects.length}`;
+    genBtn.disabled = !(v && sel > 0 && !r.running);
+  };
+  versionInput?.addEventListener("input", () => {
+    r.version = versionInput.value.trim();
+    syncControls();
+  });
+  sourceInput?.addEventListener("input", () => {
+    r.sourceBranch = sourceInput.value.trim();
+  });
+  list.querySelectorAll(".rel-proj-check").forEach((cb) =>
+    cb.addEventListener("change", () => {
+      const id = cb.dataset.id;
+      if (cb.checked) r.selected.add(id);
+      else r.selected.delete(id);
+      cb.closest(".rel-proj")?.classList.toggle("on", cb.checked);
+      syncControls();
+    }),
+  );
+  $("#rel-toggle-all")?.addEventListener("click", () => {
+    if (allOn) r.selected.clear();
+    else for (const p of projects) r.selected.add(String(p.id));
+    renderReleases();
+  });
+  list.querySelectorAll(".rel-res[data-url]").forEach((a) =>
+    a.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (a.dataset.url) window.pulpo.openExternal(a.dataset.url);
+    }),
+  );
+  $("#rel-generate")?.addEventListener("click", confirmAndGenerateReleases);
+  notifySelftestOnce();
+}
+
+// Confirmación antes de crear (operación de escritura sobre N proyectos, no atómica): mostramos
+// la rama, el origen y la lista de destinos. Nunca dispara sin confirmar.
+function confirmAndGenerateReleases() {
+  const r = state.releases;
+  if (!releaseBranchValid(r.version)) return;
+  const prefix = r.defaults.branchPrefix || "rb/";
+  const branch = `${prefix}${r.version}`;
+  const source = r.sourceBranch || r.defaults.sourceBranch || "development";
+  const targets = r.defaults.projects.filter((p) => r.selected.has(String(p.id)));
+  if (!targets.length) return;
+  const root = $("#modal-root");
+  const noteProjects = targets.filter((p) => p.note);
+  const notesHtml = noteProjects.length
+    ? `<div class="rel-confirm-notes">${noteProjects.map((p) => `<div class="rel-confirm-note">⚠️ <b>${esc(p.name)}</b>: ${esc(p.note)}</div>`).join("")}</div>`
+    : "";
+  root.innerHTML = `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <h3>Crear <code>${esc(branch)}</code> en ${targets.length} proyecto${targets.length === 1 ? "" : "s"}</h3>
+        <p class="muted">Desde la rama <code>${esc(source)}</code>. Se aplica proyecto a proyecto (no atómico): si alguno falla, el resto sí se crea.</p>
+        <ul class="rel-confirm-list">${targets.map((p) => `<li>${esc(p.name || p.id)} <span class="muted">#${esc(String(p.id))}</span></li>`).join("")}</ul>
+        ${notesHtml}
+        <div class="modal-actions">
+          <button class="btn" id="modal-cancel">Cancelar</button>
+          <button class="btn btn-primary" id="modal-confirm">Crear ramas</button>
+        </div>
+      </div>
+    </div>`;
+  const close = () => (root.innerHTML = "");
+  $("#modal-backdrop").addEventListener("click", (event) => {
+    if (event.target.id === "modal-backdrop") close();
+  });
+  $("#modal-cancel").addEventListener("click", close);
+  $("#modal-confirm").addEventListener("click", () => {
+    close();
+    runReleaseGeneration();
+  });
+}
+
+async function runReleaseGeneration() {
+  const r = state.releases;
+  r.running = true;
+  r.results = null;
+  renderReleases();
+  try {
+    const projectIds = r.defaults.projects.map((p) => String(p.id)).filter((id) => r.selected.has(id));
+    r.results = await window.pulpo.generateReleaseBranches(r.version, r.sourceBranch, projectIds);
+    const ok = r.results.results.filter((x) => x.ok).length;
+    const fail = r.results.results.length - ok;
+    toast(fail ? `${ok} creada(s), ${fail} con error` : `${ok} release branch(es) creada(s)`, fail ? "warn" : "ok");
+  } catch (err) {
+    toast(String(err.message || err), "err");
+  } finally {
+    r.running = false;
+    renderReleases();
+  }
+}
+
 /* ============ arranque ============ */
 function renderRepoSelect() {
   const select = $("#repo-select");
@@ -3221,10 +3455,12 @@ async function boot() {
   document.querySelector(`[data-bucket="${state.bucket}"]`)?.classList.add("active");
   state.draftKeys = new Set(await window.pulpo.draftsKeys().catch(() => []));
   renderRepoSelect();
-  // La vista de Milestones es solo GitLab: no pintar una entrada muerta en GitHub.
+  // Las vistas de Milestones y Releases son solo GitLab: no pintar entradas muertas en GitHub.
   if (!isGitlab()) {
     $("#nav-milestones-section")?.classList.add("hidden");
     $("#bucket-milestones")?.classList.add("hidden");
+    $("#nav-releases-section")?.classList.add("hidden");
+    $("#bucket-releases")?.classList.add("hidden");
   }
 
   const auth = await window.pulpo.authStatus();
@@ -3248,6 +3484,7 @@ async function boot() {
   if (IS_SELFTEST && SELFTEST_ROUTE === "merged") switchBucket("merged");
   if (IS_SELFTEST && SELFTEST_ROUTE === "milestones") enterMilestones();
   if (IS_SELFTEST && SELFTEST_ROUTE === "milestones-summary") runMilestonesSummarySelftest();
+  if (IS_SELFTEST && SELFTEST_ROUTE === "releases") enterReleases();
 }
 
 // Selftest E2E del resumen: abre Milestones, cambia a la pestaña Resumen, dispara la generación
@@ -3287,6 +3524,7 @@ $("#repo-select").addEventListener("change", (event) => {
 $("#search").addEventListener("input", (event) => {
   state.search = event.target.value;
   if (state.view === "milestones") renderMilestones();
+  else if (state.view === "releases") {/* la vista de releases no usa el buscador */}
   else renderList();
 });
 document.querySelectorAll(".bucket[data-bucket]").forEach((btn) =>
@@ -3294,6 +3532,7 @@ document.querySelectorAll(".bucket[data-bucket]").forEach((btn) =>
 );
 $("#bucket-history").addEventListener("click", enterHistory);
 $("#bucket-milestones").addEventListener("click", enterMilestones);
+$("#bucket-releases").addEventListener("click", enterReleases);
 /* ============ paleta de comandos (⌘K) ============ */
 function paletteEntries() {
   const entries = [];
@@ -3306,6 +3545,7 @@ function paletteEntries() {
   }
   entries.push({ label: "Ir a: Histórico", hint: "grafo de ramas", run: enterHistory });
   if (isGitlab()) entries.push({ label: "Ir a: Milestones", hint: "tareas por persona", run: enterMilestones });
+  if (isGitlab()) entries.push({ label: "Ir a: Releases", hint: "generar release branches", run: enterReleases });
   for (const [bucket, label] of [["open", "Abiertas"], ["mine", "Mías"], ["review", "Para revisar"], ["draft", "Borradores"], ["merged", "Fusionadas"], ["closed", "Cerradas"]]) {
     entries.push({ label: `Ir a: ${label}`, hint: "bucket", run: () => switchBucket(bucket) });
   }
@@ -3339,8 +3579,8 @@ function switchRepo(repo) {
   renderRepoSelect();
   closeDetail();
   if (state.view === "history") loadHistory();
-  // Milestones es de grupo (global), no por repo: el cambio de repo no la afecta.
-  else if (state.view !== "milestones") refresh();
+  // Milestones y Releases son de grupo/global, no por repo: el cambio de repo no las afecta.
+  else if (state.view !== "milestones" && state.view !== "releases") refresh();
 }
 
 function openPalette() {

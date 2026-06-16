@@ -541,6 +541,47 @@ async function cherryPick(repoFullName, sha, branch, { dryRun = false } = {}) {
   }
 }
 
+/* ---------- releases (generar release branches rb/<version>) ---------- */
+
+// Proyectos configurados para la generación de release branches (set por defecto = los del
+// script legacy auto-rb-branches.py). Cada uno {id, name, note?}: id sirve como id de proyecto
+// para la API (vale id numérico o path codificado). El renderer elige cuáles ejecutar.
+function releaseProjects() {
+  const cfg = config.load();
+  return Array.isArray(cfg.releases?.projects) ? cfg.releases.projects : [];
+}
+
+function releaseDefaults() {
+  const cfg = config.load();
+  return {
+    sourceBranch: cfg.releases?.sourceBranch || "development",
+    branchPrefix: cfg.releases?.branchPrefix || "rb/",
+    projects: releaseProjects(),
+  };
+}
+
+/**
+ * Crea la release branch `${branchPrefix}${version}` en cada proyecto pedido, a partir de
+ * `sourceBranch` (POST repository/branches con {branch, ref}). Replica auto-rb-branches.py.
+ * NO atómico entre N proyectos: se aplican en serie y se reporta por-proyecto {id,name,ok,error?,
+ * webUrl?}; un fallo a medias deja unos creados y otros no (igual que cherryPick). El token NUNCA
+ * se hardcodea (a diferencia del script legacy): sale de resolveToken. Solo GitLab.
+ */
+async function generateReleaseBranches({ projects, version, sourceBranch }) {
+  const branch = `${releaseDefaults().branchPrefix}${version}`;
+  const ref = sourceBranch || releaseDefaults().sourceBranch;
+  const results = [];
+  for (const p of projects || []) {
+    try {
+      const created = await api("POST", `/projects/${proj(String(p.id))}/repository/branches`, { branch, ref });
+      results.push({ id: p.id, name: p.name || String(p.id), ok: true, branch, webUrl: created.web_url || null });
+    } catch (err) {
+      results.push({ id: p.id, name: p.name || String(p.id), ok: false, branch, error: String(err.message || err) });
+    }
+  }
+  return { branch, ref, results };
+}
+
 /** GitLab revierte creando un commit directo en la rama destino (no abre MR). */
 async function revertPullRequest(encodedId) {
   const { repo, iid } = decodeId(encodedId);
@@ -835,4 +876,6 @@ module.exports = {
   groupProjects,
   updateIssue,
   collapseMilestoneEpics,
+  releaseDefaults,
+  generateReleaseBranches,
 };
