@@ -699,7 +699,22 @@ body {
 .ms-sum-row.dragging { opacity: 0.4; }
 .ms-sum-row.drag-over { border-color: var(--accent); box-shadow: inset 0 2px 0 0 var(--accent); }
 .ms-sum-edit, .ms-sum-open { flex-shrink: 0; }
-.ms-sum-edit-input { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+/* Input de edición del título: ocupa todo el ancho del título y altura mínima (no más que el texto). */
+.ms-sum-edit-input { display: block; width: 100%; font-weight: 600; padding: 1px 6px; line-height: 1.35; border-radius: 6px; }
+
+/* Filtro por proyecto/repo del resumen: chips con icono; los excluidos quedan atenuados/tachados. */
+.ms-proj-filter { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ms-proj-filter .muted { margin-right: 2px; }
+.ms-proj-chip {
+  display: inline-flex; align-items: center; gap: 6px; font: inherit; cursor: pointer;
+  background: var(--bg-raised); color: var(--text); border: 1px solid var(--border);
+  border-radius: 999px; padding: 3px 10px 3px 3px;
+}
+.ms-proj-chip:hover { border-color: var(--accent); }
+.ms-proj-chip.off { opacity: 0.45; }
+.ms-proj-chip.off .ms-proj-name { text-decoration: line-through; }
+.ms-proj-ic { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.ms-proj-ic.letter { display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 10px; font-weight: 700; }
 
 /* Vista previa del correo: altura acotada plegable con "Leer más" + degradado al pie. */
 .ms-sum-preview-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }

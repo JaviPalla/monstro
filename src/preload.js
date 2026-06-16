@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld("pulpo", {
   listMilestones: () => ipcRenderer.invoke("milestones:list"),
   milestoneIssues: (title, includeClosed) => ipcRenderer.invoke("milestones:issues", { title, includeClosed }),
   groupLabels: () => ipcRenderer.invoke("issues:groupLabels"),
+  groupProjects: () => ipcRenderer.invoke("issues:groupProjects"),
   updateIssue: (projectId, iid, patch) => ipcRenderer.invoke("issues:update", { projectId, iid, patch }),
   summarizeMilestone: (milestoneTitle, issues) => ipcRenderer.invoke("milestones:summary", { milestoneTitle, issues }),
   openExternal: (url) => ipcRenderer.invoke("shell:open", url),

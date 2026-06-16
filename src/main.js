@@ -191,6 +191,7 @@ function wireIpc() {
     gh().milestoneIssues(title, { includeClosed: Boolean(includeClosed) }),
   );
   ipcMain.handle("issues:groupLabels", async () => gh().groupLabels());
+  ipcMain.handle("issues:groupProjects", async () => gh().groupProjects());
   ipcMain.handle("issues:update", async (_event, { projectId, iid, patch }) =>
     gh().updateIssue(projectId, iid, patch || {}),
   );

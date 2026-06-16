@@ -643,6 +643,38 @@ async function milestoneIssues(milestoneTitle, { includeClosed = false } = {}) {
   return issues.map(mapIssue);
 }
 
+// Descarga un avatar (privado, requiere token) y lo devuelve como data-URI para que el renderer
+// pueda pintarlo (las imágenes /uploads/-/system de una instancia privada dan 401 sin auth).
+async function fetchAvatarDataUri(url) {
+  try {
+    const { token } = resolveToken();
+    if (!token) return null;
+    const res = await fetch(url, { headers: { "PRIVATE-TOKEN": token, "User-Agent": "pulpo-app" } });
+    if (!res.ok) return null;
+    const type = res.headers.get("content-type") || "image/png";
+    const buf = Buffer.from(await res.arrayBuffer());
+    return `data:${type};base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+// Proyectos del grupo (incl. subgrupos) con su icono ya resuelto a data-URI, para el filtro
+// por proyecto del resumen. ponytail: trae todos los del grupo y proxea los que tengan avatar
+// (una vez, el renderer cachea); si el grupo fuese enorme, limitar a los presentes en el milestone.
+async function groupProjects() {
+  const group = milestonesGroup();
+  if (!group) return [];
+  const projects = await apiAll(`/groups/${encodeURIComponent(group)}/projects?include_subgroups=true`);
+  return Promise.all(
+    projects.map(async (p) => ({
+      path: p.path_with_namespace,
+      name: p.name,
+      icon: p.avatar_url ? await fetchAvatarDataUri(p.avatar_url) : null,
+    })),
+  );
+}
+
 // Labels del grupo, para poder asignar cualquiera (no solo las de estado configuradas).
 async function groupLabels() {
   const group = milestonesGroup();
@@ -800,6 +832,7 @@ module.exports = {
   listMilestones,
   milestoneIssues,
   groupLabels,
+  groupProjects,
   updateIssue,
   collapseMilestoneEpics,
 };

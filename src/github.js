@@ -403,6 +403,10 @@ async function collapseMilestoneEpics() {
   throw new Error("La vista de Milestones solo está disponible en GitLab.");
 }
 
+async function groupProjects() {
+  throw new Error("La vista de Milestones solo está disponible en GitLab.");
+}
+
 async function revertPullRequest(prNodeId) {
   const data = await gql(
     `mutation ($id: ID!) {
@@ -471,6 +475,7 @@ module.exports = {
   listMilestones,
   milestoneIssues,
   groupLabels,
+  groupProjects,
   updateIssue,
   collapseMilestoneEpics,
 };
