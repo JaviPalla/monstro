@@ -551,6 +551,9 @@ function releaseDefaults() {
   return {
     sourceBranch: cfg.releases?.sourceBranch || "development",
     branchPrefix: cfg.releases?.branchPrefix || "rb/",
+    // Selección por defecto (ids) y última recordada (paths) para que la vista la siembre/restaure.
+    defaultProjectIds: Array.isArray(cfg.releases?.defaultProjectIds) ? cfg.releases.defaultProjectIds.map(String) : [],
+    selectedProjects: Array.isArray(cfg.releases?.selectedProjects) ? cfg.releases.selectedProjects : null,
     ouicare: cfg.releases?.ouicare || null,
   };
 }

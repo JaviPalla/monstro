@@ -129,6 +129,16 @@ function wireIpc() {
       const branchRe = /^[\w./-]{1,200}$/;
       if (typeof r.sourceBranch === "string" && branchRe.test(r.sourceBranch.trim())) next.sourceBranch = r.sourceBranch.trim();
       if (typeof r.branchPrefix === "string" && /^[\w./-]{0,40}$/.test(r.branchPrefix)) next.branchPrefix = r.branchPrefix;
+      // Proyectos: ids del set por defecto (strings) y la última selección recordada (paths/ids).
+      const projId = /^[\w.-]+(\/[\w.-]+)*$/;
+      if (Array.isArray(r.defaultProjectIds)) {
+        next.defaultProjectIds = r.defaultProjectIds.filter((id) => (typeof id === "string" || typeof id === "number") && projId.test(String(id))).map(String);
+      }
+      if (Array.isArray(r.selectedProjects)) {
+        next.selectedProjects = r.selectedProjects.filter((p) => typeof p === "string" && projId.test(p));
+      } else if (r.selectedProjects === null) {
+        next.selectedProjects = null;
+      }
       if (r.ouicare && typeof r.ouicare === "object") {
         const o = { ...current.releases.ouicare };
         if (typeof r.ouicare.projectPath === "string" && r.ouicare.projectPath.trim()) o.projectPath = r.ouicare.projectPath.trim();

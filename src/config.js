@@ -53,13 +53,19 @@ const DEFAULTS = {
     doneLabels: ["finished", "pending check", "pending check by issuer", "pending check in pruebas"],
   },
   // Vista de Releases (solo GitLab): genera la release branch rb/<version> replicando el script
-  // legacy auto-rb-branches.py. Los PROYECTOS a elegir NO se hardcodean: se sacan del grupo en vivo
-  // (groupProjects), así no se queda corto el listado. Aquí solo van rama origen, prefijo y Ouicare.
+  // legacy auto-rb-branches.py. El selector de proyectos se puebla del grupo en vivo (groupProjects),
+  // pero la SELECCIÓN por defecto y la última usada se guardan aquí (configurable + recordada).
   releases: {
     // Rama origen por defecto de la que sale la release branch (ref del POST de creación).
     sourceBranch: "development",
     // Prefijo de la rama de salida; el nombre final es `${branchPrefix}${version}` (p.ej. rb/062026).
     branchPrefix: "rb/",
+    // Selección por defecto (los 8 proyectos del script, por ID numérico estable: los nombres ya no
+    // coinciden con el script). Se usa la PRIMERA vez (cuando aún no hay selección recordada).
+    defaultProjectIds: ["12", "42", "25", "4", "11", "13", "19", "58"],
+    // Última selección del usuario (paths de proyecto), recordada entre sesiones. null = usar los
+    // defaultProjectIds. La vista la reescribe cada vez que cambias la selección.
+    selectedProjects: null,
     // Ouicare: el AppDate es una appSetting del Web.config (cache-buster del appcache) que hay que
     // bumpear en cada release. Se actualiza en la rama origen antes de crear la release branch.
     ouicare: {

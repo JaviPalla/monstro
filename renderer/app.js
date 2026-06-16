@@ -33,7 +33,7 @@ const state = {
   // {branchPrefix, sourceBranch, ouicare} del backend; `projects` = proyectos del grupo (groupProjects,
   // con icono) entre los que elegir; `selected` = paths elegidos; `appDate` = ISO (YYYY-MM-DD) para
   // el input nativo, se convierte a DDMMYYYY al enviar; `results` = reporte de la última generación.
-  releases: { defaults: null, projects: [], loading: false, running: false, selected: new Set(), version: "", sourceBranch: "", appDateEnabled: true, appDate: "", results: null },
+  releases: { defaults: null, projects: [], loading: false, running: false, seeded: false, selected: new Set(), version: "", sourceBranch: "", appDateEnabled: true, appDate: "", results: null },
   prSnapshot: null, // nº → {reviewDecision, checks, reviewMe} para detectar cambios y notificar
   cursor: -1, // selección con teclado (j/k) en la lista
   draftKeys: new Set(), // "owner/repo#n" con borradores guardados → badge 📝 en la lista
@@ -3213,8 +3213,20 @@ async function loadReleases() {
       r.projects = [...(state.milestones.projects?.values() || [])]
         .filter((p) => !p.archived)
         .sort((a, b) => a.name.localeCompare(b.name));
-      // De fábrica TODOS seleccionados (así no falta ninguno); el usuario deselecciona los que no quiera.
-      if (!r.selected.size) for (const p of r.projects) r.selected.add(p.path);
+    }
+    // Selección: la última recordada (paths, persistida en config) si la hay; si no, el set por
+    // defecto (los 8 del script, por ID). Solo se siembra una vez por sesión (seeded), para no pisar
+    // lo que el usuario vaya cambiando al navegar dentro de la sesión.
+    if (!r.seeded) {
+      const existing = new Set(r.projects.map((p) => p.path));
+      const saved = r.defaults.selectedProjects;
+      if (Array.isArray(saved)) {
+        for (const path of saved) if (existing.has(path)) r.selected.add(path);
+      } else {
+        const defIds = new Set((r.defaults.defaultProjectIds || []).map(String));
+        for (const p of r.projects) if (defIds.has(String(p.id))) r.selected.add(p.path);
+      }
+      r.seeded = true;
     }
     if (!r.version) r.version = suggestedReleaseVersion(); // por defecto: mes+año actual (p.ej. 062026)
     if (!r.sourceBranch) r.sourceBranch = r.defaults.sourceBranch || "development";
@@ -3238,6 +3250,12 @@ function suggestedReleaseVersion() {
 function isoToAppDate(iso) {
   const [y, m, d] = (iso || "").split("-");
   return y && m && d ? `${d}${m}${y}` : "";
+}
+
+// Persiste la selección de proyectos (paths) en config para recordarla entre sesiones.
+function saveReleaseSelection() {
+  if (IS_SELFTEST) return;
+  window.pulpo.setConfig({ releases: { selectedProjects: [...state.releases.selected] } }).catch(() => {});
 }
 
 // Nombre de rama final válido (prefijo + versión) con la misma regla que valida el backend.
@@ -3373,12 +3391,14 @@ function renderReleases() {
       const path = chip.dataset.path;
       if (r.selected.has(path)) r.selected.delete(path);
       else r.selected.add(path);
+      saveReleaseSelection();
       renderReleases();
     }),
   );
   $("#rel-toggle-all")?.addEventListener("click", () => {
     if (allOn) r.selected.clear();
     else for (const p of projects) r.selected.add(p.path);
+    saveReleaseSelection();
     renderReleases();
   });
   $("#rel-appdate-on")?.addEventListener("change", (event) => {
