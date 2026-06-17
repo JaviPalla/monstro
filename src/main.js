@@ -2,10 +2,11 @@
 
 const path = require("path");
 const fs = require("fs");
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, Notification } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, Notification, dialog } = require("electron");
 const ai = require("./ai");
 const config = require("./config");
 const drafts = require("./drafts");
+const local = require("./local");
 const provider = require("./provider");
 
 // Proveedor activo (GitHub o GitLab) según config; se resuelve en cada llamada.
@@ -148,11 +149,44 @@ function wireIpc() {
       }
       allowed.releases = next;
     }
+    if (partial.local && typeof partial.local === "object") {
+      const next = { ...current.local };
+      // rootDir: ruta absoluta existente o null para limpiar. La validación real es que exista en disco.
+      if (typeof partial.local.rootDir === "string" && partial.local.rootDir.trim()) {
+        const p = partial.local.rootDir.trim();
+        if (path.isAbsolute(p) && fs.existsSync(p)) next.rootDir = p;
+      } else if (partial.local.rootDir === null) {
+        next.rootDir = null;
+      }
+      allowed.local = next;
+    }
     const { token, ...rest } = config.save(allowed);
     return { ...rest, hasManualToken: Boolean(token) };
   });
 
   ipcMain.handle("repos:suggest", async () => gh().viewerRepos());
+
+  // Trabajo local → GitLab (OPE-19). Lectura de repos locales bajo config.local.rootDir.
+  ipcMain.handle("local:pickRoot", async () => {
+    const res = await dialog.showOpenDialog(win, { properties: ["openDirectory"], title: "Directorio raíz de tus repos" });
+    if (res.canceled || !res.filePaths[0]) return { rootDir: config.load().local.rootDir };
+    const { local: l } = config.save({ local: { ...config.load().local, rootDir: res.filePaths[0] } });
+    return { rootDir: l.rootDir };
+  });
+  ipcMain.handle("local:repos", async () => {
+    const cfg = config.load();
+    const repos = await local.scanRepos(cfg.local.rootDir);
+    const known = new Set(cfg.repos);
+    return { rootDir: cfg.local.rootDir, repos: repos.map((r) => ({ ...r, known: r.gitlabPath ? known.has(r.gitlabPath) : false })) };
+  });
+  ipcMain.handle("local:repoInfo", async (_event, { dir }) => {
+    // Seguridad: solo dentro del rootDir configurado, nunca una ruta arbitraria del renderer.
+    const root = config.load().local.rootDir;
+    if (!root || !dir || !path.resolve(dir).startsWith(path.resolve(root) + path.sep)) {
+      throw new Error("Ruta fuera del directorio raíz configurado");
+    }
+    return local.repoInfo(dir);
+  });
 
   ipcMain.handle("prs:list", async (_event, { repo, states }) => gh().listPRs(repo, states));
   ipcMain.handle("prs:search", async (_event, { repos, states }) => gh().searchPRs(repos, states));
