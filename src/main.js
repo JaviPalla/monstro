@@ -17,7 +17,8 @@ const SELFTEST_SHOT = "/tmp/pulpo-selftest.png";
 const SELFTEST_ROUTE = (process.argv.find((a) => a.startsWith("--selftest-route=")) || "").split("=")[1] || "list";
 // La ruta de resumen espera a una IA (lenta con Opus); la de releases proxea los avatares del grupo
 // entero (groupProjects). Ambas necesitan más margen que los 20s por defecto.
-const SELFTEST_TIMEOUT_MS = SELFTEST_ROUTE === "milestones-summary" ? 240000 : SELFTEST_ROUTE === "releases" ? 60000 : 20000;
+const SELFTEST_TIMEOUT_MS =
+  SELFTEST_ROUTE === "milestones-summary" ? 240000 : SELFTEST_ROUTE === "releases" || SELFTEST_ROUTE === "local" ? 60000 : 20000;
 
 let win = null;
 
@@ -175,13 +176,15 @@ function wireIpc() {
   });
   ipcMain.handle("local:repos", async () => {
     const cfg = config.load();
-    const repos = await local.scanRepos(cfg.local.rootDir);
+    // Selftest: si no hay rootDir configurado, escanea ~/repositories para que la captura muestre repos reales.
+    const rootDir = cfg.local.rootDir || (SELFTEST ? path.join(app.getPath("home"), "repositories") : null);
+    const repos = await local.scanRepos(rootDir);
     const known = new Set(cfg.repos);
-    return { rootDir: cfg.local.rootDir, repos: repos.map((r) => ({ ...r, known: r.gitlabPath ? known.has(r.gitlabPath) : false })) };
+    return { rootDir, repos: repos.map((r) => ({ ...r, known: r.gitlabPath ? known.has(r.gitlabPath) : false })) };
   });
   ipcMain.handle("local:repoInfo", async (_event, { dir }) => {
     // Seguridad: solo dentro del rootDir configurado, nunca una ruta arbitraria del renderer.
-    const root = config.load().local.rootDir;
+    const root = config.load().local.rootDir || (SELFTEST ? path.join(app.getPath("home"), "repositories") : null);
     if (!root || !dir || !path.resolve(dir).startsWith(path.resolve(root) + path.sep)) {
       throw new Error("Ruta fuera del directorio raíz configurado");
     }

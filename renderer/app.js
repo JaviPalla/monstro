@@ -9,7 +9,7 @@ const state = {
   me: null,
   authSource: null,
   repo: null,
-  view: "prs", // "prs" | "history" | "milestones" | "releases"
+  view: "prs", // "prs" | "history" | "milestones" | "releases" | "local"
   bucket: "open",
   prs: [],
   openPrs: [],
@@ -34,6 +34,10 @@ const state = {
   // con icono) entre los que elegir; `selected` = paths elegidos; `appDate` = ISO (YYYY-MM-DD) para
   // el input nativo, se convierte a DDMMYYYY al enviar; `results` = reporte de la última generación.
   releases: { defaults: null, projects: [], loading: false, running: false, seeded: false, selected: new Set(), version: "", sourceBranch: "", appDateEnabled: true, appDate: "", results: null },
+  // Vista de Trabajo local (solo GitLab, OPE-19): publica trabajo de ramas/worktrees locales como
+  // Issues/Epics + MRs. `tab`: "crear" (Issue/Epic nuevos) | "vincular" (a una tarea existente).
+  // `rootDir` = directorio raíz donde conviven los clones; `repos` = lo escaneado por local:repos.
+  local: { tab: "crear", rootDir: null, repos: [], loading: false, info: {} },
   prSnapshot: null, // nº → {reviewDecision, checks, reviewMe} para detectar cambios y notificar
   cursor: -1, // selección con teclado (j/k) en la lista
   draftKeys: new Set(), // "owner/repo#n" con borradores guardados → badge 📝 en la lista
@@ -3521,6 +3525,122 @@ async function runReleaseGeneration() {
   }
 }
 
+/* ============ Trabajo local → GitLab (OPE-19) ============ */
+// Sección que publica trabajo de ramas/worktrees LOCALES como Issues/Epics + MRs. Dos pestañas
+// (buckets en el nav): "crear" (Issue/Epic nuevos) y "vincular" (a una tarea existente). Esta fase
+// monta el descubrimiento local (repos bajo el directorio raíz + sus ramas/worktrees/estado); los
+// formularios de creación/vinculación llegan en las fases siguientes.
+async function enterLocal(tab) {
+  if (!isGitlab()) {
+    toast("Trabajo local solo está disponible en GitLab", "");
+    return;
+  }
+  state.view = "local";
+  if (tab) state.local.tab = tab;
+  closeDetail();
+  document.querySelectorAll(".bucket").forEach((b) => b.classList.remove("active"));
+  $(state.local.tab === "vincular" ? "#bucket-local-vincular" : "#bucket-local-crear")?.classList.add("active");
+  await loadLocal();
+}
+
+async function loadLocal() {
+  const l = state.local;
+  l.loading = true;
+  l.info = {};
+  renderLocal();
+  try {
+    const { rootDir, repos } = await window.pulpo.localRepos();
+    l.rootDir = rootDir;
+    l.repos = repos;
+    // Estado git (rama actual, ramas, worktrees, sucio) de cada repo, en paralelo: es git local, rápido.
+    await Promise.all(
+      repos.map(async (r) => {
+        try {
+          l.info[r.dir] = await window.pulpo.localRepoInfo(r.dir);
+        } catch (err) {
+          l.info[r.dir] = { error: String(err.message || err) };
+        }
+      }),
+    );
+    l.loading = false;
+    renderLocal();
+  } catch (err) {
+    l.loading = false;
+    list.innerHTML = `<div class="error-box">${esc(String(err.message || err))}</div>`;
+    notifySelftestOnce();
+  }
+}
+
+async function pickLocalRoot() {
+  const { rootDir } = await window.pulpo.localPickRoot();
+  if (rootDir) await loadLocal();
+}
+
+function renderLocal() {
+  if (state.view !== "local") return;
+  const l = state.local;
+  if (l.loading) {
+    list.innerHTML = `<div class="loading">Escaneando repos locales…</div>`;
+    return;
+  }
+  const isCrear = l.tab === "crear";
+  const desc = isCrear
+    ? "Elige repo y rama/worktree de tu local para crear una <b>Issue/Epic</b> nueva y su <b>MR</b>."
+    : "Elige repo y rama/worktree de tu local para <b>vincular</b> el trabajo a una Issue/Epic existente y lanzar la <b>MR</b>.";
+  const head = `
+    <div class="local-head">
+      <h2>${isCrear ? "Crear tarea" : "Vincular tarea"}</h2>
+      <p class="local-desc">${desc}</p>
+    </div>`;
+
+  if (!l.rootDir) {
+    list.innerHTML =
+      head +
+      `<div class="local-empty">
+        <p>Aún no has indicado el <b>directorio raíz</b> donde tienes clonados tus repos de GitLab.</p>
+        <button class="btn btn-primary" id="local-pick">Elegir directorio raíz…</button>
+      </div>`;
+    $("#local-pick")?.addEventListener("click", pickLocalRoot);
+    notifySelftestOnce();
+    return;
+  }
+
+  const repos = l.repos || [];
+  const cards = repos
+    .map((r) => {
+      const info = l.info[r.dir] || {};
+      const badge = r.known
+        ? `<span class="local-badge ok" title="Casado con un proyecto de GitLab configurado">✓ ${esc(r.gitlabPath)}</span>`
+        : r.gitlabPath
+          ? `<span class="local-badge" title="Detectado por el remote origin, pero no está en tus repos configurados">${esc(r.gitlabPath)}</span>`
+          : `<span class="local-badge none" title="Sin remote origin de GitLab">sin remote</span>`;
+      const meta = info.error
+        ? `<span class="local-err">${esc(info.error)}</span>`
+        : `<span class="local-cur">⎇ ${esc(info.current || "—")}</span>
+           ${info.dirty ? `<span class="local-dirty" title="Cambios sin commitear">● sucio</span>` : ""}
+           <span class="local-count">${(info.branches || []).length} ramas · ${(info.worktrees || []).length} worktrees</span>`;
+      return `
+        <div class="local-repo">
+          <div class="local-repo-top">
+            <span class="local-name">${esc(r.name)}</span>
+            ${badge}
+          </div>
+          <div class="local-repo-meta">${meta}</div>
+        </div>`;
+    })
+    .join("");
+
+  list.innerHTML =
+    head +
+    `<div class="local-root">
+      <span class="local-root-path" title="${esc(l.rootDir)}">📁 ${esc(l.rootDir)}</span>
+      <button class="btn local-change" id="local-pick">Cambiar…</button>
+    </div>
+    ${repos.length ? `<div class="local-repos">${cards}</div>` : `<div class="local-empty"><p>No se han encontrado repos git directamente bajo ese directorio.</p></div>`}`;
+  $("#local-pick")?.addEventListener("click", pickLocalRoot);
+  notifySelftestOnce();
+}
+
 /* ============ arranque ============ */
 function renderRepoSelect() {
   const select = $("#repo-select");
@@ -3565,6 +3685,9 @@ async function boot() {
     $("#bucket-milestones")?.classList.add("hidden");
     $("#nav-releases-section")?.classList.add("hidden");
     $("#bucket-releases")?.classList.add("hidden");
+    $("#nav-local-section")?.classList.add("hidden");
+    $("#bucket-local-crear")?.classList.add("hidden");
+    $("#bucket-local-vincular")?.classList.add("hidden");
   }
 
   const auth = await window.pulpo.authStatus();
@@ -3589,6 +3712,7 @@ async function boot() {
   if (IS_SELFTEST && SELFTEST_ROUTE === "milestones") enterMilestones();
   if (IS_SELFTEST && SELFTEST_ROUTE === "milestones-summary") runMilestonesSummarySelftest();
   if (IS_SELFTEST && SELFTEST_ROUTE === "releases") enterReleases();
+  if (IS_SELFTEST && SELFTEST_ROUTE === "local") enterLocal("crear");
 }
 
 // Selftest E2E del resumen: abre Milestones, cambia a la pestaña Resumen, dispara la generación
@@ -3628,7 +3752,7 @@ $("#repo-select").addEventListener("change", (event) => {
 $("#search").addEventListener("input", (event) => {
   state.search = event.target.value;
   if (state.view === "milestones") renderMilestones();
-  else if (state.view === "releases") {/* la vista de releases no usa el buscador */}
+  else if (state.view === "releases" || state.view === "local") {/* estas vistas no usan el buscador */}
   else renderList();
 });
 document.querySelectorAll(".bucket[data-bucket]").forEach((btn) =>
@@ -3637,6 +3761,8 @@ document.querySelectorAll(".bucket[data-bucket]").forEach((btn) =>
 $("#bucket-history").addEventListener("click", enterHistory);
 $("#bucket-milestones").addEventListener("click", enterMilestones);
 $("#bucket-releases").addEventListener("click", enterReleases);
+$("#bucket-local-crear").addEventListener("click", () => enterLocal("crear"));
+$("#bucket-local-vincular").addEventListener("click", () => enterLocal("vincular"));
 /* ============ paleta de comandos (⌘K) ============ */
 function paletteEntries() {
   const entries = [];
@@ -3650,6 +3776,8 @@ function paletteEntries() {
   entries.push({ label: "Ir a: Histórico", hint: "grafo de ramas", run: enterHistory });
   if (isGitlab()) entries.push({ label: "Ir a: Milestones", hint: "tareas por persona", run: enterMilestones });
   if (isGitlab()) entries.push({ label: "Ir a: Releases", hint: "generar release branches", run: enterReleases });
+  if (isGitlab()) entries.push({ label: "Trabajo local: Crear tarea", hint: "Issue/Epic + MR desde local", run: () => enterLocal("crear") });
+  if (isGitlab()) entries.push({ label: "Trabajo local: Vincular tarea", hint: "vincular local a una tarea existente", run: () => enterLocal("vincular") });
   for (const [bucket, label] of [["open", "Abiertas"], ["mine", "Mías"], ["review", "Para revisar"], ["draft", "Borradores"], ["merged", "Fusionadas"], ["closed", "Cerradas"]]) {
     entries.push({ label: `Ir a: ${label}`, hint: "bucket", run: () => switchBucket(bucket) });
   }
@@ -3683,8 +3811,8 @@ function switchRepo(repo) {
   renderRepoSelect();
   closeDetail();
   if (state.view === "history") loadHistory();
-  // Milestones y Releases son de grupo/global, no por repo: el cambio de repo no las afecta.
-  else if (state.view !== "milestones" && state.view !== "releases") refresh();
+  // Milestones, Releases y Trabajo local son de grupo/global, no por repo: el cambio de repo no las afecta.
+  else if (state.view !== "milestones" && state.view !== "releases" && state.view !== "local") refresh();
 }
 
 function openPalette() {

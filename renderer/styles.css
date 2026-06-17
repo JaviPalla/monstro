@@ -1156,3 +1156,24 @@ body {
 .rel-confirm-list { margin: 10px 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
 .rel-confirm-notes { margin: 8px 0; display: flex; flex-direction: column; gap: 6px; }
 .rel-confirm-note { font-size: 12px; color: var(--text); background: var(--yellow-bg); padding: 6px 9px; border-radius: 7px; }
+
+/* ============ Trabajo local → GitLab (OPE-19) ============ */
+.local-head { padding: 16px 20px 4px; }
+.local-head h2 { margin: 0 0 4px; font-size: 17px; }
+.local-desc { margin: 0; font-size: 13px; color: var(--text-muted); }
+.local-empty { margin: 24px 20px; padding: 28px; text-align: center; border: 1px dashed var(--border); border-radius: 12px; color: var(--text-muted); }
+.local-empty p { margin: 0 0 14px; font-size: 14px; }
+.local-root { display: flex; align-items: center; gap: 10px; margin: 12px 20px; padding: 8px 12px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 9px; }
+.local-root-path { flex: 1; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn.local-change { padding: 4px 10px; font-size: 12px; }
+.local-repos { display: flex; flex-direction: column; gap: 8px; margin: 4px 20px 24px; }
+.local-repo { padding: 10px 14px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px; }
+.local-repo-top { display: flex; align-items: center; gap: 10px; }
+.local-name { font-weight: 600; font-size: 14px; }
+.local-badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); }
+.local-badge.ok { color: var(--green); border-color: var(--green); background: var(--green-bg); }
+.local-badge.none { opacity: 0.7; }
+.local-repo-meta { margin-top: 6px; display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--text-muted); }
+.local-cur { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.local-dirty { color: var(--accent); }
+.local-err { color: var(--red); }
