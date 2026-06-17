@@ -798,6 +798,14 @@ async function createMergeRequest(repoFullName, { sourceBranch, targetBranch, ti
   return { number: mr.iid, projectPath: repoFullName, url: mr.web_url, title: mr.title };
 }
 
+// Crea una "Epic": en esta instancia las epics son issues del proyecto `${group}/epics`. Devuelve la
+// misma forma mínima que createIssue (iid, projectPath, url, title).
+async function createEpic({ title, description, labels }) {
+  const group = milestonesGroup();
+  if (!group) throw new Error("No hay grupo configurado para epics (revisa repos o config.milestones.group).");
+  return createIssue(`${group}/epics`, { title, description, labels });
+}
+
 // Las Epics viven como issues en el proyecto "epics" del grupo: las detectamos por el último
 // segmento del path del proyecto en su URL.
 // ponytail: nombre de proyecto "epics" hardcodeado; si vuestra instancia lo llama distinto,
@@ -951,6 +959,7 @@ module.exports = {
   updateIssue,
   createIssue,
   createMergeRequest,
+  createEpic,
   collapseMilestoneEpics,
   releaseDefaults,
   generateReleaseBranches,

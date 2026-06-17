@@ -38,7 +38,7 @@ const state = {
   // Issues/Epics + MRs. `tab`: "crear" (Issue/Epic nuevos) | "vincular" (a una tarea existente).
   // `rootDir` = directorio raíz donde conviven los clones; `repos` = lo escaneado por local:repos.
   // `form` = formulario de "Crear tarea" abierto para un repo (null = listado). Ver openLocalForm.
-  local: { tab: "crear", rootDir: null, repos: [], loading: false, info: {}, form: null },
+  local: { tab: "crear", rootDir: null, repos: [], loading: false, info: {}, selected: new Set(), form: null },
   prSnapshot: null, // nº → {reviewDecision, checks, reviewMe} para detectar cambios y notificar
   cursor: -1, // selección con teclado (j/k) en la lista
   draftKeys: new Set(), // "owner/repo#n" con borradores guardados → badge 📝 en la lista
@@ -3608,7 +3608,8 @@ function renderLocal() {
   }
 
   const repos = l.repos || [];
-  // En "crear" solo tienen sentido los repos casados con GitLab (hay que crear Issue/MR en su proyecto).
+  // En "crear" solo se pueden marcar los repos casados con GitLab (hay que crear Issue/MR en su proyecto).
+  // Selección múltiple: 1 marcado → tarea single; 2+ → Epic (una Epic + una Task/MR por proyecto).
   const cards = repos
     .map((r) => {
       const info = l.info[r.dir] || {};
@@ -3622,13 +3623,14 @@ function renderLocal() {
         : `<span class="local-cur">⎇ ${esc(info.current || "—")}</span>
            ${info.dirty ? `<span class="local-dirty" title="Cambios sin commitear">● sucio</span>` : ""}
            <span class="local-count">${(info.branches || []).length} ramas · ${(info.worktrees || []).length} worktrees</span>`;
-      const clickable = isCrear && r.gitlabPath;
+      const selectable = isCrear && r.gitlabPath;
+      const checked = l.selected.has(r.dir);
       return `
-        <div class="local-repo ${clickable ? "clickable" : ""}" ${clickable ? `data-dir="${esc(r.dir)}"` : ""} ${clickable ? 'title="Crear tarea desde este repo"' : ""}>
+        <div class="local-repo ${selectable ? "selectable" : ""} ${checked ? "checked" : ""}" ${selectable ? `data-dir="${esc(r.dir)}"` : ""}>
           <div class="local-repo-top">
+            ${selectable ? `<input type="checkbox" class="local-cb" ${checked ? "checked" : ""} />` : ""}
             <span class="local-name">${esc(r.name)}</span>
             ${badge}
-            ${clickable ? `<span class="local-go">Crear tarea →</span>` : ""}
           </div>
           <div class="local-repo-meta">${meta}</div>
         </div>`;
@@ -3639,6 +3641,15 @@ function renderLocal() {
     ? ""
     : `<div class="local-soon">El flujo de <b>vincular</b> a una Issue/Epic existente llega en la siguiente fase. De momento puedes ver tus repos locales aquí.</div>`;
 
+  const selCount = isCrear ? l.selected.size : 0;
+  const actionBar =
+    isCrear && repos.some((r) => r.gitlabPath)
+      ? `<div class="local-actionbar">
+          <span class="local-selcount">${selCount} seleccionado${selCount === 1 ? "" : "s"}${selCount > 1 ? " · se creará una Epic" : ""}</span>
+          <button class="btn btn-primary" id="local-continue" ${selCount ? "" : "disabled"}>${selCount > 1 ? "Crear épica →" : "Crear tarea →"}</button>
+        </div>`
+      : "";
+
   list.innerHTML =
     head +
     `<div class="local-root">
@@ -3646,28 +3657,37 @@ function renderLocal() {
       <button class="btn local-change" id="local-pick">Cambiar…</button>
     </div>
     ${vincularNote}
-    ${repos.length ? `<div class="local-repos">${cards}</div>` : `<div class="local-empty"><p>No se han encontrado repos git directamente bajo ese directorio.</p></div>`}`;
+    ${repos.length ? `<div class="local-repos">${cards}</div>` : `<div class="local-empty"><p>No se han encontrado repos git directamente bajo ese directorio.</p></div>`}
+    ${actionBar}`;
   $("#local-pick")?.addEventListener("click", pickLocalRoot);
-  list.querySelectorAll(".local-repo.clickable").forEach((el) =>
-    el.addEventListener("click", () => openLocalForm(el.dataset.dir)),
+  list.querySelectorAll(".local-repo.selectable").forEach((el) =>
+    el.addEventListener("click", () => {
+      const dir = el.dataset.dir;
+      if (l.selected.has(dir)) l.selected.delete(dir);
+      else l.selected.add(dir);
+      renderLocal();
+    }),
   );
+  $("#local-continue")?.addEventListener("click", () => openLocalForm([...l.selected]));
   notifySelftestOnce();
 }
 
-// Abre el formulario "Crear tarea" para el repo en `dir`. Siembra rama origen (la actual) y destino.
-function openLocalForm(dir) {
+// Abre el formulario para los repos `dirs` (1 = tarea single; 2+ = Epic). Siembra rama origen/destino.
+function openLocalForm(dirs) {
   const l = state.local;
-  const repo = (l.repos || []).find((r) => r.dir === dir);
-  if (!repo) return;
-  const info = l.info[dir] || {};
+  const projects = (Array.isArray(dirs) ? dirs : [dirs])
+    .map((dir) => {
+      const repo = (l.repos || []).find((r) => r.dir === dir);
+      if (!repo) return null;
+      const info = l.info[dir] || {};
+      return { repo, info, sourceBranch: info.current || (info.branches?.[0]?.name ?? ""), targetBranch: "development", title: "", description: "", checklist: "" };
+    })
+    .filter(Boolean);
+  if (!projects.length) return;
   l.form = {
-    repo,
-    info,
-    sourceBranch: info.current || (info.branches?.[0]?.name ?? ""),
-    targetBranch: "development",
-    title: "",
-    description: "",
-    checklist: "",
+    epic: projects.length > 1,
+    epicTitle: "",
+    projects,
     mode: "ia", // "ia" | "manual"
     push: true,
     aiLoading: false,
@@ -3687,37 +3707,54 @@ function closeLocalForm() {
 function syncLocalForm() {
   const f = state.local.form;
   if (!f) return;
-  f.sourceBranch = $("#lf-source")?.value ?? f.sourceBranch;
-  f.targetBranch = ($("#lf-target")?.value ?? f.targetBranch).trim();
-  f.title = $("#lf-title")?.value ?? f.title;
-  f.description = $("#lf-desc")?.value ?? f.description;
-  f.checklist = $("#lf-checklist")?.value ?? f.checklist;
+  if (f.epic) f.epicTitle = $("#lf-epic-title")?.value ?? f.epicTitle;
   f.push = $("#lf-push") ? $("#lf-push").checked : f.push;
+  f.projects.forEach((p, i) => {
+    p.sourceBranch = $(`#lf-source-${i}`)?.value ?? p.sourceBranch;
+    p.targetBranch = ($(`#lf-target-${i}`)?.value ?? p.targetBranch).trim();
+    p.title = $(`#lf-title-${i}`)?.value ?? p.title;
+    p.description = $(`#lf-desc-${i}`)?.value ?? p.description;
+    p.checklist = $(`#lf-checklist-${i}`)?.value ?? p.checklist;
+  });
+}
+
+// Bloque de campos de un proyecto dentro del form. En Epic, desc/checklist van en un <details> para
+// no hacer el formulario kilométrico; en single van siempre visibles.
+function localProjectBlock(p, i, epic) {
+  const branches = p.info.branches || [];
+  const branchOpts = branches.length
+    ? branches.map((b) => `<option value="${esc(b.name)}" ${b.name === p.sourceBranch ? "selected" : ""}>${esc(b.name)}</option>`).join("")
+    : `<option value="${esc(p.sourceBranch)}">${esc(p.sourceBranch || "—")}</option>`;
+  const fields = `
+    <div class="lf-row">
+      <label>Rama origen<select id="lf-source-${i}">${branchOpts}</select></label>
+      <label>Rama destino<input id="lf-target-${i}" type="text" value="${esc(p.targetBranch)}" placeholder="development" /></label>
+    </div>
+    <label class="lf-field">Título<input id="lf-title-${i}" type="text" value="${esc(p.title)}" placeholder="Título de la tarea" /></label>
+    <label class="lf-field">Descripción<textarea id="lf-desc-${i}" rows="${epic ? 3 : 5}" placeholder="Qué cambia y por qué (markdown)">${esc(p.description)}</textarea></label>
+    <label class="lf-field">Puntos a comprobar <span class="muted">(uno por línea)</span><textarea id="lf-checklist-${i}" rows="${epic ? 3 : 5}" placeholder="- Verificar que…">${esc(p.checklist)}</textarea></label>`;
+  if (!epic) return `<div class="lf-proj">${fields}</div>`;
+  return `<details class="lf-proj" open>
+    <summary><span class="local-name">${esc(p.repo.name)}</span> <span class="local-badge ok">${esc(p.repo.gitlabPath)}</span></summary>
+    ${fields}
+  </details>`;
 }
 
 function renderLocalForm() {
   const f = state.local.form;
-  const branches = f.info.branches || [];
-  const branchOpts = branches.length
-    ? branches.map((b) => `<option value="${esc(b.name)}" ${b.name === f.sourceBranch ? "selected" : ""}>${esc(b.name)}</option>`).join("")
-    : `<option value="${esc(f.sourceBranch)}">${esc(f.sourceBranch || "—")}</option>`;
-
   if (f.result) return renderLocalResult();
+
+  const headTitle = f.epic ? `Crear épica · ${f.projects.length} proyectos` : `Crear tarea · ${esc(f.projects[0].repo.name)}`;
+  const headDesc = f.epic
+    ? `Se creará una <b>Epic</b> y, en cada proyecto, una <b>Issue</b> + una <b>MR</b> vinculadas a la Epic.`
+    : `${esc(f.projects[0].repo.gitlabPath)} — se creará una <b>Issue</b> y una <b>MR</b> con tu rama local.`;
 
   list.innerHTML = `
     <div class="local-head">
-      <h2>Crear tarea · ${esc(f.repo.name)}</h2>
-      <p class="local-desc">${esc(f.repo.gitlabPath)} — se creará una <b>Issue</b> y una <b>MR</b> con tu rama local.</p>
+      <h2>${headTitle}</h2>
+      <p class="local-desc">${headDesc}</p>
     </div>
     <div class="lf">
-      <div class="lf-row">
-        <label>Rama origen
-          <select id="lf-source">${branchOpts}</select>
-        </label>
-        <label>Rama destino
-          <input id="lf-target" type="text" value="${esc(f.targetBranch)}" placeholder="development" />
-        </label>
-      </div>
       <div class="lf-mode">
         <span>Contenido:</span>
         <button class="lf-chip ${f.mode === "ia" ? "on" : ""}" id="lf-mode-ia">✨ Generar con IA</button>
@@ -3725,19 +3762,12 @@ function renderLocalForm() {
         ${f.mode === "ia" ? `<button class="btn" id="lf-suggest" ${f.aiLoading ? "disabled" : ""}>${f.aiLoading ? "Generando…" : "Sugerir con IA"}</button>` : ""}
       </div>
       ${f.error ? `<div class="error-box">${esc(f.error)}</div>` : ""}
-      <label class="lf-field">Título
-        <input id="lf-title" type="text" value="${esc(f.title)}" placeholder="Título de la tarea" />
-      </label>
-      <label class="lf-field">Descripción
-        <textarea id="lf-desc" rows="5" placeholder="Qué cambia y por qué (markdown)">${esc(f.description)}</textarea>
-      </label>
-      <label class="lf-field">Puntos a comprobar <span class="muted">(uno por línea)</span>
-        <textarea id="lf-checklist" rows="5" placeholder="- Verificar que…">${esc(f.checklist)}</textarea>
-      </label>
-      <label class="lf-check"><input type="checkbox" id="lf-push" ${f.push ? "checked" : ""} /> Hacer push de la rama a origin antes de crear la MR</label>
+      ${f.epic ? `<label class="lf-field">Título de la Epic<input id="lf-epic-title" type="text" value="${esc(f.epicTitle)}" placeholder="Título de la Epic" /></label>` : ""}
+      ${f.projects.map((p, i) => localProjectBlock(p, i, f.epic)).join("")}
+      <label class="lf-check"><input type="checkbox" id="lf-push" ${f.push ? "checked" : ""} /> Hacer push de las ramas a origin antes de crear las MR</label>
       <div class="lf-actions">
         <button class="btn" id="lf-cancel">← Volver</button>
-        <button class="btn btn-primary" id="lf-create" ${f.creating ? "disabled" : ""}>${f.creating ? "Creando…" : "Crear Issue + MR"}</button>
+        <button class="btn btn-primary" id="lf-create" ${f.creating ? "disabled" : ""}>${f.creating ? "Creando…" : f.epic ? "Crear Epic + tareas" : "Crear Issue + MR"}</button>
       </div>
     </div>`;
 
@@ -3749,6 +3779,8 @@ function renderLocalForm() {
   notifySelftestOnce();
 }
 
+const checklistToText = (arr) => (Array.isArray(arr) && arr.length ? arr.map((c) => `- ${c}`).join("\n") : "");
+
 async function suggestLocalTask() {
   const f = state.local.form;
   syncLocalForm();
@@ -3756,15 +3788,24 @@ async function suggestLocalTask() {
   f.error = null;
   renderLocal();
   try {
-    const out = await window.pulpo.localProposeTask({
-      dir: f.repo.dir,
-      repoName: f.repo.gitlabPath || f.repo.name,
-      sourceBranch: f.sourceBranch,
-      targetBranch: f.targetBranch,
-    });
-    f.title = out.title || f.title;
-    f.description = out.description || f.description;
-    if (Array.isArray(out.checklist) && out.checklist.length) f.checklist = out.checklist.map((c) => `- ${c}`).join("\n");
+    if (f.epic) {
+      const out = await window.pulpo.localProposeEpic({
+        projects: f.projects.map((p) => ({ dir: p.repo.dir, repoName: p.repo.gitlabPath || p.repo.name, sourceBranch: p.sourceBranch, targetBranch: p.targetBranch })),
+      });
+      f.epicTitle = out.epicTitle || f.epicTitle;
+      out.projects.forEach((pr, i) => {
+        if (!f.projects[i]) return;
+        f.projects[i].title = pr.title || f.projects[i].title;
+        f.projects[i].description = pr.description || f.projects[i].description;
+        if (pr.checklist?.length) f.projects[i].checklist = checklistToText(pr.checklist);
+      });
+    } else {
+      const p = f.projects[0];
+      const out = await window.pulpo.localProposeTask({ dir: p.repo.dir, repoName: p.repo.gitlabPath || p.repo.name, sourceBranch: p.sourceBranch, targetBranch: p.targetBranch });
+      p.title = out.title || p.title;
+      p.description = out.description || p.description;
+      if (out.checklist?.length) p.checklist = checklistToText(out.checklist);
+    }
   } catch (err) {
     f.error = `IA: ${String(err.message || err)}`;
   } finally {
@@ -3773,16 +3814,22 @@ async function suggestLocalTask() {
   }
 }
 
+const parseChecklist = (text) => (text || "").split("\n").map((s) => s.replace(/^\s*[-*]\s?/, "").trim()).filter(Boolean);
+
 function confirmCreateLocalTask() {
   const f = state.local.form;
   syncLocalForm();
-  if (!f.title.trim()) { f.error = "El título es obligatorio."; renderLocal(); return; }
+  if (f.epic && !f.epicTitle.trim()) { f.error = "El título de la Epic es obligatorio."; renderLocal(); return; }
+  if (f.projects.some((p) => !p.title.trim())) { f.error = "Cada proyecto necesita un título."; renderLocal(); return; }
+  const summary = f.epic
+    ? `Se creará la <b>Epic</b> «${esc(f.epicTitle)}» y, en ${f.projects.length} proyectos, una <b>Issue</b> + una <b>MR</b> cada uno${f.push ? ", tras <b>pushear</b> las ramas" : ""}. Acción irreversible.`
+    : `En <b>${esc(f.projects[0].repo.gitlabPath)}</b> se creará una <b>Issue</b> y una <b>MR</b> <code>${esc(f.projects[0].sourceBranch)} → ${esc(f.projects[0].targetBranch)}</code>${f.push ? ", tras <b>pushear</b> la rama" : ""}. Acción irreversible.`;
   const root = $("#modal-root");
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>↗ Crear tarea en GitLab</h3>
-        <p class="muted">En <b>${esc(f.repo.gitlabPath)}</b> se creará una <b>Issue</b> y una <b>MR</b> <code>${esc(f.sourceBranch)} → ${esc(f.targetBranch)}</code>${f.push ? ", tras <b>pushear</b> la rama" : ""}. Acción irreversible.</p>
+        <h3>↗ Crear en GitLab</h3>
+        <p class="muted">${summary}</p>
         <div class="modal-actions">
           <button class="btn" id="modal-cancel">Cancelar</button>
           <button class="btn btn-primary" id="modal-confirm">Crear en GitLab</button>
@@ -3800,54 +3847,86 @@ async function createLocalTask() {
   f.error = null;
   renderLocal();
   try {
-    const checklist = f.checklist.split("\n").map((s) => s.replace(/^\s*[-*]\s?/, "").trim()).filter(Boolean);
-    f.result = await window.pulpo.localCreateTask({
-      dir: f.repo.dir,
-      projectPath: f.repo.gitlabPath,
-      sourceBranch: f.sourceBranch,
-      targetBranch: f.targetBranch,
-      title: f.title.trim(),
-      description: f.description,
-      checklist,
-      push: f.push,
-    });
-    toast("Issue + MR creadas ✓", "ok");
+    if (f.epic) {
+      f.result = await window.pulpo.localCreateEpicTask({
+        epicTitle: f.epicTitle.trim(),
+        epicDescription: "",
+        projects: f.projects.map((p) => ({
+          dir: p.repo.dir,
+          projectPath: p.repo.gitlabPath,
+          sourceBranch: p.sourceBranch,
+          targetBranch: p.targetBranch,
+          title: p.title.trim(),
+          description: p.description,
+          checklist: parseChecklist(p.checklist),
+          push: f.push,
+        })),
+      });
+      const ok = f.result.results.filter((x) => x.ok).length;
+      toast(`Epic + ${ok}/${f.result.results.length} tareas creadas ✓`, ok === f.result.results.length ? "ok" : "warn");
+    } else {
+      const p = f.projects[0];
+      f.result = await window.pulpo.localCreateTask({
+        dir: p.repo.dir,
+        projectPath: p.repo.gitlabPath,
+        sourceBranch: p.sourceBranch,
+        targetBranch: p.targetBranch,
+        title: p.title.trim(),
+        description: p.description,
+        checklist: parseChecklist(p.checklist),
+        push: f.push,
+      });
+      toast("Issue + MR creadas ✓", "ok");
+    }
   } catch (err) {
     f.error = String(err.message || err);
-    toast("Error al crear la tarea", "err");
+    toast("Error al crear", "err");
   } finally {
     f.creating = false;
     renderLocal();
   }
 }
 
+const extLink = (url, label) => `<a href="${esc(url)}" class="lf-result-link" data-ext>${esc(label)}</a>`;
+
 function renderLocalResult() {
   const f = state.local.form;
-  const { issue, mr } = f.result;
+  let bodyHtml;
+  let primaryMr = null;
+  if (f.epic) {
+    const { epic, results } = f.result;
+    primaryMr = (results.find((r) => r.ok) || {}).mr || null;
+    const rows = results
+      .map((r) =>
+        r.ok
+          ? `<div class="lf-result-card"><span class="lf-result-k">${esc(r.projectPath)}</span>${extLink(r.task.url, `#${r.task.iid}`)} · ${extLink(r.mr.url, `!${r.mr.number}`)}</div>`
+          : `<div class="lf-result-card err"><span class="lf-result-k">${esc(r.projectPath)}</span><span class="local-err">${esc(r.error)}</span></div>`,
+      )
+      .join("");
+    bodyHtml = `<div class="lf-result-card"><span class="lf-result-k">Epic</span>${extLink(epic.url, `#${epic.iid} · ${epic.title}`)}</div>${rows}`;
+  } else {
+    const { issue, mr } = f.result;
+    primaryMr = mr;
+    bodyHtml = `
+      <div class="lf-result-card"><span class="lf-result-k">Issue</span>${extLink(issue.url, `#${issue.iid} · ${issue.title}`)}</div>
+      <div class="lf-result-card"><span class="lf-result-k">Merge Request</span>${extLink(mr.url, `!${mr.number} · ${mr.title}`)}</div>`;
+  }
   list.innerHTML = `
     <div class="local-head">
-      <h2>✓ Tarea creada</h2>
-      <p class="local-desc">${esc(f.repo.gitlabPath)}</p>
+      <h2>✓ ${f.epic ? "Epic creada" : "Tarea creada"}</h2>
     </div>
     <div class="lf-result">
-      <div class="lf-result-card">
-        <span class="lf-result-k">Issue</span>
-        <a href="${esc(issue.url)}" class="lf-result-link" data-ext>#${esc(String(issue.iid))} · ${esc(issue.title)}</a>
-      </div>
-      <div class="lf-result-card">
-        <span class="lf-result-k">Merge Request</span>
-        <a href="${esc(mr.url)}" class="lf-result-link" data-ext>!${esc(String(mr.number))} · ${esc(mr.title)}</a>
-      </div>
+      ${bodyHtml}
       <div class="lf-actions">
-        <button class="btn" id="lf-again">Crear otra</button>
-        <button class="btn btn-accent" id="lf-openmr">Ver MR en Pulpo</button>
+        <button class="btn" id="lf-back">Volver al listado</button>
+        ${primaryMr ? `<button class="btn btn-accent" id="lf-openmr">Ver MR en Pulpo</button>` : ""}
       </div>
     </div>`;
   list.querySelectorAll("a[data-ext]").forEach((a) =>
     a.addEventListener("click", (e) => { e.preventDefault(); window.pulpo.openExternal(a.getAttribute("href")); }),
   );
-  $("#lf-again").addEventListener("click", () => openLocalForm(f.repo.dir));
-  $("#lf-openmr").addEventListener("click", () => openLocalMrInPulpo(mr));
+  $("#lf-back").addEventListener("click", () => { state.local.selected.clear(); closeLocalForm(); });
+  if (primaryMr) $("#lf-openmr").addEventListener("click", () => openLocalMrInPulpo(primaryMr));
   notifySelftestOnce();
 }
 
@@ -3950,8 +4029,10 @@ async function runLocalSelftest() {
   state.selftestNotified = true;
   try {
     await enterLocal("crear");
-    const first = (state.local.repos || []).find((r) => r.gitlabPath);
-    if (first) openLocalForm(first.dir);
+    // Dos proyectos casados → captura el formulario de Epic (lo nuevo de la Fase 3).
+    const gl = (state.local.repos || []).filter((r) => r.gitlabPath).slice(0, 2);
+    if (gl.length >= 2) openLocalForm(gl.map((r) => r.dir));
+    else if (gl.length === 1) openLocalForm(gl[0].dir);
   } catch (err) {
     console.error("[selftest] local failed:", err);
   } finally {

@@ -435,6 +435,10 @@ async function createMergeRequest() {
   throw new Error("Crear tareas desde Trabajo local solo está disponible en GitLab.");
 }
 
+async function createEpic() {
+  throw new Error("Crear epics desde Trabajo local solo está disponible en GitLab.");
+}
+
 async function revertPullRequest(prNodeId) {
   const data = await gql(
     `mutation ($id: ID!) {
@@ -511,4 +515,5 @@ module.exports = {
   createSnippet,
   createIssue,
   createMergeRequest,
+  createEpic,
 };

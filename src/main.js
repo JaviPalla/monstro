@@ -224,6 +224,52 @@ function wireIpc() {
     });
     return { push: pushResult, issue, mr };
   });
+  // Propuesta IA para una Epic multiproyecto: calcula el diff de cada proyecto y se lo pasa a la IA.
+  ipcMain.handle("local:proposeEpic", async (_event, { projects }) => {
+    const list = Array.isArray(projects) ? projects : [];
+    const withDiff = [];
+    for (const p of list) {
+      localRootGuard(p.dir);
+      const diff = await local.branchDiff(p.dir, p.targetBranch, p.sourceBranch);
+      withDiff.push({ name: p.repoName, branch: p.sourceBranch, diff });
+    }
+    return ai.proposeEpic({ projects: withDiff });
+  });
+  // Orquesta el flujo Epic multiproyecto: crea la Epic (issue en `${group}/epics`), luego por cada
+  // proyecto push → Task (issue, referencia la Epic) → MR (Closes #task, referencia la Epic).
+  // Secuencial y NO atómico: cada proyecto se reporta por separado; si la Epic falla, no sigue.
+  ipcMain.handle("local:createEpicTask", async (_event, { epicTitle, epicDescription, projects }) => {
+    const branchRe = /^[\w./-]{1,200}$/;
+    const projRe = /^[\w.-]+(\/[\w.-]+)*$/;
+    const list = Array.isArray(projects) ? projects : [];
+    if (!epicTitle || !String(epicTitle).trim()) throw new Error("El título de la Epic es obligatorio");
+    if (list.length < 2) throw new Error("Una Epic necesita al menos 2 proyectos");
+    const epic = await gh().createEpic({ title: String(epicTitle).trim(), description: epicDescription || "" });
+    const epicRef = `${epic.projectPath}#${epic.iid}`;
+    const results = [];
+    for (const p of list) {
+      try {
+        localRootGuard(p.dir);
+        if (!projRe.test(p.projectPath || "")) throw new Error("Proyecto no válido");
+        if (!branchRe.test(p.sourceBranch || "") || !branchRe.test(p.targetBranch || "")) throw new Error("Rama no válida");
+        if (!p.title || !String(p.title).trim()) throw new Error("Falta el título de la tarea");
+        const checkItems = (Array.isArray(p.checklist) ? p.checklist : []).filter((c) => typeof c === "string" && c.trim());
+        const checklistMd = checkItems.length ? `\n\n## Puntos a comprobar\n${checkItems.map((c) => `- [ ] ${c.trim()}`).join("\n")}` : "";
+        if (p.push) await local.pushBranch(p.dir, p.sourceBranch);
+        const task = await gh().createIssue(p.projectPath, { title: String(p.title).trim(), description: `Épica: ${epicRef}\n\n${p.description || ""}${checklistMd}`, labels: [] });
+        const mr = await gh().createMergeRequest(p.projectPath, {
+          sourceBranch: p.sourceBranch,
+          targetBranch: p.targetBranch,
+          title: String(p.title).trim(),
+          description: `Closes #${task.iid}\nÉpica: ${epicRef}\n\n${p.description || ""}${checklistMd}`,
+        });
+        results.push({ projectPath: p.projectPath, ok: true, task, mr });
+      } catch (err) {
+        results.push({ projectPath: p.projectPath, ok: false, error: String(err.message || err) });
+      }
+    }
+    return { epic, results };
+  });
 
   ipcMain.handle("prs:list", async (_event, { repo, states }) => gh().listPRs(repo, states));
   ipcMain.handle("prs:search", async (_event, { repos, states }) => gh().searchPRs(repos, states));

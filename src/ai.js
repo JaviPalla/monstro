@@ -389,6 +389,68 @@ async function proposeTask({ diffText, repoName, branch }) {
   };
 }
 
+const EPIC_SCHEMA = {
+  type: "object",
+  properties: {
+    epicTitle: { type: "string", description: "Título conciso de la Epic, en español, que englobe el cambio en todos los proyectos." },
+    projects: {
+      type: "array",
+      description: "Una entrada por proyecto, EN EL MISMO ORDEN que la lista de entrada.",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Título de la tarea para ESE proyecto, en español." },
+          description: { type: "string", description: "Descripción (markdown) del cambio en ESE proyecto, en español." },
+          checklist: { type: "array", items: { type: "string" }, description: "2 a 8 puntos a comprobar de ese proyecto." },
+        },
+        required: ["title", "description", "checklist"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["epicTitle", "projects"],
+  additionalProperties: false,
+};
+
+function buildEpicPrompt(projects) {
+  const blocks = projects
+    .map((p, i) => `## [${i}] Proyecto: ${p.name} (rama ${p.branch})\n${(p.diff || "(sin diff disponible)").slice(0, Math.floor(MAX_DIFF_CHARS / projects.length))}`)
+    .join("\n\n");
+  return `Eres un ingeniero senior preparando una EPIC en GitLab que agrupa un mismo cambio repartido en ${projects.length} proyectos.
+
+Para cada proyecto te paso su diff (encabezado con su índice entre corchetes). Devuelve:
+- "epicTitle": un título en ESPAÑOL para la Epic que englobe el cambio completo.
+- "projects": un objeto por proyecto, EN EL MISMO ORDEN, con "title" (título de la tarea de ese proyecto), "description" (markdown, qué cambia y por qué en ese proyecto) y "checklist" (2-8 puntos a comprobar concretos), todo en ESPAÑOL.
+
+Responde SOLO con un objeto JSON con esta forma (sin prosa ni cercos):
+{"epicTitle": string, "projects": [{"title": string, "description": string, "checklist": [string]}]}
+
+${blocks}`;
+}
+
+// Propuesta IA para una Epic multiproyecto: título de Epic + título/descripción/checklist por proyecto.
+// Devuelve siempre `projects` alineado por índice con la entrada (rellena huecos para no descuadrar la UI).
+async function proposeEpic({ projects }) {
+  const list = Array.isArray(projects) ? projects : [];
+  if (!list.length) throw new Error("No hay proyectos que proponer.");
+  const { data, backend, model, effort } = await runStructured(buildEpicPrompt(list), EPIC_SCHEMA);
+  const out = Array.isArray(data.projects) ? data.projects : [];
+  return {
+    epicTitle: typeof data.epicTitle === "string" ? data.epicTitle.trim() : "",
+    projects: list.map((_, i) => {
+      const p = out[i] || {};
+      return {
+        title: typeof p.title === "string" ? p.title.trim() : "",
+        description: typeof p.description === "string" ? p.description : "",
+        checklist: (Array.isArray(p.checklist) ? p.checklist : []).filter((x) => typeof x === "string" && x.trim()).slice(0, 8),
+      };
+    }),
+    backend,
+    model,
+    effort,
+  };
+}
+
 /** Estado del backend de IA, para onboarding y ajustes. */
 function backendStatus() {
   const { model, effort } = aiSettings();
@@ -444,4 +506,4 @@ function isAiEffort(level) {
   return ALL_EFFORTS.includes(level);
 }
 
-module.exports = { generateReview, summarizeMilestone, proposeTask, backendStatus, ping, isAiModel, isAiEffort };
+module.exports = { generateReview, summarizeMilestone, proposeTask, proposeEpic, backendStatus, ping, isAiModel, isAiEffort };
