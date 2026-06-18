@@ -295,7 +295,7 @@ function resumeRun(runId, projectDir, guidance) {
   const proj = findProj(run, projectDir);
   if (!proj || !proj.worktree) throw new Error("Proyecto del run no encontrado.");
   if (procs.has(`${runId}:${projectDir}`)) throw new Error("Ese agente ya está en marcha.");
-  proj.timeline.push({ kind: "say", text: guidance ? `↻ Reanudado con feedback: ${guidance}` : "↻ Reanudado", ts: Date.now() });
+  proj.timeline.push({ kind: "say", text: guidance ? `↻ Reanudado con feedback: ${guidance}` : (proj.sessionId ? "↻ Reanudado" : "↻ Reintentado tras fallo"), ts: Date.now() });
   spawnAgent(run, proj, guidance);
   return { ok: true };
 }
