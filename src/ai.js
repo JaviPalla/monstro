@@ -344,6 +344,12 @@ async function summarizeMilestone({ milestoneTitle, items }) {
 
 /* ---------- propuesta de tarea (Trabajo local → GitLab) ---------- */
 
+// Etiquetas que la IA puede sugerir: SOLO tipo de usuario afectado + prioridad (el usuario añade el
+// resto a mano desde las disponibles del grupo).
+const SUGGESTED_LABELS = ["patient user", "professional user", "center user", "high priority", "medium priority", "low priority"];
+const labelsSchema = { type: "array", items: { type: "string", enum: SUGGESTED_LABELS }, description: "Etiquetas que apliquen, SOLO de la lista permitida. Como mucho un tipo de usuario y una prioridad." };
+const labelsGuide = `- "labels": elige SOLO de esta lista las que apliquen — tipo de usuario afectado: "patient user", "professional user", "center user"; prioridad: "high priority", "medium priority", "low priority". Como mucho un tipo de usuario y una prioridad. Si no estás seguro, deja la lista vacía.`;
+
 const TASK_SCHEMA = {
   type: "object",
   properties: {
@@ -355,8 +361,9 @@ const TASK_SCHEMA = {
       description: "Puntos a comprobar del flujo (QA). Entre 2 y 8.",
     },
     commitMessage: { type: "string", description: "Mensaje de commit conciso en español (una línea, estilo imperativo). SIN el ID de la issue." },
+    labels: labelsSchema,
   },
-  required: ["title", "description", "checklist", "commitMessage"],
+  required: ["title", "description", "checklist", "commitMessage", "labels"],
   additionalProperties: false,
 };
 
@@ -368,9 +375,10 @@ Te paso el diff de la rama "${branch}" del repo "${repoName}". A partir de él:
 - "description": en ESPAÑOL (markdown), el PROPÓSITO de la tarea a nivel general (qué se busca conseguir y por qué). NO describas el detalle de implementación del código: NO menciones servicios, funciones, clases ni ficheros concretos. Si hace falta algún detalle técnico, exprésalo a nivel de ENDPOINTS a implementar (p.ej. "POST /pedidos"), nunca servicios o funciones concretas — salvo que el propósito mismo de la tarea SEA ese servicio/función.
 - "checklist": entre 2 y 8 PUNTOS A COMPROBAR del flujo introducido (QA), en ESPAÑOL, concretos y verificables (no genéricos).
 - "commitMessage": un mensaje de commit conciso en ESPAÑOL (una línea, imperativo, p.ej. "Añade exportación de pedidos a CSV"). NO incluyas el ID de la issue (se añade aparte).
+${labelsGuide}
 ${truncated ? "- Nota: el diff se truncó por longitud; tenlo en cuenta.\n" : ""}
 Responde SOLO con un objeto JSON con esta forma (sin prosa ni cercos):
-{"title": string, "description": string, "checklist": [string]}
+{"title": string, "description": string, "checklist": [string], "commitMessage": string, "labels": [string]}
 
 # Diff
 ${diffText || "(sin diff disponible: infiere lo que puedas del nombre de la rama)"}`;
@@ -386,6 +394,7 @@ async function proposeTask({ diffText, repoName, branch }) {
     description: typeof data.description === "string" ? data.description : "",
     checklist: (Array.isArray(data.checklist) ? data.checklist : []).filter((x) => typeof x === "string" && x.trim()).slice(0, 8),
     commitMessage: typeof data.commitMessage === "string" ? data.commitMessage.trim() : "",
+    labels: (Array.isArray(data.labels) ? data.labels : []).filter((x) => SUGGESTED_LABELS.includes(x)),
     backend,
     model,
     effort,
@@ -411,8 +420,9 @@ const EPIC_SCHEMA = {
         additionalProperties: false,
       },
     },
+    labels: labelsSchema,
   },
-  required: ["epicTitle", "projects"],
+  required: ["epicTitle", "projects", "labels"],
   additionalProperties: false,
 };
 
@@ -426,9 +436,11 @@ Para cada proyecto te paso su diff (encabezado con su índice entre corchetes). 
 - "epicTitle": un título en ESPAÑOL para la Epic que englobe el cambio completo.
 - "projects": un objeto por proyecto, EN EL MISMO ORDEN, con "title" (título de la tarea de ese proyecto), "description" y "checklist", todo en ESPAÑOL.
 La "description" debe ser el PROPÓSITO de la tarea a nivel general (qué se busca y por qué), NO el detalle de implementación: NO menciones servicios, funciones, clases ni ficheros concretos. Si hace falta detalle técnico, exprésalo a nivel de ENDPOINTS a implementar, nunca servicios/funciones concretas — salvo que el propósito de la tarea SEA ese servicio/función. El "checklist" son 2-8 puntos a comprobar concretos. El "commitMessage" es un mensaje de commit conciso (una línea, imperativo) SIN el ID de la issue.
+Además, a nivel raíz:
+${labelsGuide} (aplican a toda la Epic)
 
 Responde SOLO con un objeto JSON con esta forma (sin prosa ni cercos):
-{"epicTitle": string, "projects": [{"title": string, "description": string, "checklist": [string]}]}
+{"epicTitle": string, "labels": [string], "projects": [{"title": string, "description": string, "checklist": [string], "commitMessage": string}]}
 
 ${blocks}`;
 }
@@ -442,6 +454,7 @@ async function proposeEpic({ projects }) {
   const out = Array.isArray(data.projects) ? data.projects : [];
   return {
     epicTitle: typeof data.epicTitle === "string" ? data.epicTitle.trim() : "",
+    labels: (Array.isArray(data.labels) ? data.labels : []).filter((x) => SUGGESTED_LABELS.includes(x)),
     projects: list.map((_, i) => {
       const p = out[i] || {};
       return {

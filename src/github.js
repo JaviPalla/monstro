@@ -443,6 +443,16 @@ async function searchGroupIssues() {
   throw new Error("Vincular tareas desde Trabajo local solo está disponible en GitLab.");
 }
 
+async function createIssueLink() {
+  throw new Error("Vincular issues solo está disponible en GitLab.");
+}
+async function mrStatus() {
+  throw new Error("El estado del histórico solo está disponible en GitLab.");
+}
+async function issueStatus() {
+  throw new Error("El estado del histórico solo está disponible en GitLab.");
+}
+
 async function revertPullRequest(prNodeId) {
   const data = await gql(
     `mutation ($id: ID!) {
@@ -521,4 +531,7 @@ module.exports = {
   createMergeRequest,
   createEpic,
   searchGroupIssues,
+  createIssueLink,
+  mrStatus,
+  issueStatus,
 };

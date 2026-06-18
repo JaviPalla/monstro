@@ -1305,3 +1305,17 @@ div.lf-proj { border: 1px solid var(--border); border-radius: 10px; padding: 10p
 .lh-steps li.good { color: var(--text); }
 .lh-steps li.bad { color: var(--red); }
 .lh-nosteps { font-size: 12px; margin: 4px 0 0; }
+.lh-badge { font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); }
+.lh-badge.merged { color: #fff; background: #6f42c1; border-color: #6f42c1; }
+.lh-badge.closed { color: #fff; background: var(--red); border-color: var(--red); }
+.lh-badge.lbl { color: var(--text); background: var(--bg-hover); }
+
+/* Meta del formulario: milestone + etiquetas */
+.lf-meta { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-raised); }
+.lf-labels { display: flex; flex-direction: column; gap: 8px; }
+.lbl-group { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.lbl-cat { font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); min-width: 110px; }
+.lbl-chip { font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); color: var(--text-muted); cursor: pointer; }
+.lbl-chip.on { color: var(--text); border-color: var(--accent); }
+.lbl-more { font-size: 12px; }
+.lbl-more > summary { cursor: pointer; color: var(--text-muted); margin-bottom: 6px; }

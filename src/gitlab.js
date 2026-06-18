@@ -256,7 +256,7 @@ function decodeId(id) {
 
 async function viewer() {
   const me = await api("GET", "/user");
-  return { login: me.username, avatarUrl: me.avatar_url };
+  return { id: me.id, login: me.username, avatarUrl: me.avatar_url };
 }
 
 async function viewerRepos() {
@@ -775,12 +775,30 @@ async function updateIssue(projectId, iid, patch) {
 
 // Crea una issue en un proyecto. Devuelve {iid, projectPath, url, title} (forma mínima que consume
 // el flujo de Trabajo local; no normaliza a la forma de PR porque una issue no es una MR).
-async function createIssue(repoFullName, { title, description, labels }) {
+async function createIssue(repoFullName, { title, description, labels, milestoneId, assigneeIds }) {
   const body = { title };
   if (description) body.description = description;
   if (labels?.length) body.labels = labels.join(",");
+  if (milestoneId) body.milestone_id = milestoneId;
+  if (assigneeIds?.length) body.assignee_ids = assigneeIds;
   const issue = await api("POST", `/projects/${proj(repoFullName)}/issues`, body);
-  return { iid: issue.iid, projectPath: repoFullName, url: issue.web_url, title: issue.title };
+  return { iid: issue.iid, projectPath: repoFullName, projectId: issue.project_id, url: issue.web_url, title: issue.title };
+}
+
+// Vincula `targetIid` (en targetProjectId) como linked item de la issue iid. target_project_id acepta
+// id numérico o path URL-encoded. Best-effort para el flujo de Epic (no debe tumbar la creación).
+async function createIssueLink(projectPath, iid, targetProjectId, targetIid) {
+  return api("POST", `/projects/${proj(projectPath)}/issues/${iid}/links`, { target_project_id: targetProjectId, target_issue_iid: targetIid });
+}
+
+// Estado en vivo de una MR / issue para el histórico (#4b).
+async function mrStatus(projectPath, iid) {
+  const mr = await api("GET", `/projects/${proj(projectPath)}/merge_requests/${iid}`);
+  return { state: mr.state, merged: mr.state === "merged" };
+}
+async function issueStatus(projectPath, iid) {
+  const it = await api("GET", `/projects/${proj(projectPath)}/issues/${iid}`);
+  return { state: it.state, closed: it.state === "closed", labels: it.labels || [] };
 }
 
 // Crea una Merge Request sourceBranch -> targetBranch. squash:false y remove_source_branch:false
@@ -800,10 +818,10 @@ async function createMergeRequest(repoFullName, { sourceBranch, targetBranch, ti
 
 // Crea una "Epic": en esta instancia las epics son issues del proyecto `${group}/epics`. Devuelve la
 // misma forma mínima que createIssue (iid, projectPath, url, title).
-async function createEpic({ title, description, labels }) {
+async function createEpic({ title, description, labels, milestoneId, assigneeIds }) {
   const group = milestonesGroup();
   if (!group) throw new Error("No hay grupo configurado para epics (revisa repos o config.milestones.group).");
-  return createIssue(`${group}/epics`, { title, description, labels });
+  return createIssue(`${group}/epics`, { title, description, labels, milestoneId, assigneeIds });
 }
 
 // Busca issues abiertas en el grupo (incluye las del proyecto `epics` = epics) para el flujo de
@@ -977,6 +995,9 @@ module.exports = {
   createIssue,
   createMergeRequest,
   createEpic,
+  createIssueLink,
+  mrStatus,
+  issueStatus,
   searchGroupIssues,
   collapseMilestoneEpics,
   releaseDefaults,

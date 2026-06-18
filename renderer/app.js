@@ -38,7 +38,7 @@ const state = {
   // Issues/Epics + MRs. `tab`: "crear" (Issue/Epic nuevos) | "vincular" (a una tarea existente).
   // `rootDir` = directorio raíz donde conviven los clones; `repos` = lo escaneado por local:repos.
   // `form` = formulario de "Crear tarea" abierto para un repo (null = listado). Ver openLocalForm.
-  local: { tab: "crear", rootDir: null, repos: [], loading: false, info: {}, selected: new Set(), form: null, linkForm: null, history: [], historyDetail: null },
+  local: { tab: "crear", rootDir: null, repos: [], loading: false, info: {}, selected: new Set(), form: null, linkForm: null, history: [], historyDetail: null, milestones: null, groupLabels: null, historyStatus: {} },
   prSnapshot: null, // nº → {reviewDecision, checks, reviewMe} para detectar cambios y notificar
   cursor: -1, // selección con teclado (j/k) en la lista
   draftKeys: new Set(), // "owner/repo#n" con borradores guardados → badge 📝 en la lista
@@ -3560,6 +3560,29 @@ async function loadLocalHistory() {
   }
   l.loading = false;
   renderLocal();
+  if (!IS_SELFTEST) refreshHistoryStatuses(); // #4b: estado en vivo (merged / etiquetas), best-effort
+}
+
+// Reúne los items (MRs + issues/tareas) del histórico y pide su estado real a GitLab para los badges.
+async function refreshHistoryStatuses() {
+  const items = [];
+  for (const e of state.local.history || []) {
+    if (e.kind === "tarea") {
+      items.push({ type: "mr", projectPath: e.mr.projectPath, iid: e.mr.number }, { type: "issue", projectPath: e.issue.projectPath, iid: e.issue.iid });
+    } else if (e.kind === "epic") {
+      items.push({ type: "issue", projectPath: e.epic.projectPath, iid: e.epic.iid });
+      (e.results || []).forEach((r) => { if (r.ok) { items.push({ type: "mr", projectPath: r.projectPath, iid: r.mr.number }); if (r.task) items.push({ type: "issue", projectPath: r.projectPath, iid: r.task.iid }); } });
+    } else {
+      items.push({ type: "issue", projectPath: e.issue.projectPath, iid: e.issue.iid });
+      (e.results || []).forEach((r) => { if (r.ok) items.push({ type: "mr", projectPath: r.projectPath, iid: r.mr.number }); });
+    }
+  }
+  try {
+    state.local.historyStatus = (await window.pulpo.localItemStatuses(items)) || {};
+  } catch {
+    return;
+  }
+  if (state.view === "local" && state.local.tab === "historico") renderLocal();
 }
 
 async function loadLocal() {
@@ -3602,6 +3625,19 @@ const KIND_LABEL = { tarea: "Tarea", epic: "Epic", vincular: "Vinculación" };
 
 // Enlace-pill tipado (Issue/Epic/MR/Commit) a GitLab. Reutilizado por la lista y el detalle.
 const lhPill = (type, url, label) => `<a href="${esc(url)}" class="lh-pill lh-pill-${type}" data-ext>${esc(label)}</a>`;
+// Badges de estado en vivo (#4b): MR merged/closed; issue cerrada + etiquetas importantes.
+const IMPORTANT_LABEL_RE = /finished|pending check|needs fixing/i;
+const lhMrBadge = (pp, num) => {
+  const s = state.local.historyStatus[`mr:${pp}#${num}`];
+  return s?.merged ? `<span class="lh-badge merged">merged</span>` : s?.state === "closed" ? `<span class="lh-badge closed">closed</span>` : "";
+};
+const lhIssueBadges = (pp, iid) => {
+  const s = state.local.historyStatus[`issue:${pp}#${iid}`];
+  if (!s) return "";
+  const out = s.closed ? [`<span class="lh-badge closed">cerrada</span>`] : [];
+  for (const lbl of s.labels || []) if (IMPORTANT_LABEL_RE.test(lbl)) out.push(`<span class="lh-badge lbl">${esc(lbl)}</span>`);
+  return out.join("");
+};
 const lhDate = (ts) => { try { return new Date(ts).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }); } catch { return ts || ""; } };
 // ¿Algún paso o proyecto falló? (para el aviso ⚠ y que no pase desapercibido un push silencioso).
 function entryHasWarning(e) {
@@ -3625,18 +3661,18 @@ function renderLocalHistory() {
   }
   const projRow = (r, withTask) =>
     r.ok
-      ? `<div class="lh-proj"><span class="lh-proj-name">${projectIconHtml(r.projectPath)}${esc(projectMeta(r.projectPath).name)}</span><span class="lh-proj-pills">${withTask && r.task ? lhPill("issue", r.task.url, `Tarea #${r.task.iid}`) : ""}${lhPill("mr", r.mr.url, `MR !${r.mr.number}`)}${r.commit ? lhPill("commit", r.commit.url, r.commit.sha.slice(0, 8)) : ""}</span></div>`
+      ? `<div class="lh-proj"><span class="lh-proj-name">${projectIconHtml(r.projectPath)}${esc(projectMeta(r.projectPath).name)}</span><span class="lh-proj-pills">${withTask && r.task ? lhPill("issue", r.task.url, `Tarea #${r.task.iid}`) + lhIssueBadges(r.projectPath, r.task.iid) : ""}${lhPill("mr", r.mr.url, `MR !${r.mr.number}`)}${lhMrBadge(r.projectPath, r.mr.number)}${r.commit ? lhPill("commit", r.commit.url, r.commit.sha.slice(0, 8)) : ""}</span></div>`
       : `<div class="lh-proj err"><span class="lh-proj-name">${esc(r.projectPath)}</span><span class="local-err">⚠ ${esc(r.error)}</span></div>`;
   const cards = entries
     .map((e) => {
       let items = "";
       if (e.kind === "tarea") {
-        items = `<div class="lh-pills">${lhPill("issue", e.issue.url, `Issue #${e.issue.iid}`)}${lhPill("mr", e.mr.url, `MR !${e.mr.number}`)}${e.commit ? lhPill("commit", e.commit.url, `Commit ${e.commit.sha.slice(0, 8)}`) : ""}</div>`;
+        items = `<div class="lh-pills">${lhPill("issue", e.issue.url, `Issue #${e.issue.iid}`)}${lhIssueBadges(e.issue.projectPath, e.issue.iid)}${lhPill("mr", e.mr.url, `MR !${e.mr.number}`)}${lhMrBadge(e.mr.projectPath, e.mr.number)}${e.commit ? lhPill("commit", e.commit.url, `Commit ${e.commit.sha.slice(0, 8)}`) : ""}</div>`;
         if (e.projectPath) items = `<div class="lh-sub">${projectIconHtml(e.projectPath)}${esc(projectMeta(e.projectPath).name)}</div>` + items;
       } else if (e.kind === "epic") {
-        items = `<div class="lh-pills">${lhPill("epic", e.epic.url, `Epic #${e.epic.iid}`)}</div>${(e.results || []).map((r) => projRow(r, true)).join("")}`;
+        items = `<div class="lh-pills">${lhPill("epic", e.epic.url, `Epic #${e.epic.iid}`)}${lhIssueBadges(e.epic.projectPath, e.epic.iid)}</div>${(e.results || []).map((r) => projRow(r, true)).join("")}`;
       } else {
-        items = `<div class="lh-pills">${lhPill(e.issue.isEpic ? "epic" : "issue", e.issue.url, `${e.issue.isEpic ? "Epic" : "Issue"} ${e.issue.projectPath}#${e.issue.iid}`)}</div>${(e.results || []).map((r) => projRow(r, false)).join("")}`;
+        items = `<div class="lh-pills">${lhPill(e.issue.isEpic ? "epic" : "issue", e.issue.url, `${e.issue.isEpic ? "Epic" : "Issue"} ${e.issue.projectPath}#${e.issue.iid}`)}${lhIssueBadges(e.issue.projectPath, e.issue.iid)}</div>${(e.results || []).map((r) => projRow(r, false)).join("")}`;
       }
       const warn = entryHasWarning(e) ? `<span class="lh-warn" title="Algún paso no se completó — abre el detalle">⚠</span>` : "";
       return `
@@ -3821,6 +3857,29 @@ function renderLocal() {
 }
 
 // Abre el formulario para los repos `dirs` (1 = tarea single; 2+ = Epic). Siembra rama origen/destino.
+// Milestone activo "actual" por fechas (start_date ≤ hoy ≤ due_date); si ninguno encaja, null.
+function pickCurrentMilestoneId(ms) {
+  const today = new Date().toISOString().slice(0, 10);
+  const cur = (ms || []).find((m) => (!m.startDate || m.startDate <= today) && (!m.dueDate || m.dueDate >= today));
+  return cur ? cur.id : null;
+}
+
+// Carga (cacheada) milestones del grupo + etiquetas disponibles, para el selector del formulario.
+async function ensureLocalMeta() {
+  const l = state.local;
+  if (IS_SELFTEST) {
+    if (!l.milestones) l.milestones = [{ id: 55, title: "Junio 2026", startDate: "2026-06-01", dueDate: "2026-06-30" }, { id: 56, title: "Julio 2026", startDate: "2026-07-01", dueDate: "2026-07-31" }];
+    if (!l.groupLabels) l.groupLabels = [
+      { name: "patient user", color: "#1f75cb", textColor: "#fff" }, { name: "professional user", color: "#6f42c1", textColor: "#fff" }, { name: "center user", color: "#1a7f37", textColor: "#fff" },
+      { name: "high priority", color: "#dc3545", textColor: "#fff" }, { name: "medium priority", color: "#fd7e14", textColor: "#fff" }, { name: "low priority", color: "#6c757d", textColor: "#fff" },
+      { name: "finished", color: "#1a7f37", textColor: "#fff" }, { name: "needs fixing", color: "#dc3545", textColor: "#fff" },
+    ];
+    return;
+  }
+  if (!l.milestones) l.milestones = await window.pulpo.listMilestones().catch(() => []);
+  if (!l.groupLabels) l.groupLabels = await window.pulpo.groupLabels().catch(() => []);
+}
+
 function openLocalForm(dirs) {
   const l = state.local;
   const projects = (Array.isArray(dirs) ? dirs : [dirs])
@@ -3839,11 +3898,18 @@ function openLocalForm(dirs) {
     projects,
     mode: "ia", // "ia" | "manual"
     push: true,
+    milestoneId: null,
+    labels: new Set(),
     aiLoading: false,
     creating: false,
     result: null,
     error: null,
   };
+  // Milestones + etiquetas (asíncrono): default = milestone actual por fechas.
+  ensureLocalMeta().then(() => {
+    if (state.local.form === l.form && l.form.milestoneId == null) l.form.milestoneId = pickCurrentMilestoneId(l.milestones);
+    if (state.local.form === l.form) renderLocal();
+  }).catch(() => {});
   renderLocal();
 }
 
@@ -3982,6 +4048,30 @@ function localProjectBlock(p, i, epic) {
   </details>`;
 }
 
+// Sección compartida de milestone + etiquetas (se aplican a la Issue/Epic y a todas las tareas).
+const USER_LABELS = ["patient user", "professional user", "center user"];
+const PRIO_LABELS = ["high priority", "medium priority", "low priority"];
+function localMetaSection(f) {
+  const l = state.local;
+  const labelChip = (name) => {
+    const meta = (l.groupLabels || []).find((x) => x.name === name);
+    const on = f.labels.has(name);
+    const style = on && meta ? ` style="background:${esc(meta.color)};color:${esc(meta.textColor)};border-color:${esc(meta.color)}"` : "";
+    return `<button type="button" class="lbl-chip ${on ? "on" : ""}" data-label="${esc(name)}"${style}>${esc(name)}</button>`;
+  };
+  const others = (l.groupLabels || []).map((x) => x.name).filter((n) => !USER_LABELS.includes(n) && !PRIO_LABELS.includes(n));
+  const msOpts = `<option value="">— sin milestone —</option>` + (l.milestones || []).map((m) => `<option value="${m.id}" ${String(m.id) === String(f.milestoneId) ? "selected" : ""}>${esc(m.title)}</option>`).join("");
+  return `
+    <div class="lf-meta">
+      <label class="lf-field">Milestone <span class="muted">(por defecto la actual por fechas)</span><select id="lf-milestone">${msOpts}</select></label>
+      <div class="lf-labels">
+        <div class="lbl-group"><span class="lbl-cat">Tipo de usuario</span>${USER_LABELS.map(labelChip).join("")}</div>
+        <div class="lbl-group"><span class="lbl-cat">Prioridad</span>${PRIO_LABELS.map(labelChip).join("")}</div>
+        ${others.length ? `<details class="lbl-more"><summary>Más etiquetas (${others.length})</summary><div class="lbl-group">${others.map(labelChip).join("")}</div></details>` : ""}
+      </div>
+    </div>`;
+}
+
 function renderLocalForm() {
   const f = state.local.form;
   const headTitle = f.epic ? `Crear épica · ${f.projects.length} proyectos` : `Crear tarea · ${esc(f.projects[0].repo.name)}`;
@@ -4004,6 +4094,7 @@ function renderLocalForm() {
       ${f.error ? `<div class="error-box">${esc(f.error)}</div>` : ""}
       ${f.epic ? `<label class="lf-field">Título de la Epic<input id="lf-epic-title" type="text" value="${esc(f.epicTitle)}" placeholder="Título de la Epic" /></label>` : ""}
       ${f.projects.map((p, i) => localProjectBlock(p, i, f.epic)).join("")}
+      ${localMetaSection(f)}
       <label class="lf-check"><input type="checkbox" id="lf-push" ${f.push ? "checked" : ""} /> Hacer push de las ramas a origin antes de crear las MR</label>
       <div class="lf-actions">
         <button class="btn" id="lf-cancel">← Volver</button>
@@ -4021,6 +4112,8 @@ function renderLocalForm() {
     $(`#lf-source-${i}`)?.addEventListener("change", () => { syncLocalForm(); renderLocal(); });
     $(`#lf-nb-on-${i}`)?.addEventListener("change", () => { syncLocalForm(); renderLocal(); });
   });
+  $("#lf-milestone")?.addEventListener("change", (e) => { f.milestoneId = e.target.value ? Number(e.target.value) : null; });
+  list.querySelectorAll(".lbl-chip").forEach((c) => c.addEventListener("click", () => { syncLocalForm(); const n = c.dataset.label; f.labels.has(n) ? f.labels.delete(n) : f.labels.add(n); renderLocal(); }));
   wireMdFields();
   notifySelftestOnce();
 }
@@ -4053,10 +4146,12 @@ async function suggestLocalTask() {
         if (!f.projects[i]) return;
         applyProposal(f.projects[i], pr);
       });
+      (out.labels || []).forEach((n) => f.labels.add(n));
     } else {
       const p = f.projects[0];
       const out = await window.pulpo.localProposeTask({ dir: p.repo.dir, repoName: p.repo.gitlabPath || p.repo.name, sourceBranch: p.sourceBranch, targetBranch: p.targetBranch });
       applyProposal(p, out);
+      (out.labels || []).forEach((n) => f.labels.add(n));
     }
   } catch (err) {
     f.error = `IA: ${String(err.message || err)}`;
@@ -4113,12 +4208,13 @@ async function createLocalTask() {
   f.error = null;
   renderLocal();
   try {
+    const labels = [...f.labels];
     if (f.epic) {
-      const res = await window.pulpo.localCreateEpicTask({ epicTitle: f.epicTitle.trim(), epicDescription: "", projects: f.projects.map((p) => localProjPayload(p, f.push)) });
+      const res = await window.pulpo.localCreateEpicTask({ epicTitle: f.epicTitle.trim(), epicDescription: "", labels, milestoneId: f.milestoneId, projects: f.projects.map((p) => localProjPayload(p, f.push)) });
       const ok = res.results.filter((x) => x.ok).length;
       toast(`Epic + ${ok}/${res.results.length} tareas creadas`, ok === res.results.length ? "ok" : "warn");
     } else {
-      await window.pulpo.localCreateTask(localProjPayload(f.projects[0], f.push));
+      await window.pulpo.localCreateTask({ ...localProjPayload(f.projects[0], f.push), labels, milestoneId: f.milestoneId });
       toast("Issue + MR creadas ✓", "ok");
     }
     // #1: al terminar, llevar al histórico actualizado (con el detalle de lo creado y el log de pasos).
@@ -4423,8 +4519,8 @@ async function runLocalHistorySelftest() {
     const base = "https://gitlab.openhealth.es";
     state.local.history = [
       { id: "s1", ts: new Date().toISOString(), kind: "tarea", title: "Exportar pedidos a CSV", projectPath: "OpenSaludGroup/dashboard",
-        issue: { iid: 142, url: `${base}/OpenSaludGroup/dashboard/-/issues/142`, title: "Exportar pedidos a CSV" },
-        mr: { number: 318, url: `${base}/OpenSaludGroup/dashboard/-/merge_requests/318` },
+        issue: { iid: 142, projectPath: "OpenSaludGroup/dashboard", url: `${base}/OpenSaludGroup/dashboard/-/issues/142`, title: "Exportar pedidos a CSV" },
+        mr: { number: 318, projectPath: "OpenSaludGroup/dashboard", url: `${base}/OpenSaludGroup/dashboard/-/merge_requests/318` },
         commit: { sha: "a1b2c3d4e5f6", url: `${base}/OpenSaludGroup/dashboard/-/commit/a1b2c3d4e5f6` },
         steps: [{ ok: true, text: "Rama feature creada: feature/exportar-pedidos" }, { ok: true, text: 'Commit creado: a1b2c3d4 — "Añade exportación de pedidos"' }, { ok: true, text: "Push de feature/exportar-pedidos a origin: ok" }] },
       { id: "s2", ts: new Date(Date.now() - 3600e3).toISOString(), kind: "epic", title: "Unificar autenticación SSO",
@@ -4439,6 +4535,14 @@ async function runLocalHistorySelftest() {
         results: [{ ok: true, projectPath: "OpenSaludGroup/dashboard", mr: { number: 320, url: `${base}/OpenSaludGroup/dashboard/-/merge_requests/320` }, commit: null,
           steps: [{ ok: true, text: "Sin cambios locales que commitear" }, { ok: true, text: "Push de fix/cache a origin: ok" }] }] },
     ];
+    state.local.historyStatus = {
+      "mr:OpenSaludGroup/dashboard#318": { state: "merged", merged: true },
+      "issue:OpenSaludGroup/dashboard#142": { state: "opened", closed: false, labels: ["finished"] },
+      "mr:OpenSaludGroup/dashboard#319": { state: "opened", merged: false },
+      "issue:OpenSaludGroup/dashboard#143": { state: "opened", closed: false, labels: ["pending check"] },
+      "mr:OpenSaludGroup/dashboard#320": { state: "merged", merged: true },
+      "issue:OpenSaludGroup/dashboard#90": { state: "closed", closed: true, labels: [] },
+    };
     if (SELFTEST_ROUTE === "local-historico-detail") state.local.historyDetail = state.local.history[1]; // la epic con un fallo
     renderLocal();
   } catch (err) {
@@ -4480,6 +4584,9 @@ async function runLocalSelftest() {
       ta.value = "## Propósito\nPermitir **exportar pedidos** a CSV desde el panel de administración.\n\n- Expone el endpoint `GET /pedidos/export`\n- [ ] Verificar permisos del usuario";
       ta.closest(".md-field")?.querySelector('.md-tab[data-tab="preview"]')?.click();
     }
+    // Marca un par de etiquetas y lleva la sección de meta a la vista para la captura.
+    if (state.local.form) { state.local.form.labels = new Set(["professional user", "high priority"]); state.local.form.milestoneId = 55; renderLocal(); }
+    list.querySelector(".lf-meta")?.scrollIntoView({ block: "center" });
   } catch (err) {
     console.error("[selftest] local failed:", err);
   } finally {

@@ -247,7 +247,7 @@ function wireIpc() {
   });
   // Orquesta el flujo Crear tarea (single-project): crea Issue → (opcional) rama feature → commitea
   // los cambios con "#<iid>" → push → crea MR (Closes #iid). Secuencial y NO atómico.
-  ipcMain.handle("local:createTask", async (_event, { dir, projectPath, sourceBranch, targetBranch, title, description, checklist, labels, push, commitMessage, newBranch }) => {
+  ipcMain.handle("local:createTask", async (_event, { dir, projectPath, sourceBranch, targetBranch, title, description, checklist, labels, milestoneId, push, commitMessage, newBranch }) => {
     localRootGuard(dir);
     const branchRe = /^[\w./-]{1,200}$/;
     const projRe = /^[\w.-]+(\/[\w.-]+)*$/;
@@ -257,7 +257,10 @@ function wireIpc() {
     const checkItems = (Array.isArray(checklist) ? checklist : []).filter((c) => typeof c === "string" && c.trim());
     const checklistMd = checkItems.length ? `\n\n## Puntos a comprobar\n${checkItems.map((c) => `- [ ] ${c.trim()}`).join("\n")}` : "";
     const safeLabels = (Array.isArray(labels) ? labels : []).filter((l) => typeof l === "string" && l.trim());
-    const issue = await gh().createIssue(projectPath, { title: String(title).trim(), description: `${description || ""}${checklistMd}`, labels: safeLabels });
+    const me = await gh().viewer().catch(() => null); // asignar la tarea a mi usuario por defecto
+    const assigneeIds = me?.id ? [me.id] : undefined;
+    const mid = Number.isInteger(milestoneId) ? milestoneId : null;
+    const issue = await gh().createIssue(projectPath, { title: String(title).trim(), description: `${description || ""}${checklistMd}`, labels: safeLabels, milestoneId: mid, assigneeIds });
     const { branch, commit, steps } = await prepareLocalBranch(dir, projectPath, { sourceBranch, newBranch, commitMessage, issueIid: issue.iid, push, fallbackMessage: String(title).trim() });
     const mr = await gh().createMergeRequest(projectPath, {
       sourceBranch: branch,
@@ -282,13 +285,17 @@ function wireIpc() {
   // Orquesta el flujo Epic multiproyecto: crea la Epic (issue en `${group}/epics`), luego por cada
   // proyecto push → Task (issue, referencia la Epic) → MR (Closes #task, referencia la Epic).
   // Secuencial y NO atómico: cada proyecto se reporta por separado; si la Epic falla, no sigue.
-  ipcMain.handle("local:createEpicTask", async (_event, { epicTitle, epicDescription, projects }) => {
+  ipcMain.handle("local:createEpicTask", async (_event, { epicTitle, epicDescription, projects, labels, milestoneId }) => {
     const branchRe = /^[\w./-]{1,200}$/;
     const projRe = /^[\w.-]+(\/[\w.-]+)*$/;
     const list = Array.isArray(projects) ? projects : [];
     if (!epicTitle || !String(epicTitle).trim()) throw new Error("El título de la Epic es obligatorio");
     if (list.length < 2) throw new Error("Una Epic necesita al menos 2 proyectos");
-    const epic = await gh().createEpic({ title: String(epicTitle).trim(), description: epicDescription || "" });
+    const safeLabels = (Array.isArray(labels) ? labels : []).filter((l) => typeof l === "string" && l.trim());
+    const me = await gh().viewer().catch(() => null);
+    const assigneeIds = me?.id ? [me.id] : undefined;
+    const mid = Number.isInteger(milestoneId) ? milestoneId : null;
+    const epic = await gh().createEpic({ title: String(epicTitle).trim(), description: epicDescription || "", labels: safeLabels, milestoneId: mid, assigneeIds });
     const epicRef = `${epic.projectPath}#${epic.iid}`;
     const results = [];
     for (const p of list) {
@@ -299,8 +306,15 @@ function wireIpc() {
         if (!p.title || !String(p.title).trim()) throw new Error("Falta el título de la tarea");
         const checkItems = (Array.isArray(p.checklist) ? p.checklist : []).filter((c) => typeof c === "string" && c.trim());
         const checklistMd = checkItems.length ? `\n\n## Puntos a comprobar\n${checkItems.map((c) => `- [ ] ${c.trim()}`).join("\n")}` : "";
-        const task = await gh().createIssue(p.projectPath, { title: String(p.title).trim(), description: `Épica: ${epicRef}\n\n${p.description || ""}${checklistMd}`, labels: [] });
+        const task = await gh().createIssue(p.projectPath, { title: String(p.title).trim(), description: `Épica: ${epicRef}\n\n${p.description || ""}${checklistMd}`, labels: safeLabels, milestoneId: mid, assigneeIds });
         const { branch, commit, steps } = await prepareLocalBranch(p.dir, p.projectPath, { sourceBranch: p.sourceBranch, newBranch: p.newBranch, commitMessage: p.commitMessage, issueIid: task.iid, push: p.push, fallbackMessage: String(p.title).trim() });
+        // Vincula la subtarea como linked item de la Epic (best-effort: no debe tumbar la creación).
+        try {
+          await gh().createIssueLink(epic.projectPath, epic.iid, task.projectId, task.iid);
+          steps.push({ ok: true, text: `Vinculada como linked item de la Epic #${epic.iid}` });
+        } catch (e) {
+          steps.push({ ok: false, text: `No se pudo vincular a la Epic: ${String(e.message || e)}` });
+        }
         const mr = await gh().createMergeRequest(p.projectPath, {
           sourceBranch: branch,
           targetBranch: p.targetBranch,
@@ -345,6 +359,22 @@ function wireIpc() {
     return { issue, results };
   });
   // Histórico local de trabajos creados (tareas/epics/vinculaciones) con sus enlaces de GitLab.
+  // Estado en vivo de los items del histórico (#4b): MR merged + estado/etiquetas de la issue. `items`
+  // = [{type:"mr"|"issue", projectPath, iid}]; devuelve un mapa keyed por "type:projectPath#iid".
+  ipcMain.handle("local:itemStatuses", async (_event, { items }) => {
+    const out = {};
+    await Promise.all(
+      (Array.isArray(items) ? items : []).map(async (it) => {
+        const key = `${it.type}:${it.projectPath}#${it.iid}`;
+        try {
+          out[key] = it.type === "mr" ? await gh().mrStatus(it.projectPath, it.iid) : await gh().issueStatus(it.projectPath, it.iid);
+        } catch {
+          /* item borrado o sin acceso: lo omitimos */
+        }
+      }),
+    );
+    return out;
+  });
   ipcMain.handle("localHistory:list", () => localHistory.load());
   ipcMain.handle("localHistory:remove", (_event, { id }) => localHistory.remove(id));
   ipcMain.handle("localHistory:clear", () => localHistory.clear());
