@@ -1479,3 +1479,15 @@ div.lf-proj { border: 1px solid var(--border); border-radius: 10px; padding: 10p
 .lr-timeline .tl-result { color: var(--green); font-weight: 500; }
 .lr-timeline .tl-empty { color: var(--text-muted); }
 .lr-proj-actions { display: flex; gap: 8px; }
+
+/* ---------- OPE-20 fase 4: cierre (MR + diff + limpiar worktree) ---------- */
+.lr-mr { display: flex; align-items: center; gap: 6px; }
+.lr-cleaned { font-size: 12px; }
+.agent-diff { max-height: 60vh; overflow: auto; }
+.agent-diff.loading { color: var(--text-muted); padding: 16px; }
+.agent-diff-pre { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.45; white-space: pre; }
+.agent-diff-pre span { display: block; padding: 0 6px; }
+.agent-diff-pre .d-add { background: var(--green-bg); color: var(--green); }
+.agent-diff-pre .d-del { background: var(--red-bg); color: var(--red); }
+.agent-diff-pre .d-hunk { color: var(--accent); }
+.agent-diff-pre .d-meta { color: var(--text-muted); font-weight: 600; }

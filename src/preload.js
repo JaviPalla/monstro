@@ -31,6 +31,10 @@ contextBridge.exposeInMainWorld("monstro", {
   agentsStop: (runId, projectDir) => ipcRenderer.invoke("agents:stop", { runId, projectDir }),
   agentsRemove: (runId) => ipcRenderer.invoke("agents:remove", { runId }),
   agentsOpenEditor: (projectDir, worktree) => ipcRenderer.invoke("agents:openEditor", { projectDir, worktree }),
+  agentsFinalize: (runId, projectDir, commitMessage) => ipcRenderer.invoke("agents:finalize", { runId, projectDir, commitMessage }),
+  agentsDiff: (projectDir, worktree, base, branch) => ipcRenderer.invoke("agents:diff", { projectDir, worktree, base, branch }),
+  agentsMrStatuses: (runId) => ipcRenderer.invoke("agents:mrStatuses", { runId }),
+  agentsCleanupWorktree: (runId, projectDir) => ipcRenderer.invoke("agents:cleanupWorktree", { runId, projectDir }),
   // Eventos push de los agentes (timeline/estado/notificación). Devuelve un de-suscriptor.
   onAgentEvent: (channel, cb) => {
     const ok = ["agents:event", "agents:run", "agents:notify"];

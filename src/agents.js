@@ -262,6 +262,29 @@ async function startRun({ title, url, isEpic, indications, objectives, requireme
 function listRuns() { return load(); }
 function getRun(runId) { return findRun(runId) || null; }
 
+// Fase 4: fusiona un patch en un proyecto del run (mr, finalized, worktreeRemoved…) y persiste.
+function updateProject(runId, dir, patch) {
+  const run = findRun(runId);
+  const proj = findProj(run, dir);
+  if (!proj) throw new Error("Proyecto del run no encontrado.");
+  Object.assign(proj, patch || {});
+  persist();
+  emit("agents:event", { runId, projectDir: dir, ...patch });
+  return proj;
+}
+
+// Fase 4: quita el worktree de un proyecto (para limpiar stale tras fusionar la MR).
+async function cleanupWorktree(runId, dir) {
+  const run = findRun(runId);
+  const proj = findProj(run, dir);
+  if (!proj || !proj.worktree) throw new Error("Worktree del proyecto no encontrado.");
+  await local().removeWorktree(proj.dir, proj.worktree);
+  proj.worktreeRemoved = true;
+  persist();
+  emit("agents:event", { runId, projectDir: dir, worktreeRemoved: true });
+  return { ok: true };
+}
+
 function resumeRun(runId, projectDir, guidance) {
   const run = findRun(runId);
   const proj = findProj(run, projectDir);
@@ -303,7 +326,7 @@ function openEditor(projectDir, worktree) {
   return { ok: true, stack };
 }
 
-module.exports = { init, startRun, listRuns, getRun, resumeRun, stopRun, removeRun, openEditor, slugify, toolLabel, summarizeEvent };
+module.exports = { init, startRun, listRuns, getRun, updateProject, cleanupWorktree, resumeRun, stopRun, removeRun, openEditor, slugify, toolLabel, summarizeEvent };
 
 /* ---------- auto-verificación de las funciones puras ---------- */
 if (require.main === module && process.argv[2] === "--self-check") {
