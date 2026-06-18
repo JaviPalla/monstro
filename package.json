@@ -12,9 +12,12 @@
     "icon": "electron scripts/make-icon.js"
   },
   "author": "Jesús García (JesusGR4)",
+  "contributors": [
+    "Javier Pallarés (JaviPalla)"
+  ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/JesusGR4/monstro"
+    "url": "https://github.com/JaviPalla/monstro"
   },
   "keywords": [
     "github",
