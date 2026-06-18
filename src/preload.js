@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld("monstro", {
   localProposeEpic: (payload) => ipcRenderer.invoke("local:proposeEpic", payload),
   localCreateEpicTask: (payload) => ipcRenderer.invoke("local:createEpicTask", payload),
   localSearchIssues: (query) => ipcRenderer.invoke("local:searchIssues", { query }),
+  localMyTasks: () => ipcRenderer.invoke("local:myTasks"),
+  localProposePlan: (payload) => ipcRenderer.invoke("local:proposePlan", payload),
   localLinkTask: (payload) => ipcRenderer.invoke("local:linkTask", payload),
   localItemStatuses: (items) => ipcRenderer.invoke("local:itemStatuses", { items }),
   localHistoryList: () => ipcRenderer.invoke("localHistory:list"),

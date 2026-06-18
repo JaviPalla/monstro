@@ -42,6 +42,18 @@ function aiSettings() {
   return { model, effort };
 }
 
+/** Como aiSettings() pero pudiendo forzar modelo/esfuerzo (lo elige el usuario en el form del plan).
+ * Si el override trae un modelo válido, su esfuerzo se sanea contra el catálogo de ESE modelo. */
+function resolveAi(override) {
+  if (!override || !override.model || !AI_MODELS[override.model]) return aiSettings();
+  const model = override.model;
+  const efforts = AI_MODELS[model].efforts;
+  const effort = efforts.includes(override.effort)
+    ? override.effort
+    : efforts.includes(DEFAULT_EFFORT) ? DEFAULT_EFFORT : efforts[efforts.length - 1] || null;
+  return { model, effort };
+}
+
 const MAX_DIFF_CHARS = 70_000;
 const CLI_TIMEOUT_MS = 12 * 60 * 1000;
 // Sin MCP servers ni persistencia de sesión: arranque más rápido y sin tocar
@@ -217,8 +229,8 @@ function extractJson(text) {
 // Lanza el prompt contra el backend disponible (SDK si hay API key, si no el CLI) y devuelve
 // el JSON ya parseado + qué backend/modelo se usó. El schema solo lo aplica el SDK; el CLI
 // lo cumple por el prompt y se parsea de forma tolerante (extractJson).
-async function runStructured(prompt, schema) {
-  const { model, effort } = aiSettings();
+async function runStructured(prompt, schema, override) {
+  const { model, effort } = resolveAi(override);
   if (process.env.ANTHROPIC_API_KEY) {
     return { data: await generateViaSdk(prompt, model, effort, schema), backend: "anthropic-sdk", model, effort };
   }
@@ -477,6 +489,77 @@ async function proposeEpic({ projects }) {
   };
 }
 
+/* ---------- plan de "Empezar tarea" (OPE-20) ---------- */
+
+const PLAN_SCHEMA = {
+  type: "object",
+  properties: {
+    objectives: { type: "array", items: { type: "string" }, description: "Objetivos de la tarea, en español. 2 a 6." },
+    requirements: { type: "array", items: { type: "string" }, description: "Requisitos a cumplir para darla por hecha, en español. 2 a 8." },
+    tests: { type: "array", items: { type: "string" }, description: "Pruebas a realizar tras el desarrollo para verificar el trabajo, en español. 2 a 8." },
+    projects: {
+      type: "array",
+      description: "Proyectos que hay que tocar. Si el usuario fijó una lista, úsala TAL CUAL; si no, INFIÉRELOS de la descripción.",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Path o nombre del proyecto GitLab a tocar." },
+          tasks: { type: "array", items: { type: "string" }, description: "Tareas concretas a hacer en ESE proyecto, en español." },
+        },
+        required: ["name", "tasks"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["objectives", "requirements", "tests", "projects"],
+  additionalProperties: false,
+};
+
+function buildPlanPrompt({ title, description, isEpic, indications, repos }) {
+  const projBlock = (repos || []).length
+    ? `El usuario YA ha fijado los proyectos a tocar (úsalos tal cual, uno por entrada en "projects"):\n${repos.map((r) => `- ${r}`).join("\n")}`
+    : `El usuario NO ha fijado proyectos: INFIERE de la descripción cuáles hay que tocar y lístalos en "projects".`;
+  return `Eres un tech lead senior. Vas a redactar el PLAN de trabajo de una ${isEpic ? "Epic (cambio repartido en varios proyectos)" : "tarea"} de GitLab, que el usuario deberá APROBAR antes de lanzar a los agentes. El plan debe ser claro y accionable, en ESPAÑOL.
+
+Devuelve:
+- "objectives": objetivos de la tarea (qué se busca conseguir).
+- "requirements": requisitos que se deben cumplir para darla por terminada.
+- "tests": pruebas a realizar TRAS el desarrollo para verificar el trabajo (concretas y verificables, no genéricas).
+- "projects": por cada proyecto a tocar, su "name" y la lista de "tasks" concretas en ese proyecto.
+
+${projBlock}
+
+# Tarea
+Título: ${title}
+${description ? `Descripción:\n${description}` : "(sin descripción)"}
+${indications ? `\n# Indicaciones adicionales del usuario\n${indications}` : ""}
+
+Responde SOLO con un objeto JSON con esta forma (sin prosa ni cercos):
+{"objectives":[string],"requirements":[string],"tests":[string],"projects":[{"name":string,"tasks":[string]}]}`;
+}
+
+// Plan aprobable de "Empezar tarea". SIEMPRE permite forzar modelo/esfuerzo (el usuario lo elige;
+// por defecto el más alto). Nada se ejecuta con esto: es solo la propuesta que el usuario aprueba.
+async function proposePlan({ title, description, isEpic, indications, repos, model, effort }) {
+  if (!String(title || "").trim()) throw new Error("La tarea no tiene título.");
+  const prompt = buildPlanPrompt({ title, description, isEpic, indications, repos });
+  const res = await runStructured(prompt, PLAN_SCHEMA, { model, effort });
+  const d = res.data || {};
+  const arr = (x) => (Array.isArray(x) ? x : []).filter((s) => typeof s === "string" && s.trim());
+  return {
+    objectives: arr(d.objectives),
+    requirements: arr(d.requirements),
+    tests: arr(d.tests),
+    projects: (Array.isArray(d.projects) ? d.projects : []).map((p) => ({
+      name: typeof p.name === "string" ? p.name.trim() : "",
+      tasks: arr(p.tasks),
+    })).filter((p) => p.name),
+    backend: res.backend,
+    model: res.model,
+    effort: res.effort,
+  };
+}
+
 /** Estado del backend de IA, para onboarding y ajustes. */
 function backendStatus() {
   const { model, effort } = aiSettings();
@@ -532,4 +615,4 @@ function isAiEffort(level) {
   return ALL_EFFORTS.includes(level);
 }
 
-module.exports = { generateReview, summarizeMilestone, proposeTask, proposeEpic, backendStatus, ping, isAiModel, isAiEffort };
+module.exports = { generateReview, summarizeMilestone, proposeTask, proposeEpic, proposePlan, backendStatus, ping, isAiModel, isAiEffort };

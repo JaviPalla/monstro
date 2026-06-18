@@ -334,6 +334,14 @@ function wireIpc() {
   });
   // Busca Issues/Epics abiertas del grupo (para el flujo Vincular tarea).
   ipcMain.handle("local:searchIssues", async (_event, { query }) => gh().searchGroupIssues(query));
+  // OPE-20 "Empezar tarea": tareas (issues abiertas) del grupo asignadas a mí, para el picker.
+  ipcMain.handle("local:myTasks", async () => gh().listMyTasks());
+  // OPE-20: plan aprobable de la tarea elegida. Modelo/esfuerzo los elige el usuario (por defecto
+  // el más alto). NO ejecuta nada: solo devuelve la propuesta de plan que el usuario aprobará.
+  ipcMain.handle("local:proposePlan", async (_event, { title, description, isEpic, indications, repos, model, effort }) => {
+    const safeRepos = (Array.isArray(repos) ? repos : []).filter((r) => typeof r === "string" && r.trim()).slice(0, 20);
+    return ai.proposePlan({ title, description, isEpic, indications, repos: safeRepos, model, effort });
+  });
   // Orquesta el flujo Vincular: por cada proyecto push → MR vinculada a la Issue/Epic existente.
   // Misma proyecto que la issue → "Closes #iid" (auto-cierra); otro proyecto/Epic → referencia cruzada.
   ipcMain.handle("local:linkTask", async (_event, { issue, projects }) => {

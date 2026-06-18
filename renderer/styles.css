@@ -1395,3 +1395,52 @@ div.lf-proj { border: 1px solid var(--border); border-radius: 10px; padding: 10p
 .mascot { display: inline-block; vertical-align: middle; }
 .brand { display: flex; align-items: center; gap: 8px; }
 .welcome-logo .mascot { filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.25)); }
+
+/* ---------- OPE-20: Empezar tarea (picker + plan) ---------- */
+.ico-local-empezar { color: var(--green); }
+.ls-toolbar { display: flex; align-items: center; gap: 12px; margin: 12px 20px; flex-wrap: wrap; }
+.ls-search { flex: 1; min-width: 220px; padding: 7px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+.ls-search:focus { border-color: var(--accent); outline: none; }
+.ls-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); cursor: pointer; }
+.ls-toggle input { accent-color: var(--accent); width: 15px; height: 15px; }
+.ls-count { margin-left: auto; }
+.ls-list { display: flex; flex-direction: column; gap: 8px; margin: 0 20px 28px; }
+.ls-task { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-raised); cursor: pointer; }
+.ls-task:hover { border-color: var(--accent); background: var(--bg-hover); }
+.ls-task:hover .ls-go { opacity: 1; }
+.ls-pri { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 999px; flex-shrink: 0; min-width: 44px; text-align: center; }
+.ls-pri.pri-high { background: var(--red-bg); color: var(--red); }
+.ls-pri.pri-med { background: var(--purple-bg); color: var(--purple); }
+.ls-pri.pri-low { background: var(--bg-hover); color: var(--text-muted); }
+.ls-pri.pri-none { background: var(--bg-hover); color: var(--text-muted); }
+.ls-kind { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; background: var(--bg-hover); flex-shrink: 0; }
+.ls-kind.ls-epic { color: var(--green); }
+.ls-kind.ls-issue { color: var(--accent); }
+.ls-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.ls-title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-proj { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+.ls-proj .ms-proj-ic { width: 14px; height: 14px; font-size: 8px; }
+.ls-go { margin-left: auto; font-size: 12px; color: var(--accent); white-space: nowrap; opacity: 0.5; transition: opacity 0.12s; }
+
+.pf-form, .pf-plan { margin: 12px 20px 8px; display: flex; flex-direction: column; gap: 16px; }
+.pf-block { display: flex; flex-direction: column; gap: 8px; }
+.pf-label { font-weight: 600; font-size: 13px; }
+.pf-textarea { padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
+.pf-textarea:focus { border-color: var(--accent); outline: none; }
+.pf-projects { display: flex; flex-wrap: wrap; gap: 8px; }
+.pf-projects.off { opacity: 0.45; }
+.pf-proj { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; }
+.pf-proj input { accent-color: var(--accent); }
+.pf-proj .ms-proj-ic { width: 15px; height: 15px; font-size: 8px; }
+.pf-ai-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.pf-ai-row select { padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+.pf-hint { margin: 0; font-size: 12px; }
+.pf-plan-meta { font-size: 12px; color: var(--text-muted); }
+.pf-sec h3 { margin: 0 0 6px; font-size: 14px; }
+.pf-sec { padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-raised); }
+.pf-ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.pf-proj-plan { margin-top: 8px; }
+.pf-proj-head { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+.pf-proj-head .ms-proj-ic { width: 15px; height: 15px; font-size: 8px; }
+.pf-plan.approved { opacity: 0.92; }
+.pf-approved-note { padding: 10px 14px; border-radius: 8px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; }
