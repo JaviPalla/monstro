@@ -515,17 +515,20 @@ const PLAN_SCHEMA = {
   additionalProperties: false,
 };
 
-function buildPlanPrompt({ title, description, isEpic, indications, repos }) {
-  const projBlock = (repos || []).length
-    ? `El usuario YA ha fijado los proyectos a tocar (úsalos tal cual, uno por entrada en "projects"):\n${repos.map((r) => `- ${r}`).join("\n")}`
-    : `El usuario NO ha fijado proyectos: INFIERE de la descripción cuáles hay que tocar y lístalos en "projects".`;
+function buildPlanPrompt({ title, description, isEpic, indications, repos, available }) {
+  // El conjunto PERMITIDO de proyectos: si el usuario fijó una lista, esa; si no, los disponibles
+  // (clonados en local Y seleccionables en la app). El "name" de cada project DEBE salir de aquí.
+  const allowed = (repos && repos.length ? repos.map((p) => ({ path: p, name: p })) : available || []);
+  const projBlock = allowed.length
+    ? `PROYECTOS PERMITIDOS (clonados en local y seleccionables en la app). El campo "name" de CADA entrada de "projects" DEBE ser EXACTAMENTE uno de estos paths — agrupa todo el trabajo bajo ellos, sin inventar nombres ni descripciones. Si de verdad algún trabajo no encaja en NINGUNO, ponle un "name" descriptivo y corto (el usuario lo asignará a mano):\n${allowed.map((p) => `- ${p.path}${p.name && p.name !== p.path ? `  (${p.name})` : ""}`).join("\n")}`
+    : `No hay lista de proyectos disponibles: INFIERE de la descripción cuáles hay que tocar y usa su path de GitLab "grupo/proyecto" como "name".`;
   return `Eres un tech lead senior. Vas a redactar el PLAN de trabajo de una ${isEpic ? "Epic (cambio repartido en varios proyectos)" : "tarea"} de GitLab, que el usuario deberá APROBAR antes de lanzar a los agentes. El plan debe ser claro y accionable, en ESPAÑOL.
 
 Devuelve:
 - "objectives": objetivos de la tarea (qué se busca conseguir).
 - "requirements": requisitos que se deben cumplir para darla por terminada.
 - "tests": pruebas a realizar TRAS el desarrollo para verificar el trabajo (concretas y verificables, no genéricas).
-- "projects": por cada proyecto a tocar, su "name" y la lista de "tasks" concretas en ese proyecto.
+- "projects": por cada proyecto a tocar, su "name" (un path de la lista permitida) y la lista de "tasks" concretas en ese proyecto.
 
 ${projBlock}
 
@@ -540,9 +543,10 @@ Responde SOLO con un objeto JSON con esta forma (sin prosa ni cercos):
 
 // Plan aprobable de "Empezar tarea". SIEMPRE permite forzar modelo/esfuerzo (el usuario lo elige;
 // por defecto el más alto). Nada se ejecuta con esto: es solo la propuesta que el usuario aprueba.
-async function proposePlan({ title, description, isEpic, indications, repos, model, effort }) {
+// `available` = proyectos candidatos {path,name} (local ∩ remotos) para que el "name" sea un path real.
+async function proposePlan({ title, description, isEpic, indications, repos, available, model, effort }) {
   if (!String(title || "").trim()) throw new Error("La tarea no tiene título.");
-  const prompt = buildPlanPrompt({ title, description, isEpic, indications, repos });
+  const prompt = buildPlanPrompt({ title, description, isEpic, indications, repos, available });
   const res = await runStructured(prompt, PLAN_SCHEMA, { model, effort });
   const d = res.data || {};
   const arr = (x) => (Array.isArray(x) ? x : []).filter((s) => typeof s === "string" && s.trim());

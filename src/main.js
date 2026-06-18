@@ -75,6 +75,17 @@ function localRootGuard(dir) {
   return root;
 }
 
+// Plan → Markdown para publicarlo como nota en la Epic/Issue de GitLab (OPE-20: que no se pierda y
+// lo vea todo el equipo). GitLab renderiza la nota como markdown (la "preview" que pide el usuario).
+function planMarkdown({ title, indications, objectives, requirements, tests, projects }) {
+  const bullets = (arr) => (arr || []).map((x) => `- ${x}`).join("\n");
+  const sec = (h, arr) => ((arr || []).length ? `\n### ${h}\n${bullets(arr)}\n` : "");
+  const projs = (projects || [])
+    .map((p) => `\n**${p.name}**${p.model ? ` _(agente: ${p.model}${p.effort ? ` · ${p.effort}` : ""})_` : ""}\n${bullets(p.tasks)}`)
+    .join("\n");
+  return `## 🤖 Plan de trabajo (Monstro)\n\n_Plan aprobado y lanzado a los agentes el ${new Date().toLocaleString("es-ES")}._\n${indications ? `\n> **Indicaciones:** ${indications}\n` : ""}${sec("🎯 Objetivos", objectives)}${sec("📋 Requisitos", requirements)}${projects && projects.length ? `\n### 📦 Trabajo por proyecto\n${projs}\n` : ""}${sec("🧪 Pruebas", tests)}`;
+}
+
 // Prepara la rama de una MR en un repo local: (opcional) crea una rama feature, commitea los cambios
 // sin commitear (SIEMPRE que el working tree esté sucio — no se salta en silencio aunque no haya
 // mensaje: usa el fallback) con el "#<iid>" al final para linkar el commit, y hace push. Devuelve
@@ -342,14 +353,15 @@ function wireIpc() {
   ipcMain.handle("local:myTasks", async () => gh().listMyTasks());
   // OPE-20: plan aprobable de la tarea elegida. Modelo/esfuerzo los elige el usuario (por defecto
   // el más alto). NO ejecuta nada: solo devuelve la propuesta de plan que el usuario aprobará.
-  ipcMain.handle("local:proposePlan", async (_event, { title, description, isEpic, indications, repos, model, effort }) => {
+  ipcMain.handle("local:proposePlan", async (_event, { title, description, isEpic, indications, repos, available, model, effort }) => {
     const safeRepos = (Array.isArray(repos) ? repos : []).filter((r) => typeof r === "string" && r.trim()).slice(0, 20);
-    return ai.proposePlan({ title, description, isEpic, indications, repos: safeRepos, model, effort });
+    const safeAvail = (Array.isArray(available) ? available : []).filter((a) => a && typeof a.path === "string" && a.path.trim()).map((a) => ({ path: a.path, name: a.name || a.path })).slice(0, 60);
+    return ai.proposePlan({ title, description, isEpic, indications, repos: safeRepos, available: safeAvail, model, effort });
   });
   // OPE-20 fase 3: arranca el run. El "orquestador" (ai.planAgents) decide modelo/esfuerzo por
   // proyecto (queda en el log del run); luego agents.startRun crea worktrees y lanza los agentes.
   // Acción que SÍ ejecuta procesos locales reales → solo se dispara por acción explícita del usuario.
-  ipcMain.handle("agents:start", async (_event, { title, url, isEpic, indications, objectives, requirements, tests, projects }) => {
+  ipcMain.handle("agents:start", async (_event, { title, url, isEpic, indications, objectives, requirements, tests, projects, taskProjectPath, taskIid }) => {
     const list = Array.isArray(projects) ? projects : [];
     if (!list.length) throw new Error("No hay proyectos sobre los que trabajar.");
     for (const p of list) localRootGuard(p.dir);
@@ -357,7 +369,14 @@ function wireIpc() {
     try { assigned = (await ai.planAgents({ title, projects: list.map((p) => ({ name: p.name, tasks: p.tasks })) })).projects; }
     catch { /* si el orquestador falla, cada proyecto cae a un default razonable */ }
     const merged = list.map((p, i) => ({ ...p, model: assigned[i] && assigned[i].model, effort: assigned[i] && assigned[i].effort, rationale: assigned[i] && assigned[i].rationale }));
-    return agents.startRun({ title, url, isEpic, indications, objectives, requirements, tests, projects: merged });
+    // Requisito del usuario: el plan lanzado queda registrado como nota markdown en la Epic/Issue de
+    // GitLab (no se pierde y todo el equipo lo ve). Best-effort: si falla, no aborta el lanzamiento.
+    let planNote = null;
+    if (taskProjectPath && Number.isInteger(taskIid)) {
+      try { const c = await gh().addIssueComment(taskProjectPath, taskIid, planMarkdown({ title, indications, objectives, requirements, tests, projects: merged })); planNote = c && (c.url || c.html_url || true); }
+      catch (err) { planNote = { error: String(err.message || err) }; }
+    }
+    return { ...(await agents.startRun({ title, url, isEpic, indications, objectives, requirements, tests, projects: merged })), planNote };
   });
   ipcMain.handle("agents:list", () => agents.listRuns());
   ipcMain.handle("agents:get", (_event, { runId }) => agents.getRun(runId));
