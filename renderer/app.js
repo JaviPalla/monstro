@@ -3582,6 +3582,9 @@ async function loadLocal() {
     );
     l.loading = false;
     renderLocal();
+    // Avatares de proyecto (groupProjects) en 2º plano: la lista se pinta ya con icono-letra y se
+    // actualiza al llegar. Best-effort; se omite en selftest (la captura no debe esperar a la red).
+    if (!IS_SELFTEST) ensureProjects().then(() => { if (state.view === "local" && state.local.tab !== "historico") renderLocal(); }).catch(() => {});
   } catch (err) {
     l.loading = false;
     list.innerHTML = `<div class="error-box">${esc(String(err.message || err))}</div>`;
@@ -3608,39 +3611,38 @@ function renderLocalHistory() {
     notifySelftestOnce();
     return;
   }
-  const line = (k, html) => `<div class="lh-line"><span class="lh-k">${k}</span>${html}</div>`;
-  const projLines = (results, withTask) =>
-    (results || [])
-      .map((r) =>
-        r.ok
-          ? line(esc(r.projectPath), `${withTask && r.task ? `${extLink(r.task.url, `#${r.task.iid}`)} · ` : ""}${extLink(r.mr.url, `!${r.mr.number}`)}${r.commit ? ` · ${extLink(r.commit.url, `commit ${r.commit.sha.slice(0, 8)}`)}` : ""}`)
-          : `<div class="lh-line err"><span class="lh-k">${esc(r.projectPath)}</span><span class="local-err">${esc(r.error)}</span></div>`,
-      )
-      .join("");
+  // Enlace-pill tipado (Issue/Epic/MR/Commit) a GitLab.
+  const pill = (type, url, label) => `<a href="${esc(url)}" class="lh-pill lh-pill-${type}" data-ext>${esc(label)}</a>`;
+  // Fila por proyecto (epics/vinculaciones multiproyecto): nombre del proyecto + sus pills.
+  const projRow = (r, withTask) =>
+    r.ok
+      ? `<div class="lh-proj"><span class="lh-proj-name">${projectIconHtml(r.projectPath)}${esc(projectMeta(r.projectPath).name)}</span><span class="lh-proj-pills">${withTask && r.task ? pill("issue", r.task.url, `#${r.task.iid}`) : ""}${pill("mr", r.mr.url, `!${r.mr.number}`)}${r.commit ? pill("commit", r.commit.url, r.commit.sha.slice(0, 8)) : ""}</span></div>`
+      : `<div class="lh-proj err"><span class="lh-proj-name">${esc(r.projectPath)}</span><span class="local-err">${esc(r.error)}</span></div>`;
   const cards = entries
     .map((e) => {
       const date = (() => { try { return new Date(e.ts).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }); } catch { return e.ts || ""; } })();
       let items = "";
       if (e.kind === "tarea") {
-        items = line("Issue", extLink(e.issue.url, `#${e.issue.iid} · ${e.issue.title}`)) + line("MR", extLink(e.mr.url, `!${e.mr.number}`)) + (e.commit ? line("Commit", extLink(e.commit.url, e.commit.sha.slice(0, 8))) : "");
+        items = `<div class="lh-pills">${pill("issue", e.issue.url, `Issue #${e.issue.iid}`)}${pill("mr", e.mr.url, `MR !${e.mr.number}`)}${e.commit ? pill("commit", e.commit.url, `Commit ${e.commit.sha.slice(0, 8)}`) : ""}</div>`;
+        if (e.projectPath) items = `<div class="lh-sub">${projectIconHtml(e.projectPath)}${esc(projectMeta(e.projectPath).name)}</div>` + items;
       } else if (e.kind === "epic") {
-        items = line("Epic", extLink(e.epic.url, `#${e.epic.iid} · ${e.epic.title}`)) + projLines(e.results, true);
+        items = `<div class="lh-pills">${pill("epic", e.epic.url, `Epic #${e.epic.iid}`)}</div>${(e.results || []).map((r) => projRow(r, true)).join("")}`;
       } else {
-        items = line(e.issue.isEpic ? "Epic" : "Issue", extLink(e.issue.url, `${e.issue.projectPath}#${e.issue.iid} · ${e.issue.title}`)) + projLines(e.results, false);
+        items = `<div class="lh-pills">${pill(e.issue.isEpic ? "epic" : "issue", e.issue.url, `${e.issue.isEpic ? "Epic" : "Issue"} ${e.issue.projectPath}#${e.issue.iid}`)}</div>${(e.results || []).map((r) => projRow(r, false)).join("")}`;
       }
       return `
-        <div class="lh-card">
+        <div class="lh-card lh-k-${esc(e.kind)}">
           <div class="lh-head">
             <span class="lh-kind lh-${esc(e.kind)}">${KIND_LABEL[e.kind] || esc(e.kind)}</span>
             <span class="lh-title">${esc(e.title || "(sin título)")}</span>
-            <span class="lh-date">${esc(date)}</span>
-            <button class="lh-del" data-id="${esc(e.id)}" title="Quitar del histórico">✕</button>
+            <time class="lh-date">${esc(date)}</time>
+            <button class="lh-del" data-id="${esc(e.id)}" title="Quitar del histórico" aria-label="Quitar del histórico">✕</button>
           </div>
           <div class="lh-items">${items}</div>
         </div>`;
     })
     .join("");
-  list.innerHTML = head + `<div class="lh-toolbar"><button class="btn local-change" id="lh-clear">Vaciar histórico</button></div><div class="lh-list">${cards}</div>`;
+  list.innerHTML = head + `<div class="lh-toolbar"><span class="muted">${entries.length} trabajo${entries.length === 1 ? "" : "s"}</span><button class="btn local-change" id="lh-clear">Vaciar histórico</button></div><div class="lh-list">${cards}</div>`;
   list.querySelectorAll("a[data-ext]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); window.pulpo.openExternal(a.getAttribute("href")); }));
   list.querySelectorAll(".lh-del").forEach((b) => b.addEventListener("click", async () => { state.local.history = await window.pulpo.localHistoryRemove(b.dataset.id); renderLocal(); }));
   $("#lh-clear")?.addEventListener("click", async () => { state.local.history = await window.pulpo.localHistoryClear(); renderLocal(); });
@@ -3680,32 +3682,48 @@ function renderLocal() {
   }
 
   const repos = l.repos || [];
-  // En "crear" solo se pueden marcar los repos casados con GitLab (hay que crear Issue/MR en su proyecto).
-  // Selección múltiple: 1 marcado → tarea single; 2+ → Epic (una Epic + una Task/MR por proyecto).
-  const cards = repos
-    .map((r) => {
-      const info = l.info[r.dir] || {};
-      const badge = r.known
-        ? `<span class="local-badge ok" title="Casado con un proyecto de GitLab configurado">✓ ${esc(r.gitlabPath)}</span>`
-        : r.gitlabPath
-          ? `<span class="local-badge" title="Detectado por el remote origin, pero no está en tus repos configurados">${esc(r.gitlabPath)}</span>`
-          : `<span class="local-badge none" title="Sin remote origin de GitLab">sin remote</span>`;
-      const meta = info.error
-        ? `<span class="local-err">${esc(info.error)}</span>`
-        : `<span class="local-cur">⎇ ${esc(info.current || "—")}</span>
-           ${info.dirty ? `<span class="local-dirty" title="Cambios sin commitear">● sucio</span>` : ""}
-           <span class="local-count">${(info.branches || []).length} ramas · ${(info.worktrees || []).length} worktrees</span>`;
-      const selectable = Boolean(r.gitlabPath);
-      const checked = l.selected.has(r.dir);
-      return `
-        <div class="local-repo ${selectable ? "selectable" : ""} ${checked ? "checked" : ""}" ${selectable ? `data-dir="${esc(r.dir)}"` : ""}>
-          <div class="local-repo-top">
-            ${selectable ? `<input type="checkbox" class="local-cb" ${checked ? "checked" : ""} />` : ""}
-            <span class="local-name">${esc(r.name)}</span>
-            ${badge}
-          </div>
-          <div class="local-repo-meta">${meta}</div>
-        </div>`;
+  // Las carpetas se AGRUPAN por su repo base de GitLab (mismo remote origin): varios worktrees/clones
+  // del mismo proyecto quedan bajo una cabecera estilo chip de proyecto (icono + nombre). Las carpetas
+  // sin remote de GitLab van a un grupo aparte. Seleccionar es por carpeta; 1 marcada = tarea, 2+ = Epic.
+  const folderCard = (r) => {
+    const info = l.info[r.dir] || {};
+    const meta = info.error
+      ? `<span class="local-err">${esc(info.error)}</span>`
+      : `<span class="local-cur">⎇ ${esc(info.current || "—")}</span>
+         ${info.dirty ? `<span class="local-dirty" title="Cambios sin commitear">● sucio</span>` : ""}
+         <span class="local-count">${(info.branches || []).length} ramas · ${(info.worktrees || []).length} worktrees</span>`;
+    const selectable = Boolean(r.gitlabPath);
+    const checked = l.selected.has(r.dir);
+    return `
+      <div class="local-repo ${selectable ? "selectable" : ""} ${checked ? "checked" : ""}" ${selectable ? `data-dir="${esc(r.dir)}"` : ""}>
+        <div class="local-repo-top">
+          ${selectable ? `<input type="checkbox" class="local-cb" ${checked ? "checked" : ""} />` : ""}
+          <span class="local-name">${esc(r.name)}</span>
+        </div>
+        <div class="local-repo-meta">${meta}</div>
+      </div>`;
+  };
+  const groups = new Map();
+  for (const r of repos) {
+    const key = r.gitlabPath || "__none__";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  const cards = [...groups.entries()]
+    .sort((a, b) => (a[0] === "__none__" ? 1 : b[0] === "__none__" ? -1 : projectMeta(a[0]).name.localeCompare(projectMeta(b[0]).name)))
+    .map(([key, folders]) => {
+      const known = folders[0].known;
+      const groupHead =
+        key === "__none__"
+          ? `<div class="local-group-head"><span class="local-badge none">Sin remote de GitLab</span><span class="local-group-count">${folders.length} carpeta${folders.length === 1 ? "" : "s"}</span></div>`
+          : `<div class="local-group-head">
+              ${projectIconHtml(key)}
+              <span class="ms-proj-name">${esc(projectMeta(key).name)}</span>
+              <span class="local-group-path" title="${esc(key)}">${esc(key)}</span>
+              ${known ? `<span class="local-badge ok" title="Proyecto configurado en Pulpo">✓</span>` : ""}
+              ${folders.length > 1 ? `<span class="local-group-count">${folders.length} carpetas</span>` : ""}
+            </div>`;
+      return `<div class="local-group">${groupHead}<div class="local-group-folders">${folders.map(folderCard).join("")}</div></div>`;
     })
     .join("");
 
@@ -4392,6 +4410,23 @@ async function boot() {
   if (IS_SELFTEST && SELFTEST_ROUTE === "local") runLocalSelftest();
   if (IS_SELFTEST && SELFTEST_ROUTE === "local-vincular") runLocalLinkSelftest();
   if (IS_SELFTEST && SELFTEST_ROUTE === "local-historico") runLocalHistorySelftest();
+  if (IS_SELFTEST && SELFTEST_ROUTE === "local-list") runLocalListSelftest();
+}
+
+// Selftest del listado agrupado: entra en Crear y deja la lista (repos agrupados por repo base) visible.
+async function runLocalListSelftest() {
+  state.selftestNotified = true;
+  try {
+    await enterLocal("crear");
+    const gl = (state.local.repos || []).filter((r) => r.gitlabPath).slice(0, 1);
+    gl.forEach((r) => state.local.selected.add(r.dir));
+    renderLocal();
+  } catch (err) {
+    console.error("[selftest] local-list failed:", err);
+  } finally {
+    state.selftestNotified = false;
+    notifySelftestOnce();
+  }
 }
 
 // Selftest del histórico: siembra entradas de ejemplo (no toca disco) para capturar la vista.

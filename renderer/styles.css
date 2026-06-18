@@ -1253,19 +1253,41 @@ div.lf-proj { border: 1px solid var(--border); border-radius: 10px; padding: 10p
 .lf-feat code { background: var(--bg-hover); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
 .lf-nb { font: inherit; font-size: 13px; color: var(--text); background: var(--bg-raised); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
 
+/* Agrupación de carpetas por repo base (listado de Trabajo local) */
+.local-group { margin: 0 20px 14px; }
+.local-group-head { display: flex; align-items: center; gap: 8px; padding: 6px 4px; }
+.local-group-head .ms-proj-name { font-weight: 600; font-size: 14px; }
+.local-group-path { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.local-group-count { margin-left: auto; font-size: 11px; color: var(--text-muted); background: var(--bg-hover); padding: 2px 8px; border-radius: 999px; }
+.local-group-folders { display: flex; flex-direction: column; gap: 6px; padding-left: 12px; border-left: 2px solid var(--border); margin-left: 11px; }
+
 /* Histórico de Trabajo local */
-.lh-toolbar { display: flex; justify-content: flex-end; margin: 0 20px 8px; }
-.lh-list { display: flex; flex-direction: column; gap: 10px; margin: 0 20px 28px; }
-.lh-card { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-raised); padding: 10px 14px; }
+.lh-toolbar { display: flex; align-items: center; justify-content: space-between; margin: 0 20px 10px; }
+.lh-list { display: flex; flex-direction: column; gap: 12px; margin: 0 20px 28px; }
+.lh-card { border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 10px; background: var(--bg-raised); padding: 12px 16px; }
+.lh-card.lh-k-tarea { border-left-color: var(--accent); }
+.lh-card.lh-k-epic { border-left-color: var(--green); }
+.lh-card.lh-k-vincular { border-left-color: var(--text-muted); }
 .lh-head { display: flex; align-items: center; gap: 10px; }
-.lh-kind { font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); }
-.lh-kind.lh-tarea { color: var(--accent); border-color: var(--accent); }
-.lh-kind.lh-epic { color: var(--green); border-color: var(--green); background: var(--green-bg); }
-.lh-title { flex: 1; font-weight: 600; font-size: 14px; }
-.lh-date { font-size: 12px; color: var(--text-muted); }
-.lh-del { font: inherit; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.lh-kind { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; background: var(--bg-hover); color: var(--text-muted); }
+.lh-kind.lh-tarea { color: var(--accent); }
+.lh-kind.lh-epic { color: var(--green); }
+.lh-title { flex: 1; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lh-date { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.lh-del { font: inherit; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 2px 7px; border-radius: 6px; line-height: 1; }
 .lh-del:hover { background: var(--bg-hover); color: var(--red); }
-.lh-items { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
-.lh-line { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
-.lh-line.err { color: var(--red); }
-.lh-k { min-width: 150px; font-size: 12px; color: var(--text-muted); }
+.lh-items { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.lh-sub { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+.lh-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.lh-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; text-decoration: none; padding: 3px 9px; border-radius: 7px; border: 1px solid var(--border); color: var(--text); background: var(--bg); }
+.lh-pill:hover { border-color: var(--accent); }
+.lh-pill::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--text-muted); }
+.lh-pill-issue::before { background: var(--accent); }
+.lh-pill-epic::before { background: var(--green); border-radius: 50%; }
+.lh-pill-mr::before { background: var(--accent); border-radius: 50%; }
+.lh-pill-commit::before { background: var(--text-muted); border-radius: 50%; }
+.lh-pill-commit { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.lh-proj { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 0; border-top: 1px solid var(--border); }
+.lh-proj-name { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); min-width: 160px; }
+.lh-proj-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.lh-proj .ms-proj-ic, .lh-sub .ms-proj-ic { width: 16px; height: 16px; font-size: 9px; }
