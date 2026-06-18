@@ -24,6 +24,21 @@ contextBridge.exposeInMainWorld("monstro", {
   localHistoryList: () => ipcRenderer.invoke("localHistory:list"),
   localHistoryRemove: (id) => ipcRenderer.invoke("localHistory:remove", { id }),
   localHistoryClear: () => ipcRenderer.invoke("localHistory:clear"),
+  agentsStart: (payload) => ipcRenderer.invoke("agents:start", payload),
+  agentsList: () => ipcRenderer.invoke("agents:list"),
+  agentsGet: (runId) => ipcRenderer.invoke("agents:get", { runId }),
+  agentsResume: (runId, projectDir, guidance) => ipcRenderer.invoke("agents:resume", { runId, projectDir, guidance }),
+  agentsStop: (runId, projectDir) => ipcRenderer.invoke("agents:stop", { runId, projectDir }),
+  agentsRemove: (runId) => ipcRenderer.invoke("agents:remove", { runId }),
+  agentsOpenEditor: (projectDir, worktree) => ipcRenderer.invoke("agents:openEditor", { projectDir, worktree }),
+  // Eventos push de los agentes (timeline/estado/notificación). Devuelve un de-suscriptor.
+  onAgentEvent: (channel, cb) => {
+    const ok = ["agents:event", "agents:run", "agents:notify"];
+    if (!ok.includes(channel)) return () => {};
+    const listener = (_e, payload) => cb(payload);
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
+  },
   listPRs: (repo, states) => ipcRenderer.invoke("prs:list", { repo, states }),
   searchPRs: (repos, states) => ipcRenderer.invoke("prs:search", { repos, states }),
   prDetail: (repo, number) => ipcRenderer.invoke("pr:detail", { repo, number }),

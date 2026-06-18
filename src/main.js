@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const { app, BrowserWindow, ipcMain, shell, nativeTheme, Notification, dialog } = require("electron");
+const agents = require("./agents");
 const ai = require("./ai");
 const config = require("./config");
 const drafts = require("./drafts");
@@ -53,6 +54,9 @@ function createWindow() {
       seed_draft: process.argv.includes("--seed-draft") ? "1" : "0",
     },
   });
+
+  // OPE-20 fase 3: los agentes emiten eventos de timeline/estado al renderer por este canal.
+  agents.init((type, payload) => { if (win && !win.isDestroyed()) win.webContents.send(type, payload); });
 
   // Los enlaces externos se abren en el navegador, nunca dentro de la app.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -342,6 +346,26 @@ function wireIpc() {
     const safeRepos = (Array.isArray(repos) ? repos : []).filter((r) => typeof r === "string" && r.trim()).slice(0, 20);
     return ai.proposePlan({ title, description, isEpic, indications, repos: safeRepos, model, effort });
   });
+  // OPE-20 fase 3: arranca el run. El "orquestador" (ai.planAgents) decide modelo/esfuerzo por
+  // proyecto (queda en el log del run); luego agents.startRun crea worktrees y lanza los agentes.
+  // Acción que SÍ ejecuta procesos locales reales → solo se dispara por acción explícita del usuario.
+  ipcMain.handle("agents:start", async (_event, { title, url, isEpic, indications, objectives, requirements, tests, projects }) => {
+    const list = Array.isArray(projects) ? projects : [];
+    if (!list.length) throw new Error("No hay proyectos sobre los que trabajar.");
+    for (const p of list) localRootGuard(p.dir);
+    let assigned = list.map(() => ({ model: "claude-sonnet-4-6", effort: "medium", rationale: "(orquestador no disponible)" }));
+    try { assigned = (await ai.planAgents({ title, projects: list.map((p) => ({ name: p.name, tasks: p.tasks })) })).projects; }
+    catch { /* si el orquestador falla, cada proyecto cae a un default razonable */ }
+    const merged = list.map((p, i) => ({ ...p, model: assigned[i] && assigned[i].model, effort: assigned[i] && assigned[i].effort, rationale: assigned[i] && assigned[i].rationale }));
+    return agents.startRun({ title, url, isEpic, indications, objectives, requirements, tests, projects: merged });
+  });
+  ipcMain.handle("agents:list", () => agents.listRuns());
+  ipcMain.handle("agents:get", (_event, { runId }) => agents.getRun(runId));
+  ipcMain.handle("agents:resume", (_event, { runId, projectDir, guidance }) => { localRootGuard(projectDir); return agents.resumeRun(runId, projectDir, guidance); });
+  ipcMain.handle("agents:stop", (_event, { runId, projectDir }) => agents.stopRun(runId, projectDir));
+  ipcMain.handle("agents:remove", (_event, { runId }) => agents.removeRun(runId));
+  ipcMain.handle("agents:openEditor", (_event, { projectDir, worktree }) => { localRootGuard(projectDir); return agents.openEditor(projectDir, worktree); });
+
   // Orquesta el flujo Vincular: por cada proyecto push → MR vinculada a la Issue/Epic existente.
   // Misma proyecto que la issue → "Closes #iid" (auto-cierra); otro proyecto/Epic → referencia cruzada.
   ipcMain.handle("local:linkTask", async (_event, { issue, projects }) => {

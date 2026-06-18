@@ -560,6 +560,61 @@ async function proposePlan({ title, description, isEpic, indications, repos, mod
   };
 }
 
+/* ---------- orquestador: elige modelo/esfuerzo por proyecto (OPE-20 fase 3) ---------- */
+
+const AGENTS_SCHEMA = {
+  type: "object",
+  properties: {
+    projects: {
+      type: "array",
+      description: "Una entrada por proyecto, EN EL MISMO ORDEN que la entrada.",
+      items: {
+        type: "object",
+        properties: {
+          model: { type: "string", enum: Object.keys(AI_MODELS), description: "Modelo adecuado al trabajo de ese proyecto." },
+          effort: { type: "string", enum: ["", ...ALL_EFFORTS], description: "Esfuerzo de razonamiento (vacío si el modelo no lo soporta)." },
+          rationale: { type: "string", description: "Una frase, en español, justificando la elección." },
+        },
+        required: ["model", "effort", "rationale"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["projects"],
+  additionalProperties: false,
+};
+
+// El "agente orquestador": dado el plan, asigna a CADA proyecto el modelo/esfuerzo adecuado (no
+// siempre hace falta Opus/max). Devuelve la elección + el porqué, que queda registrado en los logs
+// del run. Se sanea contra el catálogo (un modelo/effort inválido cae al default).
+async function planAgents({ title, projects }) {
+  const list = (Array.isArray(projects) ? projects : []).map((p) => ({ name: p.name, tasks: p.tasks || [] }));
+  if (!list.length) throw new Error("No hay proyectos que orquestar.");
+  const blocks = list.map((p, i) => `## [${i}] ${p.name}\n${(p.tasks || []).map((t) => `- ${t}`).join("\n") || "- (sin tareas)"}`).join("\n\n");
+  const catalog = Object.entries(AI_MODELS).map(([id, m]) => `- ${id} (${m.label})${m.efforts.length ? ` esfuerzos: ${m.efforts.join("/")}` : " sin esfuerzo"}`).join("\n");
+  const prompt = `Eres un tech lead que reparte trabajo entre agentes de IA. Para la tarea "${title}", asigna a CADA proyecto el modelo y esfuerzo ADECUADOS al tamaño/dificultad de su parte. No malgastes: usa Opus/esfuerzo alto SOLO si el trabajo lo merece; tareas sencillas → modelos más baratos (Sonnet/Haiku) y esfuerzo bajo/medio.
+
+Modelos disponibles:
+${catalog}
+
+Proyectos (en orden):
+${blocks}
+
+Responde SOLO con JSON: {"projects":[{"model":string,"effort":string,"rationale":string}]} (un objeto por proyecto, mismo orden; "effort" vacío si el modelo no soporta esfuerzo).`;
+  const { data, backend } = await runStructured(prompt, AGENTS_SCHEMA);
+  const out = Array.isArray(data.projects) ? data.projects : [];
+  return {
+    backend,
+    projects: list.map((p, i) => {
+      const choice = out[i] || {};
+      const model = AI_MODELS[choice.model] ? choice.model : DEFAULT_MODEL;
+      const efforts = AI_MODELS[model].efforts;
+      const effort = efforts.includes(choice.effort) ? choice.effort : efforts.includes(DEFAULT_EFFORT) ? DEFAULT_EFFORT : null;
+      return { name: p.name, model, effort, rationale: typeof choice.rationale === "string" ? choice.rationale.trim() : "" };
+    }),
+  };
+}
+
 /** Estado del backend de IA, para onboarding y ajustes. */
 function backendStatus() {
   const { model, effort } = aiSettings();
@@ -615,4 +670,4 @@ function isAiEffort(level) {
   return ALL_EFFORTS.includes(level);
 }
 
-module.exports = { generateReview, summarizeMilestone, proposeTask, proposeEpic, proposePlan, backendStatus, ping, isAiModel, isAiEffort };
+module.exports = { generateReview, summarizeMilestone, proposeTask, proposeEpic, proposePlan, planAgents, backendStatus, ping, isAiModel, isAiEffort };

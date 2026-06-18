@@ -1444,3 +1444,38 @@ div.lf-proj { border: 1px solid var(--border); border-radius: 10px; padding: 10p
 .pf-proj-head .ms-proj-ic { width: 15px; height: 15px; font-size: 8px; }
 .pf-plan.approved { opacity: 0.92; }
 .pf-approved-note { padding: 10px 14px; border-radius: 8px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; }
+
+/* ---------- OPE-20 fase 3: runs de agentes ---------- */
+.nav-dot { margin-left: auto; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--red); color: #fff; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.lr-runs { margin: 12px 20px 0; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-raised); overflow: hidden; }
+.lr-runs-head { padding: 8px 14px; font-size: 12px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+.lr-run-row { display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.lr-run-row:last-child { border-bottom: 0; }
+.lr-run-row:hover { background: var(--bg-hover); }
+.lr-run-row:hover .ls-go { opacity: 1; }
+.lr-run-title { font-weight: 600; font-size: 14px; }
+.lr-run-meta { font-size: 12px; }
+.lr-status { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; flex-shrink: 0; }
+.lr-status.st-run { background: var(--purple-bg); color: var(--purple); }
+.lr-status.st-done { background: var(--green-bg); color: var(--green); }
+.lr-status.st-fail { background: var(--red-bg); color: var(--red); }
+.lr-status.st-stop { background: var(--bg-hover); color: var(--text-muted); }
+.lr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; margin: 14px 20px 8px; }
+.lr-proj { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-raised); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.lr-proj-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lr-proj-head .ms-proj-ic { width: 16px; height: 16px; font-size: 8px; }
+.lr-proj-name { font-weight: 600; font-size: 14px; }
+.lr-model { font-size: 10px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); cursor: help; }
+.lr-pend { font-size: 11px; color: var(--red); font-weight: 600; }
+.lr-proj-sub { font-size: 12px; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.lr-timeline { list-style: none; margin: 0; padding: 8px 10px; max-height: 280px; overflow-y: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.lr-timeline li { display: flex; gap: 7px; align-items: baseline; line-height: 1.35; }
+.tl-ic { flex-shrink: 0; width: 14px; text-align: center; color: var(--text-muted); }
+.tl-tx { min-width: 0; word-break: break-word; }
+.lr-timeline .tl-tool .tl-tx { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); }
+.lr-timeline .tl-say .tl-tx { color: var(--text-muted); }
+.lr-timeline .tl-blocked { color: var(--red); }
+.lr-timeline .tl-blocked .tl-ic { color: var(--red); }
+.lr-timeline .tl-result { color: var(--green); font-weight: 500; }
+.lr-timeline .tl-empty { color: var(--text-muted); }
+.lr-proj-actions { display: flex; gap: 8px; }
