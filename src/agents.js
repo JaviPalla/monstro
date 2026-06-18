@@ -194,6 +194,11 @@ function spawnAgent(run, proj, guidance) {
     if (code === 0 || (lastResult && lastResult.ok)) setProjStatus(run, proj, "done");
     else setProjStatus(run, proj, "failed", (proj.stderr || `claude salió con código ${code}`).slice(0, 300));
   });
+  // `claude -p` (--print) espera el prompt por stdin: si no se lo damos, expira a los 3s con
+  // "Input must be provided either through stdin or as a prompt argument". Se lo escribimos y cerramos.
+  child.stdin.on("error", () => { /* EPIPE si el proceso muere antes de leer stdin: lo ignora el close handler */ });
+  child.stdin.write(prompt);
+  child.stdin.end();
 }
 
 function setProjStatus(run, proj, status, error) {
