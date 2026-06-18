@@ -121,5 +121,5 @@
     return out;
   }
 
-  window.pulpoHL = { highlightLine, familyFromFilename };
+  window.monstroHL = { highlightLine, familyFromFilename };
 })();

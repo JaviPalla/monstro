@@ -49,7 +49,7 @@ async function gql(query, variables) {
     headers: {
       Authorization: `bearer ${token}`,
       "Content-Type": "application/json",
-      "User-Agent": "pulpo-app",
+      "User-Agent": "monstro-app",
     },
     body: JSON.stringify({ query, variables }),
   });
@@ -67,7 +67,7 @@ async function rest(method, path, body) {
     headers: {
       Authorization: `bearer ${token}`,
       Accept: "application/vnd.github+json",
-      "User-Agent": "pulpo-app",
+      "User-Agent": "monstro-app",
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,

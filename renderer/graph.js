@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * PulpoGraph — layout y render del grafo de commits (estilo gitk/GitKraken).
+ * MonstroGraph — layout y render del grafo de commits (estilo gitk/GitKraken).
  *
  * computeLayout(commits, branches):
  *   - ordena por fecha (con ajuste topológico: un padre nunca antes que su hijo)
@@ -164,5 +164,5 @@
     };
   }
 
-  window.PulpoGraph = { computeLayout, renderSVG, laneColor };
+  window.MonstroGraph = { computeLayout, renderSVG, laneColor };
 })();

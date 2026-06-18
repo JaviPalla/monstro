@@ -14,7 +14,7 @@ const provider = require("./provider");
 const gh = () => provider.current();
 
 const SELFTEST = process.argv.includes("--selftest");
-const SELFTEST_SHOT = "/tmp/pulpo-selftest.png";
+const SELFTEST_SHOT = "/tmp/monstro-selftest.png";
 const SELFTEST_ROUTE = (process.argv.find((a) => a.startsWith("--selftest-route=")) || "").split("=")[1] || "list";
 // La ruta de resumen espera a una IA (lenta con Opus); la de releases proxea los avatares del grupo
 // entero (groupProjects). Ambas necesitan más margen que los 20s por defecto.
@@ -29,7 +29,7 @@ function createWindow() {
     height: 820,
     minWidth: 980,
     minHeight: 600,
-    title: "Pulpo",
+    title: "Monstro",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 16, y: 14 },
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#1b1f24" : "#f6f8fa",

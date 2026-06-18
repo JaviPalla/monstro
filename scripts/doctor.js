@@ -2,7 +2,7 @@
 "use strict";
 
 /**
- * `npm run doctor` — diagnóstico de puesta en marcha de Pulpo.
+ * `npm run doctor` — diagnóstico de puesta en marcha de Monstro.
  * Comprueba cada dependencia y dice exactamente cómo arreglar lo que falte,
  * para que cualquiera pueda levantar el proyecto sin ayuda.
  */
@@ -43,7 +43,7 @@ function which(bin) {
   return run("/bin/sh", ["-lc", `command -v ${bin}`]);
 }
 
-console.log("\n🐙 Pulpo doctor\n");
+console.log("\n👾 Monstro doctor\n");
 
 console.log("Imprescindible:");
 check("Node.js ≥ 18", () => {
@@ -58,14 +58,14 @@ check("Dependencias instaladas (node_modules)", () => {
   return require(path.join(electronPath, "package.json")).version;
 }, { fix: "npm install" });
 
-// Pulpo guarda la config en userData; replicamos esa ruta para saber el proveedor.
-function loadPulpoConfig() {
+// Monstro guarda la config en userData; replicamos esa ruta para saber el proveedor.
+function loadMonstroConfig() {
   const dir =
     process.platform === "darwin"
-      ? path.join(os.homedir(), "Library", "Application Support", "Pulpo")
+      ? path.join(os.homedir(), "Library", "Application Support", "Monstro")
       : process.platform === "win32"
-        ? path.join(process.env.APPDATA || "", "Pulpo")
-        : path.join(os.homedir(), ".config", "Pulpo");
+        ? path.join(process.env.APPDATA || "", "Monstro")
+        : path.join(os.homedir(), ".config", "Monstro");
   try {
     return JSON.parse(fs.readFileSync(path.join(dir, "config.json"), "utf8"));
   } catch {
@@ -73,7 +73,7 @@ function loadPulpoConfig() {
   }
 }
 
-const cfg = loadPulpoConfig();
+const cfg = loadMonstroConfig();
 const provider = cfg.provider || "github";
 const hasManualToken = Boolean(cfg.token);
 
@@ -141,7 +141,7 @@ if (!sdkKey) {
     return `${cli} (${version})`;
   }, {
     optional: true,
-    fix: "instala Claude Code (https://claude.com/claude-code) y ábrelo una vez para autenticarte — Pulpo usará tu sesión automáticamente",
+    fix: "instala Claude Code (https://claude.com/claude-code) y ábrelo una vez para autenticarte — Monstro usará tu sesión automáticamente",
   });
 }
 

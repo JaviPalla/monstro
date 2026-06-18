@@ -2,7 +2,7 @@
 
 const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld("pulpo", {
+contextBridge.exposeInMainWorld("monstro", {
   authStatus: () => ipcRenderer.invoke("auth:status"),
   getConfig: () => ipcRenderer.invoke("config:get"),
   setConfig: (partial) => ipcRenderer.invoke("config:set", partial),

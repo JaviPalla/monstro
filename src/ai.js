@@ -2,7 +2,7 @@
 
 /**
  * Review con IA: analiza el diff de una PR y devuelve comentarios de review
- * estructurados (en inglés) que Pulpo convierte en BORRADORES locales — nunca
+ * estructurados (en inglés) que Monstro convierte en BORRADORES locales — nunca
  * se publica nada sin que el usuario pulse Publicar.
  *
  * Backends, en orden:

@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * Descubrimiento de repos LOCALES (OPE-19): Pulpo es un cliente remoto puro, así que esta
+ * Descubrimiento de repos LOCALES (OPE-19): Monstro es un cliente remoto puro, así que esta
  * es la única pieza que toca git en disco. Dado un directorio raíz donde conviven todos los
  * clones de GitLab (config.local.rootDir), lista los repos, sus ramas y worktrees, y los
  * casa con los proyectos de GitLab por la URL del remote `origin`.
