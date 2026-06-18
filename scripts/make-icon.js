@@ -1,9 +1,9 @@
 "use strict";
 
 /**
- * Genera assets/icon-1024.png renderizando el SVG del pulpo con el propio
- * Electron (ventana offscreen transparente + capturePage). Después, el
- * empaquetado a .icns se hace con sips/iconutil (ver scripts/make-icon.sh).
+ * Genera assets/icon-1024.png renderizando el SVG del monstruo (Monstro) con el
+ * propio Electron (ventana offscreen transparente + capturePage). Después, el
+ * empaquetado a .icns se hace con sips/iconutil (ver README / npm run icon).
  */
 const fs = require("fs");
 const path = require("path");
@@ -20,26 +20,29 @@ const SVG = `
       <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
       <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5ff0b8"/>
+      <stop offset="1" stop-color="#23c98c"/>
+    </linearGradient>
   </defs>
   <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
   <rect x="64" y="64" width="896" height="448" rx="200" fill="url(#shine)"/>
-  <!-- tentáculos -->
-  <g stroke="#ffffff" stroke-width="58" stroke-linecap="round" fill="none" opacity="0.96">
-    <path d="M 330 600 C 320 730, 250 750, 215 700"/>
-    <path d="M 430 640 C 430 780, 350 820, 305 775"/>
-    <path d="M 512 650 C 512 800, 512 800, 512 800"/>
-    <path d="M 594 640 C 594 780, 674 820, 719 775"/>
-    <path d="M 694 600 C 704 730, 774 750, 809 700"/>
-  </g>
-  <!-- cabeza -->
-  <ellipse cx="512" cy="440" rx="252" ry="232" fill="#ffffff"/>
-  <!-- ojos -->
-  <circle cx="430" cy="430" r="46" fill="#2b2f55"/>
-  <circle cx="594" cy="430" r="46" fill="#2b2f55"/>
-  <circle cx="444" cy="416" r="14" fill="#ffffff"/>
-  <circle cx="608" cy="416" r="14" fill="#ffffff"/>
-  <!-- sonrisa -->
-  <path d="M 462 540 Q 512 580 562 540" stroke="#2b2f55" stroke-width="22" stroke-linecap="round" fill="none"/>
+  <!-- cuernos -->
+  <path d="M 372 332 L 322 196 L 452 312 Z" fill="#2b2f55"/>
+  <path d="M 652 332 L 702 196 L 572 312 Z" fill="#2b2f55"/>
+  <!-- cuerpo -->
+  <rect x="292" y="296" width="440" height="452" rx="158" fill="url(#body)"/>
+  <!-- piececitos -->
+  <ellipse cx="392" cy="748" rx="62" ry="40" fill="#23c98c"/>
+  <ellipse cx="632" cy="748" rx="62" ry="40" fill="#23c98c"/>
+  <!-- ojo (cíclope) -->
+  <circle cx="512" cy="468" r="126" fill="#ffffff"/>
+  <circle cx="512" cy="480" r="60" fill="#2b2f55"/>
+  <circle cx="542" cy="452" r="22" fill="#ffffff"/>
+  <!-- boca + colmillos -->
+  <path d="M 416 606 Q 512 700 608 606 Z" fill="#2b2f55"/>
+  <path d="M 466 612 L 502 612 L 484 660 Z" fill="#ffffff"/>
+  <path d="M 540 612 L 576 612 L 558 654 Z" fill="#ffffff"/>
 </svg>`;
 
 app.whenReady().then(async () => {

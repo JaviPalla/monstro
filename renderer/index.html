@@ -5,13 +5,44 @@
   <!-- style-src permite inline: los templates propios pintan colores de labels/lanes vía style=""; no se inyecta CSS de terceros -->
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src https: data:; font-src 'self'" />
-  <title>Pulpo</title>
+  <title>Monstro</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <div id="splash">
+    <svg id="splash-monster" viewBox="0 0 1024 1024" aria-hidden="true">
+      <defs>
+        <linearGradient id="sp-body" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#5ff0b8"/>
+          <stop offset="1" stop-color="#23c98c"/>
+        </linearGradient>
+      </defs>
+      <g class="sp-bob">
+        <g class="sp-horns">
+          <path d="M 372 332 L 322 196 L 452 312 Z" fill="#2b2f55"/>
+          <path d="M 652 332 L 702 196 L 572 312 Z" fill="#2b2f55"/>
+        </g>
+        <rect x="292" y="296" width="440" height="452" rx="158" fill="url(#sp-body)"/>
+        <ellipse cx="392" cy="748" rx="62" ry="40" fill="#23c98c"/>
+        <ellipse cx="632" cy="748" rx="62" ry="40" fill="#23c98c"/>
+        <g class="sp-eye">
+          <circle cx="512" cy="468" r="126" fill="#ffffff"/>
+          <circle cx="512" cy="480" r="60" fill="#2b2f55"/>
+          <circle cx="542" cy="452" r="22" fill="#ffffff"/>
+          <rect class="sp-lid" x="386" y="342" width="252" height="252" rx="40" fill="#34dd9c"/>
+        </g>
+        <path d="M 416 606 Q 512 700 608 606 Z" fill="#2b2f55"/>
+        <path d="M 466 612 L 502 612 L 484 660 Z" fill="#ffffff"/>
+        <path d="M 540 612 L 576 612 L 558 654 Z" fill="#ffffff"/>
+      </g>
+    </svg>
+    <div class="splash-word">Monstro</div>
+    <div class="splash-dots"><span></span><span></span><span></span></div>
+  </div>
+
   <header id="topbar">
     <div class="traffic-pad"></div>
-    <div class="brand" title="Pulpo">🐙 <strong>Pulpo</strong></div>
+    <div class="brand" title="Monstro">👾 <strong>Monstro</strong></div>
     <input id="search" type="search" placeholder="Filtrar…" />
     <button id="refresh" class="icon-btn" title="Refrescar (R)">⟳</button>
     <button id="settings-btn" class="icon-btn" title="Ajustes">⚙</button>

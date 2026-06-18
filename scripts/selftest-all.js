@@ -12,7 +12,7 @@ const fs = require("fs");
 const path = require("path");
 
 const ELECTRON = path.join(__dirname, "..", "node_modules", ".bin", "electron");
-const SHOT = "/tmp/pulpo-selftest.png";
+const SHOT = "/tmp/monstro-selftest.png";
 const ROUTES = ["list", "changes", "history"];
 
 let failed = 0;

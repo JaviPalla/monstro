@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/icon-1024.png" width="128" alt="Pulpo" />
+  <img src="assets/icon-1024.png" width="128" alt="Monstro" />
 </p>
 
-<h1 align="center">🐙 Pulpo</h1>
+<h1 align="center">👾 Monstro</h1>
 
 <p align="center">
   <b>Cliente de GitHub y GitLab para Mac para pull/merge requests <i>y gestión de tareas</i>.</b><br/>
@@ -61,7 +61,7 @@ No configurables. A propósito.
   sobre las tareas asignadas — y **filtros de estado** tri-estado (solo estas · ocultar · sin
   filtro) con su explicación animada. Toggles para mostrar cerradas o sin asignar.
 - **Cherry-pick de hotfix** 🍒 *(solo GitLab)* — al fusionar una MR cuya rama de origen empieza por
-  `hotfix/`, Pulpo ofrece **replicar el cambio** (cherry-pick del commit de merge) a otras ramas
+  `hotfix/`, Monstro ofrece **replicar el cambio** (cherry-pick del commit de merge) a otras ramas
   configuradas y a la rama hermana `-mx` de la *release*, con un *dry-run* por rama (✓/✗) antes de
   confirmar. Nunca se dispara solo.
 - **Notificaciones nativas** 🔔 — te avisa cuando te piden review, cuando tu PR es aprobada o le
@@ -75,7 +75,7 @@ No configurables. A propósito.
 ## Puesta en marcha (2 minutos)
 
 ```bash
-git clone https://github.com/JaviPalla/pulpo && cd pulpo
+git clone https://github.com/JaviPalla/monstro && cd monstro
 npm install
 npm run doctor   # te dice exactamente qué falta y cómo arreglarlo
 npm start
@@ -83,7 +83,7 @@ npm start
 
 `npm run doctor` comprueba Node, dependencias, GitHub e IA, con el comando de arreglo para
 cada cosa que falte. Si arrancas sin GitHub conectado, la propia app te recibe con una
-pantalla de configuración guiada y botón de reintento. Una vez conectado, Pulpo te lista
+pantalla de configuración guiada y botón de reintento. Una vez conectado, Monstro te lista
 tus repositorios accesibles para que marques los que quieres vigilar (o añadas cualquier
 `owner/repo` a mano) — y puedes cambiarlos cuando quieras en Ajustes ⚙.
 
@@ -94,7 +94,7 @@ GitLab admite **gitlab.com y self-hosted** — al elegir GitLab puedes indicar l
 instancia (`https://gitlab.miempresa.com`). Los proyectos de GitLab pueden ir anidados
 (`group/subgrupo/proyecto`).
 
-Pulpo no guarda tu token salvo que tú lo pidas. Orden de resolución según el proveedor:
+Monstro no guarda tu token salvo que tú lo pidas. Orden de resolución según el proveedor:
 
 **GitHub**
 1. Variable de entorno `GITHUB_TOKEN`
@@ -106,21 +106,21 @@ Pulpo no guarda tu token salvo que tú lo pidas. Orden de resolución según el 
 2. `glab` CLI: `brew install glab && glab auth login`
 3. Token manual desde Ajustes ⚙
 
-El token manual queda en `~/Library/Application Support/pulpo/config.json` (permisos 600). Vive solo
+El token manual queda en `~/Library/Application Support/monstro/config.json` (permisos 600). Vive solo
 en el proceso principal: el renderer va sandboxed con CSP estricta y habla por IPC.
 
 ### 2. Claude (opcional — para 🤖 Review con IA)
 
 Sin configurar nada: si tienes [Claude Code](https://claude.com/claude-code) instalado y has
-hecho login alguna vez, Pulpo usa esa sesión automáticamente (`claude -p` headless). Si
-prefieres la API directa, exporta `ANTHROPIC_API_KEY` y Pulpo usará el SDK oficial con
+hecho login alguna vez, Monstro usa esa sesión automáticamente (`claude -p` headless). Si
+prefieres la API directa, exporta `ANTHROPIC_API_KEY` y Monstro usará el SDK oficial con
 salida estructurada. En Ajustes ⚙ hay un botón **"Probar conexión con Claude"** para
 verificarlo desde la app.
 
 ### Empaquetar como .app (opcional)
 
 ```bash
-npx electron-packager . Pulpo --platform=darwin --arch=arm64 --icon=build/icon.icns --out=dist
+npx electron-packager . Monstro --platform=darwin --arch=arm64 --icon=build/icon.icns --out=dist
 ```
 
 ## Arquitectura
@@ -139,7 +139,7 @@ scripts/         make-icon.js (el icono se renderiza con el propio Electron)
 ```
 
 `npm run selftest` arranca la app contra la API real, captura la pantalla en
-`/tmp/pulpo-selftest.png` y sale — así se verifican los cambios de UI. `npm test` corre
+`/tmp/monstro-selftest.png` y sale — así se verifican los cambios de UI. `npm test` corre
 las tres vistas (lista, cambios, histórico) y comprueba que todas renderizan.
 
 ## Atajos

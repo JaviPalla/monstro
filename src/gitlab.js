@@ -59,7 +59,7 @@ async function api(method, path, body) {
   const { token } = resolveToken();
   if (!token) throw new Error("NO_TOKEN");
   const { apiBase } = settings();
-  const headers = { "PRIVATE-TOKEN": token, "User-Agent": "pulpo-app" };
+  const headers = { "PRIVATE-TOKEN": token, "User-Agent": "monstro-app" };
   if (body) headers["Content-Type"] = "application/json";
   const res = await fetch(`${apiBase}${path}`, {
     method,
@@ -795,7 +795,7 @@ async function fetchAvatarDataUri(url) {
   try {
     const { token } = resolveToken();
     if (!token) return null;
-    const res = await fetch(url, { headers: { "PRIVATE-TOKEN": token, "User-Agent": "pulpo-app" } });
+    const res = await fetch(url, { headers: { "PRIVATE-TOKEN": token, "User-Agent": "monstro-app" } });
     if (!res.ok) return null;
     const type = res.headers.get("content-type") || "image/png";
     const buf = Buffer.from(await res.arrayBuffer());
@@ -930,7 +930,7 @@ async function graphql(query, variables) {
   const { base } = settings();
   const res = await fetch(`${base}/api/graphql`, {
     method: "POST",
-    headers: { "PRIVATE-TOKEN": token, "User-Agent": "pulpo-app", "Content-Type": "application/json" },
+    headers: { "PRIVATE-TOKEN": token, "User-Agent": "monstro-app", "Content-Type": "application/json" },
     body: JSON.stringify({ query, variables }),
   });
   const json = await res.json();

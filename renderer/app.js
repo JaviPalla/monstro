@@ -4,6 +4,31 @@
 const IS_SELFTEST = new URLSearchParams(location.search).get("selftest") === "1";
 const SELFTEST_ROUTE = new URLSearchParams(location.search).get("selftest_route") || "list";
 
+// Mascota = el mismo icono del dock (scripts/make-icon.js), inline en SVG porque el CSP
+// (img-src https: data:) no deja cargar el PNG local. Fuente única para brand/welcome/empty.
+function mascot(size = 24) {
+  return `<svg class="mascot" width="${size}" height="${size}" viewBox="0 0 1024 1024" aria-hidden="true">
+  <defs>
+    <linearGradient id="m-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6573ef"/><stop offset="1" stop-color="#7f3df0"/></linearGradient>
+    <linearGradient id="m-shine" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="m-body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5ff0b8"/><stop offset="1" stop-color="#23c98c"/></linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#m-bg)"/>
+  <rect x="64" y="64" width="896" height="448" rx="200" fill="url(#m-shine)"/>
+  <path d="M 372 332 L 322 196 L 452 312 Z" fill="#2b2f55"/>
+  <path d="M 652 332 L 702 196 L 572 312 Z" fill="#2b2f55"/>
+  <rect x="292" y="296" width="440" height="452" rx="158" fill="url(#m-body)"/>
+  <ellipse cx="392" cy="748" rx="62" ry="40" fill="#23c98c"/>
+  <ellipse cx="632" cy="748" rx="62" ry="40" fill="#23c98c"/>
+  <circle cx="512" cy="468" r="126" fill="#ffffff"/>
+  <circle cx="512" cy="480" r="60" fill="#2b2f55"/>
+  <circle cx="542" cy="452" r="22" fill="#ffffff"/>
+  <path d="M 416 606 Q 512 700 608 606 Z" fill="#2b2f55"/>
+  <path d="M 466 612 L 502 612 L 484 660 Z" fill="#ffffff"/>
+  <path d="M 540 612 L 576 612 L 558 654 Z" fill="#ffffff"/>
+</svg>`;
+}
+
 const state = {
   config: null,
   me: null,
@@ -120,7 +145,7 @@ function copyRich(html, plain) {
 function notifySelftestOnce() {
   if (!state.selftestNotified) {
     state.selftestNotified = true;
-    window.pulpo.selftestRenderComplete();
+    window.monstro.selftestRenderComplete();
   }
 }
 
@@ -136,8 +161,8 @@ function draftsKey() {
 }
 
 async function saveDrafts() {
-  state.drafts = await window.pulpo.draftsSave(draftsKey(), state.drafts);
-  state.draftKeys = new Set(await window.pulpo.draftsKeys());
+  state.drafts = await window.monstro.draftsSave(draftsKey(), state.drafts);
+  state.draftKeys = new Set(await window.monstro.draftsKeys());
 }
 
 async function addDraft(draft) {
@@ -191,9 +216,9 @@ async function generateAiReview(pr) {
   try {
     const files = state.selected === pr.number && state.files
       ? state.files
-      : await window.pulpo.prFiles(repoKey.split("#")[0], pr.number);
+      : await window.monstro.prFiles(repoKey.split("#")[0], pr.number);
     if (state.selected === pr.number) state.files = files;
-    const { review, backend, model, effort } = await window.pulpo.aiReview(pr.title, pr.body || "", files);
+    const { review, backend, model, effort } = await window.monstro.aiReview(pr.title, pr.body || "", files);
 
     const anchors = new Set();
     for (const file of files) {
@@ -249,9 +274,9 @@ async function generateAiReview(pr) {
       await saveDrafts();
       state.detailTab = "changes";
     } else {
-      const existing = await window.pulpo.draftsList(repoKey);
-      await window.pulpo.draftsSave(repoKey, [...existing, ...newDrafts]);
-      state.draftKeys = new Set(await window.pulpo.draftsKeys());
+      const existing = await window.monstro.draftsList(repoKey);
+      await window.monstro.draftsSave(repoKey, [...existing, ...newDrafts]);
+      state.draftKeys = new Set(await window.monstro.draftsKeys());
       renderList();
     }
     toast(`IA (${backend} · ${model}${effort ? ` · ${effort}` : ""}): ${newDrafts.length - (summaryParts.length ? 1 : 0)} comentario(s) en línea + resumen, en borradores de #${pr.number}`, "ok");
@@ -329,8 +354,8 @@ function confirmPublishSingle(draft) {
   $("#modal-confirm").addEventListener("click", async () => {
     root.innerHTML = "";
     try {
-      state.conversation = await window.pulpo.prConversation(detailRepo(), state.selected);
-      await window.pulpo.submitReview(detailRepo(), state.selected, {
+      state.conversation = await window.monstro.prConversation(detailRepo(), state.selected);
+      await window.monstro.submitReview(detailRepo(), state.selected, {
         commitId: state.conversation.headRefOid,
         event: "COMMENT",
         body: draft.kind === "general" ? draft.body : undefined,
@@ -338,7 +363,7 @@ function confirmPublishSingle(draft) {
       });
       await removeDraft(draft.id);
       toast("Borrador publicado ✓", "ok");
-      state.conversation = await window.pulpo.prConversation(detailRepo(), state.selected);
+      state.conversation = await window.monstro.prConversation(detailRepo(), state.selected);
       renderDetail();
     } catch (err) {
       toast(`No se pudo publicar (el borrador sigue guardado): ${String(err.message || err)}`, "err");
@@ -528,10 +553,10 @@ async function publishDrafts(event) {
   const pr = state.detailPR;
   try {
     // headRefOid fresco: si la rama avanzó, los comentarios se anclan al último commit
-    state.conversation = await window.pulpo.prConversation(detailRepo(), pr.number);
+    state.conversation = await window.monstro.prConversation(detailRepo(), pr.number);
     const inline = state.drafts.filter((d) => d.kind === "inline");
     const general = state.drafts.filter((d) => d.kind === "general");
-    await window.pulpo.submitReview(detailRepo(), pr.number, {
+    await window.monstro.submitReview(detailRepo(), pr.number, {
       commitId: state.conversation.headRefOid,
       event,
       body: general.map((d) => d.body).join("\n\n---\n\n") || undefined,
@@ -540,7 +565,7 @@ async function publishDrafts(event) {
     state.drafts = [];
     await saveDrafts();
     toast(`Review publicada (${event === "APPROVE" ? "aprobada ✅" : event === "REQUEST_CHANGES" ? "cambios pedidos" : "comentarios"})`, "ok");
-    state.conversation = await window.pulpo.prConversation(detailRepo(), pr.number);
+    state.conversation = await window.monstro.prConversation(detailRepo(), pr.number);
     renderDetail();
   } catch (err) {
     toast(`No se pudo publicar (tus borradores siguen guardados): ${String(err.message || err)}`, "err");
@@ -655,7 +680,7 @@ function renderList() {
     return;
   }
   if (!prs.length) {
-    list.innerHTML = `<div class="empty"><span class="big">🐙</span>Nada por aquí. Mar en calma.</div>`;
+    list.innerHTML = `<div class="empty"><span class="big">${mascot(48)}</span>Nada por aquí. Todo tranquilo.</div>`;
     notifySelftestOnce();
     return;
   }
@@ -722,9 +747,9 @@ async function openDetail(number, tab = "conv", repoOverride = null) {
   detailContent.innerHTML = `<div class="detail-inner"><div class="loading">Cargando #${number}…</div></div>`;
   try {
     const [pr, conversation, drafts] = await Promise.all([
-      window.pulpo.prDetail(detailRepo(), number),
-      window.pulpo.prConversation(detailRepo(), number),
-      window.pulpo.draftsList(`${detailRepo()}#${number}`),
+      window.monstro.prDetail(detailRepo(), number),
+      window.monstro.prConversation(detailRepo(), number),
+      window.monstro.draftsList(`${detailRepo()}#${number}`),
     ]);
     state.detailPR = pr;
     state.conversation = conversation;
@@ -808,7 +833,7 @@ function renderDetail() {
     const btn = $("#act-draft-toggle");
     btn.disabled = true;
     try {
-      const result = await window.pulpo.setPrDraft(pr.id, !pr.isDraft);
+      const result = await window.monstro.setPrDraft(pr.id, !pr.isDraft);
       toast(result.isDraft ? `#${pr.number} convertida a borrador` : `#${pr.number} lista para review 🚀`, "ok");
       await refresh();
       openDetail(pr.number, state.detailTab);
@@ -962,8 +987,8 @@ function diffLineRow(file, line, anchored) {
   const sign = line.type === "add" ? "+" : line.type === "del" ? "−" : " ";
   const commentLine = line.type === "del" ? line.old : line.new;
   const side = line.type === "del" ? "LEFT" : "RIGHT";
-  const codeHtml = window.pulpoHL
-    ? window.pulpoHL.highlightLine(line.text, window.pulpoHL.familyFromFilename(file.filename))
+  const codeHtml = window.monstroHL
+    ? window.monstroHL.highlightLine(line.text, window.monstroHL.familyFromFilename(file.filename))
     : esc(line.text);
   const threadsHtml = (anchored.get(`${file.filename}::${line.new}`) || [])
     .map(threadBlock)
@@ -986,7 +1011,7 @@ function renderChangesTab() {
   const files = state.files;
   if (!files) {
     $("#tab-body").innerHTML = `<div class="loading">Cargando diff…</div>`;
-    window.pulpo.prFiles(detailRepo(), state.detailPR.number).then((loaded) => {
+    window.monstro.prFiles(detailRepo(), state.detailPR.number).then((loaded) => {
       state.files = loaded;
       if (state.detailTab === "changes") renderChangesTab();
     }).catch((err) => {
@@ -1086,9 +1111,9 @@ function renderChangesTab() {
       if (!body || !btn.dataset.reply) return;
       btn.disabled = true;
       try {
-        await window.pulpo.replyThread(detailRepo(), state.detailPR.number, Number(btn.dataset.reply), body);
+        await window.monstro.replyThread(detailRepo(), state.detailPR.number, Number(btn.dataset.reply), body);
         toast("Respuesta publicada", "ok");
-        state.conversation = await window.pulpo.prConversation(detailRepo(), state.detailPR.number);
+        state.conversation = await window.monstro.prConversation(detailRepo(), state.detailPR.number);
         renderChangesTab();
       } catch (err) {
         toast(`No se pudo responder: ${String(err.message || err)}`, "err");
@@ -1102,9 +1127,9 @@ function renderChangesTab() {
       const resolved = btn.dataset.resolved === "true";
       btn.disabled = true;
       try {
-        await window.pulpo.resolveThread(btn.dataset.resolveId, resolved);
+        await window.monstro.resolveThread(btn.dataset.resolveId, resolved);
         toast(resolved ? "Conversación resuelta ✓" : "Conversación reabierta", "ok");
-        state.conversation = await window.pulpo.prConversation(detailRepo(), state.detailPR.number);
+        state.conversation = await window.monstro.prConversation(detailRepo(), state.detailPR.number);
         renderChangesTab();
       } catch (err) {
         toast(`No se pudo ${resolved ? "resolver" : "reabrir"}: ${String(err.message || err)}`, "err");
@@ -1150,7 +1175,7 @@ function wireExternalLinks() {
     a.addEventListener("click", (event) => {
       event.preventDefault();
       const url = a.dataset.ext || a.href;
-      if (url?.startsWith("http")) window.pulpo.openExternal(url);
+      if (url?.startsWith("http")) window.monstro.openExternal(url);
     }),
   );
 }
@@ -1161,7 +1186,7 @@ async function updateBranch(pr) {
   btn.disabled = true;
   btn.textContent = "Rebasando…";
   try {
-    await window.pulpo.updateBranch(pr.id);
+    await window.monstro.updateBranch(pr.id);
     toast(`#${pr.number}: rama actualizada con rebase`, "ok");
     await refresh();
     openDetail(pr.number, state.detailTab);
@@ -1203,10 +1228,10 @@ function confirmUnapprove(pr) {
     if (event.target.id === "modal-backdrop") root.innerHTML = "";
   });
   $("#modal-confirm").addEventListener("click", async () => {
-    const message = $("#dismiss-reason").value.trim() || "Aprobación retirada desde Pulpo";
+    const message = $("#dismiss-reason").value.trim() || "Aprobación retirada desde Monstro";
     root.innerHTML = "";
     try {
-      await window.pulpo.dismissReview(detailRepo(), pr.number, review.databaseId, message);
+      await window.monstro.dismissReview(detailRepo(), pr.number, review.databaseId, message);
       toast(`Aprobación retirada de #${pr.number}`, "ok");
       await refresh();
       openDetail(pr.number, state.detailTab);
@@ -1237,7 +1262,7 @@ function confirmApprove(pr) {
   $("#modal-confirm").addEventListener("click", async () => {
     root.innerHTML = "";
     try {
-      await window.pulpo.submitReview(detailRepo(), pr.number, { event: "APPROVE" });
+      await window.monstro.submitReview(detailRepo(), pr.number, { event: "APPROVE" });
       toast(`#${pr.number} aprobada ✅`, "ok");
       await refresh();
       openDetail(pr.number, state.detailTab);
@@ -1270,7 +1295,7 @@ function confirmMerge(pr) {
     const deleteBranch = $("#del-branch")?.checked ?? false;
     root.innerHTML = "";
     try {
-      const res = await window.pulpo.mergePR({
+      const res = await window.monstro.mergePR({
         repo: detailRepo(),
         number: pr.number,
         deleteBranch,
@@ -1348,7 +1373,7 @@ async function offerCherryPick(pr, sha) {
 
   // Dry-run en paralelo: anticipa conflictos / ramas protegidas antes de escribir nada.
   const checks = await Promise.all(
-    targets.map((branch) => window.pulpo.cherryPick(repo, sha, branch, true)),
+    targets.map((branch) => window.monstro.cherryPick(repo, sha, branch, true)),
   );
 
   await new Promise((resolve) => {
@@ -1390,7 +1415,7 @@ async function offerCherryPick(pr, sha) {
       // No atómico entre ramas: aplicamos en secuencia y reportamos por-rama.
       const results = [];
       for (const branch of branches) {
-        results.push(await window.pulpo.cherryPick(repo, sha, branch, false));
+        results.push(await window.monstro.cherryPick(repo, sha, branch, false));
       }
       const ok = results.filter((r) => r.ok).map((r) => r.branch);
       const failed = results.filter((r) => !r.ok);
@@ -1425,7 +1450,7 @@ async function loadHistory() {
   renderHistory();
   try {
     if (!h.branches.length) {
-      const def = await window.pulpo.defaultBranch(state.repo);
+      const def = await window.monstro.defaultBranch(state.repo);
       const candidates = new Set([def, "develop"]);
       for (const pr of state.openPrs.slice(0, 10)) {
         if (!pr.isCrossRepository) candidates.add(pr.headRefName);
@@ -1435,8 +1460,8 @@ async function loadHistory() {
       h.enabled = new Set([def, "develop"].filter((b) => h.branches.includes(b)));
       if (!h.enabled.size) h.enabled = new Set(h.branches.slice(0, 2));
     }
-    const { branches, commits } = await window.pulpo.historyGraph(state.repo, historyBranchSpecs());
-    h.layout = window.PulpoGraph.computeLayout(commits, branches);
+    const { branches, commits } = await window.monstro.historyGraph(state.repo, historyBranchSpecs());
+    h.layout = window.MonstroGraph.computeLayout(commits, branches);
     h.loading = false;
     renderHistory();
   } catch (err) {
@@ -1460,7 +1485,7 @@ function renderHistory() {
       (name) => `<button class="branch-chip ${h.enabled.has(name) ? "on" : ""}" data-branch="${esc(name)}">${esc(name)}</button>`,
     )
     .join("");
-  const { svg, width } = window.PulpoGraph.renderSVG(h.layout);
+  const { svg, width } = window.MonstroGraph.renderSVG(h.layout);
   const rowsHtml = h.layout.rows
     .map((row, i) => {
       const c = row.commit;
@@ -1548,7 +1573,7 @@ function openCommitPanel(oid) {
         <button class="btn" id="cp-reset">⏪ Mover una rama a este commit…</button>
         ${pr && pr.state === "MERGED" ? `<button class="btn btn-danger" id="cp-revert">↩️ Revertir #${pr.number} (${isGitlab() ? "commit de revert" : "crea PR de revert"})</button>` : ""}
       </div>
-      <p class="muted">“Mover una rama” reescribe la punta de la rama (force). Pulpo te pedirá confirmación escrita; aún así, úsalo sabiendo lo que haces.</p>
+      <p class="muted">“Mover una rama” reescribe la punta de la rama (force). Monstro te pedirá confirmación escrita; aún así, úsalo sabiendo lo que haces.</p>
     </div>`;
 
   $("#detail-close").addEventListener("click", () => {
@@ -1582,7 +1607,7 @@ function createBranchModal(commit) {
     if (!name) return;
     root.innerHTML = "";
     try {
-      await window.pulpo.createBranch(state.repo, name, commit.oid);
+      await window.monstro.createBranch(state.repo, name, commit.oid);
       toast(`Rama ${name} creada en ${commit.abbreviatedOid}`, "ok");
       state.history.branches = [];
       loadHistory();
@@ -1617,7 +1642,7 @@ function resetBranchModal(commit) {
     if (typed !== branch) return toast("El nombre no coincide: no muevo nada", "err");
     root.innerHTML = "";
     try {
-      await window.pulpo.forceUpdateBranch(state.repo, branch, commit.oid);
+      await window.monstro.forceUpdateBranch(state.repo, branch, commit.oid);
       toast(`${branch} ahora apunta a ${commit.abbreviatedOid}`, "ok");
       loadHistory();
     } catch (err) {
@@ -1648,13 +1673,13 @@ function revertPRModal(pr) {
   $("#modal-confirm").addEventListener("click", async () => {
     root.innerHTML = "";
     try {
-      const revert = await window.pulpo.revertPR(state.repo, pr.number);
+      const revert = await window.monstro.revertPR(state.repo, pr.number);
       if (revert.number) {
         toast(`PR de revert creada: #${revert.number}`, "ok");
         exitHistoryToPR(revert.number);
       } else {
         toast("Commit de revert creado", "ok");
-        if (revert.url) window.pulpo.openExternal(revert.url);
+        if (revert.url) window.monstro.openExternal(revert.url);
       }
     } catch (err) {
       toast(`Revert falló: ${String(err.message || err)}`, "err");
@@ -1685,23 +1710,23 @@ function detectAndNotify(openPrs) {
   }
   const previous = state.prSnapshot;
   state.prSnapshot = snapshot;
-  window.pulpo.dockBadge(String([...snapshot.values()].filter((s) => s.reviewMe).length || ""));
+  window.monstro.dockBadge(String([...snapshot.values()].filter((s) => s.reviewMe).length || ""));
   if (!previous) return; // primera carga: sin spam
 
   for (const [number, now] of snapshot) {
     const before = previous.get(number);
     if (now.reviewMe && !(before?.reviewMe)) {
-      window.pulpo.notify(`Te piden review · #${number}`, now.title);
+      window.monstro.notify(`Te piden review · #${number}`, now.title);
     }
     if (!before || !now.mine) continue;
     if (now.reviewDecision === "APPROVED" && before.reviewDecision !== "APPROVED") {
-      window.pulpo.notify(`✅ Aprobada · #${number}`, now.title);
+      window.monstro.notify(`✅ Aprobada · #${number}`, now.title);
     }
     if (now.reviewDecision === "CHANGES_REQUESTED" && before.reviewDecision !== "CHANGES_REQUESTED") {
-      window.pulpo.notify(`± Cambios pedidos · #${number}`, now.title);
+      window.monstro.notify(`± Cambios pedidos · #${number}`, now.title);
     }
     if (["FAILURE", "ERROR"].includes(now.checks) && !["FAILURE", "ERROR"].includes(before.checks)) {
-      window.pulpo.notify(`✗ Checks en rojo · #${number}`, now.title);
+      window.monstro.notify(`✗ Checks en rojo · #${number}`, now.title);
     }
   }
 }
@@ -1720,14 +1745,14 @@ async function refresh() {
   renderList();
   try {
     const prs = state.repo === ALL_REPOS
-      ? await window.pulpo.searchPRs(state.config.repos, bucketStates())
-      : await window.pulpo.listPRs(state.repo, bucketStates());
+      ? await window.monstro.searchPRs(state.config.repos, bucketStates())
+      : await window.monstro.listPRs(state.repo, bucketStates());
     state.prs = prs;
     if (bucketStates()[0] === "OPEN") {
       state.openPrs = prs;
       detectAndNotify(prs);
     } else if (!state.openPrs.length) {
-      window.pulpo.listPRs(state.repo, ["OPEN"]).then((open) => {
+      window.monstro.listPRs(state.repo, ["OPEN"]).then((open) => {
         state.openPrs = open;
         renderCounts();
       }).catch(() => {});
@@ -1753,8 +1778,8 @@ async function refreshOpenDetailSilently() {
   if (typing) return;
   try {
     const [pr, conversation] = await Promise.all([
-      window.pulpo.prDetail(detailRepo(), state.selected),
-      window.pulpo.prConversation(detailRepo(), state.selected),
+      window.monstro.prDetail(detailRepo(), state.selected),
+      window.monstro.prConversation(detailRepo(), state.selected),
     ]);
     const changed = JSON.stringify([pr.mergeStateStatus, pr.reviewDecision, checksStateOf(pr), conversation.comments.totalCount]) !==
       JSON.stringify([state.detailPR.mergeStateStatus, state.detailPR.reviewDecision, checksStateOf(state.detailPR), state.conversation?.comments?.totalCount]);
@@ -1812,7 +1837,7 @@ const THEMES = [
 /** Filas de muestra (con add/del/ctx) para previsualizar el tema de sintaxis en Ajustes. */
 function themePreviewRows() {
   const hl = (code, family) =>
-    window.pulpoHL ? window.pulpoHL.highlightLine(code, family) : esc(code);
+    window.monstroHL ? window.monstroHL.highlightLine(code, family) : esc(code);
   const rows = [
     { cls: "diff-ctx", sign: " ", fam: "c", code: `// Suma dos números y devuelve el total` },
     { cls: "diff-del", sign: "−", fam: "c", code: `function add(a, b) { return a - b; }` },
@@ -1905,7 +1930,7 @@ function openSettings() {
   $("#settings-back").addEventListener("click", async () => {
     const pollSeconds = parseInt($("#poll-seconds").value, 10);
     if (Number.isInteger(pollSeconds) && pollSeconds >= 15 && pollSeconds !== cfg.pollSeconds) {
-      state.config = await window.pulpo.setConfig({ pollSeconds });
+      state.config = await window.monstro.setConfig({ pollSeconds });
       schedulePoll();
     }
     root.classList.add("hidden");
@@ -1916,14 +1941,14 @@ function openSettings() {
   $("#add-repo").addEventListener("click", async () => {
     const value = $("#new-repo").value.trim();
     if (!repoRe().test(value)) return toast(`Formato esperado: ${repoPlaceholder()}`, "err");
-    state.config = await window.pulpo.setConfig({ repos: [...cfg.repos, value] });
+    state.config = await window.monstro.setConfig({ repos: [...cfg.repos, value] });
     renderRepoSelect();
     openSettings();
   });
   $("#switch-provider")?.addEventListener("click", async () => {
     const target = $("#switch-provider").dataset.target;
     // Cambiar de proveedor vacía repos y token: el onboarding los pedirá de nuevo.
-    state.config = await window.pulpo.setConfig({ provider: target, repos: [] });
+    state.config = await window.monstro.setConfig({ provider: target, repos: [] });
     state.repo = null;
     root.classList.add("hidden");
     root.innerHTML = "";
@@ -1932,20 +1957,20 @@ function openSettings() {
   $("#save-gitlab-base")?.addEventListener("click", async () => {
     const base = $("#gitlab-base").value.trim();
     if (!/^https:\/\/[\w.-]+/.test(base)) return toast("URL no válida (https://…)", "err");
-    state.config = await window.pulpo.setConfig({ gitlabBaseUrl: base });
+    state.config = await window.monstro.setConfig({ gitlabBaseUrl: base });
     toast("URL base guardada", "ok");
     boot();
   });
   root.querySelectorAll("[data-del]").forEach((btn) =>
     btn.addEventListener("click", async () => {
-      state.config = await window.pulpo.setConfig({ repos: cfg.repos.filter((r) => r !== btn.dataset.del) });
+      state.config = await window.monstro.setConfig({ repos: cfg.repos.filter((r) => r !== btn.dataset.del) });
       if (state.repo === btn.dataset.del) state.repo = state.config.repos[0] || null;
       renderRepoSelect();
       openSettings();
     }),
   );
   $("#save-token").addEventListener("click", async () => {
-    state.config = await window.pulpo.setConfig({ token: $("#manual-token").value });
+    state.config = await window.monstro.setConfig({ token: $("#manual-token").value });
     toast("Token guardado", "ok");
     boot();
   });
@@ -1953,14 +1978,14 @@ function openSettings() {
     const theme = event.target.value;
     // Preview instantáneo antes de persistir.
     $("#theme-preview").dataset.syntaxTheme = theme;
-    state.config = await window.pulpo.setConfig({ theme });
+    state.config = await window.monstro.setConfig({ theme });
     applyTheme(theme);
   });
 
   // --- Cherry-pick de hotfix (solo GitLab) ---
   const saveCherryPick = async (partial) => {
     const cp = { ...(state.config.cherryPick || {}), ...partial };
-    state.config = await window.pulpo.setConfig({ cherryPick: cp });
+    state.config = await window.monstro.setConfig({ cherryPick: cp });
   };
   $("#cp-save")?.addEventListener("click", async () => {
     const prefix = $("#cp-prefix").value.trim();
@@ -1984,7 +2009,7 @@ function openSettings() {
     }),
   );
 
-  window.pulpo.aiStatus().then((s) => {
+  window.monstro.aiStatus().then((s) => {
     const line = $("#ai-status-line");
     if (line) line.innerHTML = s.backend
       ? `✓ <b>${esc(s.backend)}</b> — ${esc(s.detail)}`
@@ -2016,13 +2041,13 @@ function openSettings() {
       renderEfforts(modelSel.value);
       const payload = { aiModel: modelSel.value };
       if (effortSel.value) payload.aiEffort = effortSel.value;
-      state.config = await window.pulpo.setConfig(payload);
+      state.config = await window.monstro.setConfig(payload);
       toast(`Review con IA: ${modelSel.value}${effortSel.value ? ` · esfuerzo ${effortSel.value}` : ""}`, "ok");
     });
     effortSel.addEventListener("change", async () => {
       if (!effortSel.value) return;
       currentEffort = effortSel.value;
-      state.config = await window.pulpo.setConfig({ aiEffort: effortSel.value });
+      state.config = await window.monstro.setConfig({ aiEffort: effortSel.value });
       toast(`Review con IA: esfuerzo ${effortSel.value}`, "ok");
     });
   }).catch(() => {});
@@ -2031,7 +2056,7 @@ function openSettings() {
     btn.disabled = true;
     btn.textContent = "Probando… (puede tardar ~30s)";
     try {
-      const result = await window.pulpo.aiPing();
+      const result = await window.monstro.aiPing();
       toast(result.ok ? `IA OK vía ${result.backend}` : `IA no disponible: ${result.detail}`, result.ok ? "ok" : "err");
       const line = $("#ai-status-line");
       if (line) line.innerHTML = `${result.ok ? "✓" : "✗"} <b>${esc(result.backend || "sin backend")}</b> — ${esc(result.detail)}`;
@@ -2048,7 +2073,7 @@ function openSettings() {
 async function renderProviderChooser() {
   list.innerHTML = `
     <div class="welcome">
-      <div class="welcome-logo">🐙</div>
+      <div class="welcome-logo">${mascot(64)}</div>
       <h2>¿Con qué trabajas?</h2>
       <p class="muted">Elige tu proveedor. Podrás cambiarlo luego en Ajustes ⚙.</p>
       <div class="provider-choice">
@@ -2088,14 +2113,14 @@ async function renderProviderChooser() {
         partial.gitlabBaseUrl = base;
       }
     }
-    state.config = await window.pulpo.setConfig(partial);
+    state.config = await window.monstro.setConfig(partial);
     boot();
   });
   notifySelftestOnce();
 }
 
 async function renderWelcome() {
-  const aiStatus = await window.pulpo.aiStatus().catch(() => ({ backend: null, detail: "" }));
+  const aiStatus = await window.monstro.aiStatus().catch(() => ({ backend: null, detail: "" }));
   const aiOk = Boolean(aiStatus.backend);
   const gitlab = isGitlab();
   const cliCmd = gitlab ? "brew install glab && glab auth login" : "brew install gh && gh auth login";
@@ -2103,15 +2128,15 @@ async function renderWelcome() {
   const envVar = gitlab ? "GITLAB_TOKEN" : "GITHUB_TOKEN";
   list.innerHTML = `
     <div class="welcome">
-      <div class="welcome-logo">🐙</div>
-      <h2>Bienvenido a Pulpo</h2>
-      <p class="muted">Dos pasos y listo. Pulpo no guarda credenciales: usa las sesiones que ya tienes.</p>
+      <div class="welcome-logo">${mascot(64)}</div>
+      <h2>Bienvenido a Monstro</h2>
+      <p class="muted">Dos pasos y listo. Monstro no guarda credenciales: usa las sesiones que ya tienes.</p>
 
       <div class="setup-step bad">
         <div class="setup-mark">1</div>
         <div>
           <b>Conecta ${providerName()}</b> <span class="chip chip-closed">pendiente</span>
-          <p class="muted">La vía fácil es el ${cliName} — Pulpo coge el token de ahí:</p>
+          <p class="muted">La vía fácil es el ${cliName} — Monstro coge el token de ahí:</p>
           <pre class="setup-cmd">${cliCmd}</pre>
           <p class="muted">Alternativas: exporta <code>${envVar}</code>, o pega un token en Ajustes ⚙.</p>
         </div>
@@ -2123,7 +2148,7 @@ async function renderWelcome() {
           <b>Conecta Claude</b> <span class="chip ${aiOk ? "chip-open" : "chip-draft"}">${aiOk ? "listo" : "opcional"}</span>
           <p class="muted">${aiOk
             ? `Detectado: ${esc(aiStatus.detail)} — el botón 🤖 Review con IA ya funciona.`
-            : `Para el botón 🤖 Review con IA: instala <a href="#" data-ext="https://claude.com/claude-code">Claude Code</a> y ábrelo una vez para autenticarte (Pulpo usará tu sesión), o exporta <code>ANTHROPIC_API_KEY</code>.`}</p>
+            : `Para el botón 🤖 Review con IA: instala <a href="#" data-ext="https://claude.com/claude-code">Claude Code</a> y ábrelo una vez para autenticarte (Monstro usará tu sesión), o exporta <code>ANTHROPIC_API_KEY</code>.`}</p>
         </div>
       </div>
 
@@ -2138,7 +2163,7 @@ async function renderWelcome() {
   list.querySelectorAll("[data-ext]").forEach((a) =>
     a.addEventListener("click", (event) => {
       event.preventDefault();
-      window.pulpo.openExternal(a.dataset.ext);
+      window.monstro.openExternal(a.dataset.ext);
     }),
   );
 }
@@ -2149,9 +2174,9 @@ async function renderRepoPicker() {
   let suggestions = [];
   list.innerHTML = `
     <div class="welcome">
-      <div class="welcome-logo">🐙</div>
+      <div class="welcome-logo">${mascot(64)}</div>
       <h2>¿Qué repositorios quieres ver?</h2>
-      <p class="muted">Conectado como <b>${esc(state.me?.login || "?")}</b>. Marca los repos que Pulpo vigilará — podrás cambiarlos cuando quieras en Ajustes ⚙.</p>
+      <p class="muted">Conectado como <b>${esc(state.me?.login || "?")}</b>. Marca los repos que Monstro vigilará — podrás cambiarlos cuando quieras en Ajustes ⚙.</p>
       <div id="repo-picker" class="repo-picker"><div class="empty">Buscando tus repositorios…</div></div>
       <div class="add-repo picker-manual">
         <input type="text" id="picker-manual-input" placeholder="¿Falta alguno? Escríbelo: ${repoPlaceholder()}" />
@@ -2198,7 +2223,7 @@ async function renderRepoPicker() {
 
   startBtn.addEventListener("click", async () => {
     if (!selected.size) return;
-    state.config = await window.pulpo.setConfig({ repos: [...selected] });
+    state.config = await window.monstro.setConfig({ repos: [...selected] });
     state.repo = null;
     boot();
   });
@@ -2216,7 +2241,7 @@ async function renderRepoPicker() {
   });
 
   try {
-    suggestions = await window.pulpo.suggestRepos();
+    suggestions = await window.monstro.suggestRepos();
   } catch {
     /* sin sugerencias no pasa nada: queda la entrada manual */
   }
@@ -2247,14 +2272,14 @@ async function loadMilestones() {
   m.loading = true;
   renderMilestones();
   try {
-    if (!m.list.length) m.list = await window.pulpo.listMilestones();
-    if (!m.labels.length) m.labels = await window.pulpo.groupLabels().catch(() => []);
+    if (!m.list.length) m.list = await window.monstro.listMilestones();
+    if (!m.labels.length) m.labels = await window.monstro.groupLabels().catch(() => []);
     if (!m.selectedTitle && m.list.length) m.selectedTitle = pickCurrentMilestone(m.list);
     // Traemos SIEMPRE todo (incl. cerradas): las métricas To do / pending check se calculan
     // contra las cerradas/terminadas, así que las necesitamos aunque no se muestren. El filtro
     // "Mostrar cerradas" pasa a ser solo de visualización. Limitado por milestone, no es el grupo
     // entero. ponytail: si un milestone supera el cap de 500 (apiAll), las métricas se quedan cortas.
-    m.issues = m.selectedTitle ? await window.pulpo.milestoneIssues(m.selectedTitle, true) : [];
+    m.issues = m.selectedTitle ? await window.monstro.milestoneIssues(m.selectedTitle, true) : [];
     m.loading = false;
     renderMilestones();
   } catch (err) {
@@ -2585,7 +2610,7 @@ function renderMilestones() {
   list.querySelectorAll(".ms-task-title").forEach((btn) =>
     btn.addEventListener("click", (event) => {
       event.stopPropagation(); // no seleccionar la tarjeta al abrir en GitLab
-      window.pulpo.openExternal(btn.dataset.url);
+      window.monstro.openExternal(btn.dataset.url);
     }),
   );
 
@@ -2623,7 +2648,7 @@ async function applyIssuePatch(keys, patchOrFn) {
     const patch = typeof patchOrFn === "function" ? patchOrFn(iss) : patchOrFn;
     if (!patch) continue;
     try {
-      await window.pulpo.updateIssue(iss.projectId, iss.iid, patch);
+      await window.monstro.updateIssue(iss.projectId, iss.iid, patch);
       ok++;
     } catch {
       fail++;
@@ -2641,6 +2666,7 @@ async function applyIssuePatch(keys, patchOrFn) {
 // ponytail: localStorage vive en el app-data de esta instalación (no portable entre máquinas/perfiles);
 // si algún día hace falta portabilidad, mover a un fichero en userData vía IPC como los borradores.
 function summaryKey(title) {
+  // ponytail: prefijo "pulpo:" conservado a propósito tras el rename — renombrarlo borraría los resúmenes/filtros ya guardados en localStorage.
   return `pulpo:ms-summary:${title}`;
 }
 
@@ -2703,7 +2729,7 @@ function saveExcludedProjects(title, set) {
 async function ensureProjects() {
   const m = state.milestones;
   if (m.projects) return;
-  const arr = await window.pulpo.groupProjects().catch(() => []);
+  const arr = await window.monstro.groupProjects().catch(() => []);
   m.projects = new Map(arr.map((p) => [p.path, p]));
 }
 
@@ -2876,7 +2902,7 @@ async function generateMilestoneSummary(title) {
   m.summaryLoading = true;
   renderMilestones();
   try {
-    const { items, model } = await window.pulpo.summarizeMilestone(title, payload);
+    const { items, model } = await window.monstro.summarizeMilestone(title, payload);
     const stored = {
       generatedAt: new Date().toISOString(),
       model: model || "",
@@ -2937,7 +2963,7 @@ function wireMilestoneSummary() {
   );
 
   list.querySelectorAll(".ms-sum-open").forEach((btn) =>
-    btn.addEventListener("click", () => window.pulpo.openExternal(btn.dataset.url)),
+    btn.addEventListener("click", () => window.monstro.openExternal(btn.dataset.url)),
   );
 
   // Editar el título: el lápiz cambia el headline por un input; Enter/blur persiste, Escape cancela.
@@ -3036,10 +3062,10 @@ function wireMilestoneSummary() {
     const prev = btn.textContent;
     btn.textContent = "Publicando…";
     try {
-      const { url } = await window.pulpo.publishMilestoneSnippet(`Novedades — ${title}`, markdown);
+      const { url } = await window.monstro.publishMilestoneSnippet(`Novedades — ${title}`, markdown);
       copyText(url);
       toast("Snippet publicado · enlace copiado", "ok");
-      window.pulpo.openExternal(url);
+      window.monstro.openExternal(url);
     } catch (err) {
       toast(`Error publicando el snippet: ${String(err.message || err)}`, "err");
     } finally {
@@ -3250,7 +3276,7 @@ async function loadReleases() {
   r.loading = true;
   renderReleases();
   try {
-    if (!r.defaults) r.defaults = await window.pulpo.releasesDefaults();
+    if (!r.defaults) r.defaults = await window.monstro.releasesDefaults();
     // Proyectos: del grupo en vivo (mismos datos + iconos que el filtro del resumen). No archivados.
     await ensureProjects();
     if (!r.projects.length) {
@@ -3299,7 +3325,7 @@ function isoToAppDate(iso) {
 // Persiste la selección de proyectos (paths) en config para recordarla entre sesiones.
 function saveReleaseSelection() {
   if (IS_SELFTEST) return;
-  window.pulpo.setConfig({ releases: { selectedProjects: [...state.releases.selected] } }).catch(() => {});
+  window.monstro.setConfig({ releases: { selectedProjects: [...state.releases.selected] } }).catch(() => {});
 }
 
 // Nombre de rama final válido (prefijo + versión) con la misma regla que valida el backend.
@@ -3456,7 +3482,7 @@ function renderReleases() {
   list.querySelectorAll(".rel-results a[data-url]").forEach((a) =>
     a.addEventListener("click", (event) => {
       event.preventDefault();
-      if (a.dataset.url) window.pulpo.openExternal(a.dataset.url);
+      if (a.dataset.url) window.monstro.openExternal(a.dataset.url);
     }),
   );
   $("#rel-generate")?.addEventListener("click", confirmAndGenerateReleases);
@@ -3516,7 +3542,7 @@ async function runReleaseGeneration() {
       ouicarePath && r.selected.has(ouicarePath) && r.appDateEnabled
         ? { enabled: true, date: isoToAppDate(r.appDate) }
         : { enabled: false };
-    r.results = await window.pulpo.generateReleaseBranches({ version: r.version, sourceBranch: r.sourceBranch, projects, ouicare });
+    r.results = await window.monstro.generateReleaseBranches({ version: r.version, sourceBranch: r.sourceBranch, projects, ouicare });
     const ok = r.results.results.filter((x) => x.ok).length;
     const fail = r.results.results.length - ok;
     toast(fail ? `${ok} creada(s), ${fail} con error` : `${ok} release branch(es) creada(s)`, fail ? "warn" : "ok");
@@ -3556,7 +3582,7 @@ async function loadLocalHistory() {
   l.historyDetail = null;
   renderLocal();
   try {
-    l.history = await window.pulpo.localHistoryList();
+    l.history = await window.monstro.localHistoryList();
   } catch {
     l.history = [];
   }
@@ -3580,7 +3606,7 @@ async function refreshHistoryStatuses() {
     }
   }
   try {
-    state.local.historyStatus = (await window.pulpo.localItemStatuses(items)) || {};
+    state.local.historyStatus = (await window.monstro.localItemStatuses(items)) || {};
   } catch {
     return;
   }
@@ -3593,14 +3619,14 @@ async function loadLocal() {
   l.info = {};
   renderLocal();
   try {
-    const { rootDir, repos } = await window.pulpo.localRepos();
+    const { rootDir, repos } = await window.monstro.localRepos();
     l.rootDir = rootDir;
     l.repos = repos;
     // Estado git (rama actual, ramas, worktrees, sucio) de cada repo, en paralelo: es git local, rápido.
     await Promise.all(
       repos.map(async (r) => {
         try {
-          l.info[r.dir] = await window.pulpo.localRepoInfo(r.dir);
+          l.info[r.dir] = await window.monstro.localRepoInfo(r.dir);
         } catch (err) {
           l.info[r.dir] = { error: String(err.message || err) };
         }
@@ -3619,7 +3645,7 @@ async function loadLocal() {
 }
 
 async function pickLocalRoot() {
-  const { rootDir } = await window.pulpo.localPickRoot();
+  const { rootDir } = await window.monstro.localPickRoot();
   if (rootDir) await loadLocal();
 }
 
@@ -3692,10 +3718,10 @@ function renderLocalHistory() {
     })
     .join("");
   list.innerHTML = head + `<div class="lh-toolbar"><span class="muted">${entries.length} trabajo${entries.length === 1 ? "" : "s"}</span><button class="btn local-change" id="lh-clear">Vaciar histórico</button></div><div class="lh-list">${cards}</div>`;
-  list.querySelectorAll("a[data-ext]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); window.pulpo.openExternal(a.getAttribute("href")); }));
+  list.querySelectorAll("a[data-ext]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); window.monstro.openExternal(a.getAttribute("href")); }));
   list.querySelectorAll(".lh-detail").forEach((b) => b.addEventListener("click", () => { state.local.historyDetail = (state.local.history || []).find((x) => x.id === b.dataset.id) || null; renderLocal(); }));
-  list.querySelectorAll(".lh-del").forEach((b) => b.addEventListener("click", async () => { state.local.history = await window.pulpo.localHistoryRemove(b.dataset.id); renderLocal(); }));
-  $("#lh-clear")?.addEventListener("click", async () => { state.local.history = await window.pulpo.localHistoryClear(); renderLocal(); });
+  list.querySelectorAll(".lh-del").forEach((b) => b.addEventListener("click", async () => { state.local.history = await window.monstro.localHistoryRemove(b.dataset.id); renderLocal(); }));
+  $("#lh-clear")?.addEventListener("click", async () => { state.local.history = await window.monstro.localHistoryClear(); renderLocal(); });
   notifySelftestOnce();
 }
 
@@ -3740,11 +3766,11 @@ function renderLocalHistoryDetail() {
     <div class="lh-detail-body">${body}</div>
     <div class="lf-actions" style="margin:0 20px 28px">
       <button class="btn" id="lhd-back">← Volver al histórico</button>
-      ${primaryMr ? `<button class="btn btn-accent" id="lhd-openmr">Ver MR en Pulpo</button>` : ""}
+      ${primaryMr ? `<button class="btn btn-accent" id="lhd-openmr">Ver MR en Monstro</button>` : ""}
     </div>`;
-  list.querySelectorAll("a[data-ext]").forEach((a) => a.addEventListener("click", (ev) => { ev.preventDefault(); window.pulpo.openExternal(a.getAttribute("href")); }));
+  list.querySelectorAll("a[data-ext]").forEach((a) => a.addEventListener("click", (ev) => { ev.preventDefault(); window.monstro.openExternal(a.getAttribute("href")); }));
   $("#lhd-back").addEventListener("click", () => { state.local.historyDetail = null; renderLocal(); });
-  if (primaryMr) $("#lhd-openmr").addEventListener("click", () => { state.local.historyDetail = null; openLocalMrInPulpo(primaryMr); });
+  if (primaryMr) $("#lhd-openmr").addEventListener("click", () => { state.local.historyDetail = null; openLocalMrInMonstro(primaryMr); });
   notifySelftestOnce();
 }
 
@@ -3819,7 +3845,7 @@ function renderLocal() {
               ${projectIconHtml(key)}
               <span class="ms-proj-name">${esc(projectMeta(key).name)}</span>
               <span class="local-group-path" title="${esc(key)}">${esc(key)}</span>
-              ${known ? `<span class="local-badge ok" title="Proyecto configurado en Pulpo">✓</span>` : ""}
+              ${known ? `<span class="local-badge ok" title="Proyecto configurado en Monstro">✓</span>` : ""}
               ${folders.length > 1 ? `<span class="local-group-count">${folders.length} carpetas</span>` : ""}
             </div>`;
       return `<div class="local-group">${groupHead}<div class="local-group-folders">${folders.map(folderCard).join("")}</div></div>`;
@@ -3878,8 +3904,8 @@ async function ensureLocalMeta() {
     ];
     return;
   }
-  if (!l.milestones) l.milestones = await window.pulpo.listMilestones().catch(() => []);
-  if (!l.groupLabels) l.groupLabels = await window.pulpo.groupLabels().catch(() => []);
+  if (!l.milestones) l.milestones = await window.monstro.listMilestones().catch(() => []);
+  if (!l.groupLabels) l.groupLabels = await window.monstro.groupLabels().catch(() => []);
 }
 
 function openLocalForm(dirs) {
@@ -4140,7 +4166,7 @@ async function suggestLocalTask() {
   renderLocal();
   try {
     if (f.epic) {
-      const out = await window.pulpo.localProposeEpic({
+      const out = await window.monstro.localProposeEpic({
         projects: f.projects.map((p) => ({ dir: p.repo.dir, repoName: p.repo.gitlabPath || p.repo.name, sourceBranch: p.sourceBranch, targetBranch: p.targetBranch })),
       });
       f.epicTitle = out.epicTitle || f.epicTitle;
@@ -4151,7 +4177,7 @@ async function suggestLocalTask() {
       (out.labels || []).forEach((n) => f.labels.add(n));
     } else {
       const p = f.projects[0];
-      const out = await window.pulpo.localProposeTask({ dir: p.repo.dir, repoName: p.repo.gitlabPath || p.repo.name, sourceBranch: p.sourceBranch, targetBranch: p.targetBranch });
+      const out = await window.monstro.localProposeTask({ dir: p.repo.dir, repoName: p.repo.gitlabPath || p.repo.name, sourceBranch: p.sourceBranch, targetBranch: p.targetBranch });
       applyProposal(p, out);
       (out.labels || []).forEach((n) => f.labels.add(n));
     }
@@ -4212,11 +4238,11 @@ async function createLocalTask() {
   try {
     const labels = [...f.labels];
     if (f.epic) {
-      const res = await window.pulpo.localCreateEpicTask({ epicTitle: f.epicTitle.trim(), epicDescription: "", labels, milestoneId: f.milestoneId, projects: f.projects.map((p) => localProjPayload(p, f.push)) });
+      const res = await window.monstro.localCreateEpicTask({ epicTitle: f.epicTitle.trim(), epicDescription: "", labels, milestoneId: f.milestoneId, projects: f.projects.map((p) => localProjPayload(p, f.push)) });
       const ok = res.results.filter((x) => x.ok).length;
       toast(`Epic + ${ok}/${res.results.length} tareas creadas`, ok === res.results.length ? "ok" : "warn");
     } else {
-      await window.pulpo.localCreateTask({ ...localProjPayload(f.projects[0], f.push), labels, milestoneId: f.milestoneId });
+      await window.monstro.localCreateTask({ ...localProjPayload(f.projects[0], f.push), labels, milestoneId: f.milestoneId });
       toast("Issue + MR creadas ✓", "ok");
     }
     // #1: al terminar, llevar al histórico actualizado (con el detalle de lo creado y el log de pasos).
@@ -4234,7 +4260,7 @@ async function createLocalTask() {
 const extLink = (url, label) => `<a href="${esc(url)}" class="lf-result-link" data-ext>${esc(label)}</a>`;
 
 // Deep-link interno: salta a la vista de MRs del repo de la MR creada y abre su detalle.
-async function openLocalMrInPulpo(mr) {
+async function openLocalMrInMonstro(mr) {
   state.local.form = null;
   state.view = "prs";
   state.bucket = "open";
@@ -4366,7 +4392,7 @@ async function searchLinkIssues() {
   f.error = null;
   renderLocal();
   try {
-    f.results = await window.pulpo.localSearchIssues(f.search.trim());
+    f.results = await window.monstro.localSearchIssues(f.search.trim());
   } catch (err) {
     f.error = String(err.message || err);
     f.results = [];
@@ -4404,7 +4430,7 @@ async function createLinkTask() {
   f.error = null;
   renderLocal();
   try {
-    const res = await window.pulpo.localLinkTask({ issue: f.issue, projects: f.projects.map((p) => localProjPayload(p, f.push)) });
+    const res = await window.monstro.localLinkTask({ issue: f.issue, projects: f.projects.map((p) => localProjPayload(p, f.push)) });
     const ok = res.results.filter((x) => x.ok).length;
     toast(`${ok}/${res.results.length} MR creadas`, ok === res.results.length ? "ok" : "warn");
     // #1: al terminar, al histórico actualizado.
@@ -4445,7 +4471,7 @@ function renderReleasePublish() {
   // Milestones (títulos) para el desplegable. Carga perezosa: solo al entrar en esta pestaña.
   if (p.milestonesList === null && !p.milestonesLoading) {
     p.milestonesLoading = true;
-    window.pulpo
+    window.monstro
       .listMilestones()
       .then((ms) => {
         p.milestonesList = ms || [];
@@ -4586,7 +4612,7 @@ function renderReleasePublish() {
   list.querySelectorAll(".rel-results a[data-url]").forEach((a) =>
     a.addEventListener("click", (event) => {
       event.preventDefault();
-      if (a.dataset.url) window.pulpo.openExternal(a.dataset.url);
+      if (a.dataset.url) window.monstro.openExternal(a.dataset.url);
     }),
   );
   $("#rel-publish")?.addEventListener("click", confirmAndPublishReleases);
@@ -4641,7 +4667,7 @@ async function runReleasePublish() {
   renderReleasePublish();
   try {
     const projects = r.projects.filter((proj) => r.selected.has(proj.path)).map((proj) => ({ id: proj.path, name: proj.name }));
-    p.results = await window.pulpo.createReleases({
+    p.results = await window.monstro.createReleases({
       projects,
       ref: p.ref,
       base: calverBase(p.ref),
@@ -4678,13 +4704,13 @@ function startReleaseStatusPoll() {
     ticks++;
     for (const res of ok) {
       const before = p.status.get(res.id)?.pipeline?.state || null;
-      const st = await window.pulpo.releaseStatus(res.id, res.tag).catch(() => null);
+      const st = await window.monstro.releaseStatus(res.id, res.tag).catch(() => null);
       if (!st) continue;
       p.status.set(res.id, st);
       const now = st.pipeline?.state || null;
       if (["FAILURE", "ERROR"].includes(now) && !["FAILURE", "ERROR"].includes(before)) {
         toast(`Pipeline en rojo · ${res.name} ${res.tag}`, "err");
-        window.pulpo.notify("Pipeline de release falló", `${res.name} · ${res.tag}`);
+        window.monstro.notify("Pipeline de release falló", `${res.name} · ${res.tag}`);
       }
     }
     if (state.view === "releases" && r.tab === "publish") renderReleasePublish();
@@ -4715,13 +4741,40 @@ function applyTheme(theme) {
   document.body.dataset.syntaxTheme = theme || "one-dark";
 }
 
+const SPLASH_AT = Date.now();
+function hideSplash() {
+  const el = document.getElementById("splash");
+  if (!el || el.dataset.hiding) return;
+  el.dataset.hiding = "1";
+  // Garantiza un mínimo visible para que se aprecie la animación, sin alargar arranques lentos.
+  const wait = Math.max(0, 750 - (Date.now() - SPLASH_AT));
+  setTimeout(() => {
+    el.classList.add("splash-out");
+    setTimeout(() => el.remove(), 500);
+  }, wait);
+}
+// Red de seguridad: si el arranque se cuelga (p. ej. red caída), no dejes al usuario atrapado tras el splash.
+setTimeout(hideSplash, 8000);
+
 async function boot() {
-  state.config = await window.pulpo.getConfig();
+  // Marca del topbar = mascota (icono del dock) + nombre. Inyectada aquí para no duplicar el SVG.
+  const brand = document.querySelector(".brand");
+  if (brand) brand.innerHTML = `${mascot(22)} <strong>Monstro</strong>`;
+  // Ruta dedicada para capturar el propio splash (lo deja visible y termina ahí).
+  if (IS_SELFTEST && SELFTEST_ROUTE === "splash") {
+    applyTheme((await window.monstro.getConfig()).theme);
+    notifySelftestOnce();
+    return;
+  }
+  // En el resto del selftest el splash taparía la captura: fuera de inmediato, sin fundido.
+  if (IS_SELFTEST) document.getElementById("splash")?.remove();
+  state.config = await window.monstro.getConfig();
   applyTheme(state.config.theme);
   // Instalación nueva (sin proveedor ni repos): primero elegimos GitHub o GitLab.
   // Los instalados de antes (con repos pero sin provider) siguen en GitHub por defecto.
   if (!state.config.provider && !state.config.repos.length) {
     await renderProviderChooser();
+    hideSplash();
     return;
   }
   const remembered = state.config.lastRepo;
@@ -4734,7 +4787,7 @@ async function boot() {
   if (state.config.lastBucket && !IS_SELFTEST) state.bucket = state.config.lastBucket;
   document.querySelectorAll(".bucket").forEach((b) => b.classList.remove("active"));
   document.querySelector(`[data-bucket="${state.bucket}"]`)?.classList.add("active");
-  state.draftKeys = new Set(await window.pulpo.draftsKeys().catch(() => []));
+  state.draftKeys = new Set(await window.monstro.draftsKeys().catch(() => []));
   renderRepoSelect();
   // Las vistas de Milestones y Releases son solo GitLab: no pintar entradas muertas en GitHub.
   if (!isGitlab()) {
@@ -4749,7 +4802,7 @@ async function boot() {
     $("#bucket-local-historico")?.classList.add("hidden");
   }
 
-  const auth = await window.pulpo.authStatus();
+  const auth = await window.monstro.authStatus();
   state.authSource = auth.source;
   if (auth.ok) {
     state.me = { login: auth.login, avatarUrl: auth.avatarUrl };
@@ -4758,13 +4811,16 @@ async function boot() {
     $("#me").innerHTML = "";
     await renderWelcome();
     notifySelftestOnce();
+    hideSplash();
     return;
   }
   if (!state.config.repos.length) {
     await renderRepoPicker();
+    hideSplash();
     return;
   }
   await refresh();
+  hideSplash();
   schedulePoll();
   if (IS_SELFTEST && SELFTEST_ROUTE === "history") enterHistory();
   if (IS_SELFTEST && SELFTEST_ROUTE === "merged") switchBucket("merged");
@@ -4944,7 +5000,7 @@ function paletteEntries() {
   if (isGitlab()) entries.push({ label: "Ir a: Releases · Publicar", hint: "crear tag + release", run: () => enterReleases("publish") });
   if (isGitlab()) entries.push({ label: "Trabajo local: Crear tarea", hint: "Issue/Epic + MR desde local", run: () => enterLocal("crear") });
   if (isGitlab()) entries.push({ label: "Trabajo local: Vincular tarea", hint: "vincular local a una tarea existente", run: () => enterLocal("vincular") });
-  if (isGitlab()) entries.push({ label: "Trabajo local: Histórico", hint: "trabajos creados desde Pulpo", run: () => enterLocal("historico") });
+  if (isGitlab()) entries.push({ label: "Trabajo local: Histórico", hint: "trabajos creados desde Monstro", run: () => enterLocal("historico") });
   for (const [bucket, label] of [["open", "Abiertas"], ["mine", "Mías"], ["review", "Para revisar"], ["draft", "Borradores"], ["merged", "Fusionadas"], ["closed", "Cerradas"]]) {
     entries.push({ label: `Ir a: ${label}`, hint: "bucket", run: () => switchBucket(bucket) });
   }
@@ -4962,7 +5018,7 @@ function paletteEntries() {
 function switchBucket(bucket) {
   state.view = "prs";
   state.bucket = bucket;
-  if (!IS_SELFTEST) window.pulpo.setConfig({ lastBucket: bucket }).catch(() => {});
+  if (!IS_SELFTEST) window.monstro.setConfig({ lastBucket: bucket }).catch(() => {});
   document.querySelectorAll(".bucket").forEach((b) => b.classList.remove("active"));
   document.querySelector(`[data-bucket="${bucket}"]`)?.classList.add("active");
   closeDetail();
@@ -4971,7 +5027,7 @@ function switchBucket(bucket) {
 
 function switchRepo(repo) {
   state.repo = repo;
-  if (!IS_SELFTEST) window.pulpo.setConfig({ lastRepo: repo }).catch(() => {});
+  if (!IS_SELFTEST) window.monstro.setConfig({ lastRepo: repo }).catch(() => {});
   state.openPrs = [];
   state.prSnapshot = null;
   state.history = { branches: [], enabled: new Set(), layout: null, rows: [], loading: false, selectedOid: null };
