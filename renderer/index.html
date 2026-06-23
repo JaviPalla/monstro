@@ -88,6 +88,22 @@
 
   <script src="graph.js"></script>
   <script src="highlight.js"></script>
-  <script src="app.js"></script>
+  <!-- app.js troceado por feature (OPE-21): scripts clásicos en ámbito global compartido.
+       core primero (estado/utilidades compartidas), boot último (arranque + listeners). -->
+  <script src="app/core.js"></script>
+  <script src="app/drafts.js"></script>
+  <script src="app/prlist.js"></script>
+  <script src="app/detail.js"></script>
+  <script src="app/changes.js"></script>
+  <script src="app/actions.js"></script>
+  <script src="app/history.js"></script>
+  <script src="app/poll.js"></script>
+  <script src="app/settings.js"></script>
+  <script src="app/milestones.js"></script>
+  <script src="app/milestones-summary.js"></script>
+  <script src="app/releases.js"></script>
+  <script src="app/local.js"></script>
+  <script src="app/releases-publish.js"></script>
+  <script src="app/boot.js"></script>
 </body>
 </html>
