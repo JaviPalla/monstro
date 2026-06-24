@@ -1500,3 +1500,162 @@ div.lf-proj { border: 1px solid var(--border); border-radius: 10px; padding: 10p
 .pf-map-arrow { color: var(--text-muted); }
 .pf-map-sel { min-width: 200px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-raised); color: var(--text); font: inherit; }
 .pf-map-sel:focus { border-color: var(--accent); outline: none; }
+
+/* ── Liquid Glass theme ─────────────────────────────────────────────────── */
+
+body[data-ui-theme="liquid-glass"] {
+  background: linear-gradient(145deg, #bce0ff 0%, #d8ccf7 35%, #f5ccec 65%, #c8eeff 100%);
+}
+@media (prefers-color-scheme: dark) {
+  body[data-ui-theme="liquid-glass"] {
+    background: linear-gradient(145deg, #08111f 0%, #0f0c22 35%, #1a0b1e 65%, #071219 100%);
+  }
+}
+
+/* Superficies principales: topbar, sidebar, panel de detalle */
+body[data-ui-theme="liquid-glass"] #topbar,
+body[data-ui-theme="liquid-glass"] #sidebar,
+body[data-ui-theme="liquid-glass"] #detail-pane {
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+@media (prefers-color-scheme: dark) {
+  body[data-ui-theme="liquid-glass"] #topbar,
+  body[data-ui-theme="liquid-glass"] #sidebar,
+  body[data-ui-theme="liquid-glass"] #detail-pane {
+    background: rgba(12, 16, 36, 0.6);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+  }
+}
+
+/* Topbar */
+body[data-ui-theme="liquid-glass"] #topbar {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 1px 14px rgba(0, 0, 0, 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  body[data-ui-theme="liquid-glass"] #topbar {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 18px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* Sidebar */
+body[data-ui-theme="liquid-glass"] #sidebar {
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.65), 2px 0 18px rgba(0, 0, 0, 0.05);
+}
+@media (prefers-color-scheme: dark) {
+  body[data-ui-theme="liquid-glass"] #sidebar {
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Panel de detalle */
+body[data-ui-theme="liquid-glass"] #detail-pane {
+  border-left: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.65), -4px 0 24px rgba(0, 0, 0, 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  body[data-ui-theme="liquid-glass"] #detail-pane {
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Panel de lista (transparente para dejar pasar el fondo) */
+body[data-ui-theme="liquid-glass"] #list-pane { background: transparent; }
+
+/* Filas de PR como tarjetas de cristal */
+body[data-ui-theme="liquid-glass"] .pr-row {
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+}
+body[data-ui-theme="liquid-glass"] .pr-row:hover {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(255, 255, 255, 0.88);
+}
+@media (prefers-color-scheme: dark) {
+  body[data-ui-theme="liquid-glass"] .pr-row {
+    background: rgba(25, 32, 58, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+  body[data-ui-theme="liquid-glass"] .pr-row:hover {
+    background: rgba(35, 44, 74, 0.65);
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+}
+
+/* Modales */
+body[data-ui-theme="liquid-glass"] .modal,
+body[data-ui-theme="liquid-glass"] .modal-wide {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1), 0 4px 18px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+}
+@media (prefers-color-scheme: dark) {
+  body[data-ui-theme="liquid-glass"] .modal,
+  body[data-ui-theme="liquid-glass"] .modal-wide {
+    background: rgba(18, 22, 44, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    backdrop-filter: blur(32px) saturate(200%);
+    -webkit-backdrop-filter: blur(32px) saturate(200%);
+  }
+}
+
+/* Pantalla de ajustes */
+body[data-ui-theme="liquid-glass"] #settings-root {
+  background: rgba(232, 242, 255, 0.78);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+}
+@media (prefers-color-scheme: dark) {
+  body[data-ui-theme="liquid-glass"] #settings-root {
+    background: rgba(8, 12, 28, 0.78);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+  }
+}
+
+/* Tarjetas dentro de ajustes */
+body[data-ui-theme="liquid-glass"] .settings-card {
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+@media (prefers-color-scheme: dark) {
+  body[data-ui-theme="liquid-glass"] .settings-card {
+    background: rgba(22, 28, 52, 0.58);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+}
+
+/* Toasts */
+body[data-ui-theme="liquid-glass"] .toast {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+@media (prefers-color-scheme: dark) {
+  body[data-ui-theme="liquid-glass"] .toast {
+    background: rgba(22, 28, 52, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+}

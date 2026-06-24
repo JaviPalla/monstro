@@ -14,6 +14,8 @@ const DEFAULTS = {
   pollSeconds: 60,
   // Tema de resaltado de sintaxis del diff (pantalla Cambios): "one-dark" | "dracula" | "github-light".
   theme: "one-dark",
+  // Tema visual de la interfaz: "default" | "liquid-glass".
+  uiTheme: "default",
   aiModel: "claude-opus-4-8",
   aiEffort: "high",
   lastRepo: null,

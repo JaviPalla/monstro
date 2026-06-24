@@ -16,6 +16,11 @@ function applyTheme(theme) {
   document.body.dataset.syntaxTheme = theme || "one-dark";
 }
 
+/** Aplica el tema visual de interfaz al <body> (lo consume styles.css vía [data-ui-theme]). */
+function applyUiTheme(uiTheme) {
+  document.body.dataset.uiTheme = uiTheme || "default";
+}
+
 const SPLASH_AT = Date.now();
 function hideSplash() {
   const el = document.getElementById("splash");
@@ -39,7 +44,9 @@ async function boot() {
   if (brand) brand.innerHTML = `${mascot(22)} <strong>Monstro</strong>`;
   // Ruta dedicada para capturar el propio splash (lo deja visible y termina ahí).
   if (IS_SELFTEST && SELFTEST_ROUTE === "splash") {
-    applyTheme((await window.monstro.getConfig()).theme);
+    const splashCfg = await window.monstro.getConfig();
+    applyTheme(splashCfg.theme);
+    applyUiTheme(splashCfg.uiTheme);
     notifySelftestOnce();
     return;
   }
@@ -47,6 +54,7 @@ async function boot() {
   if (IS_SELFTEST) document.getElementById("splash")?.remove();
   state.config = await window.monstro.getConfig();
   applyTheme(state.config.theme);
+  applyUiTheme(state.config.uiTheme);
   // Instalación nueva (sin proveedor ni repos): primero elegimos GitHub o GitLab.
   // Los instalados de antes (con repos pero sin provider) siguen en GitHub por defecto.
   if (!state.config.provider && !state.config.repos.length) {

@@ -111,6 +111,16 @@ function openSettings() {
       </div>
       ${isGitlab() ? cherryPickSettingsCard(cfg) : ""}
       <div class="settings-card">
+        <h4>Tema de interfaz ✦</h4>
+        <p class="muted">Aspecto visual general de la aplicación.</p>
+        <div class="add-repo">
+          <select id="ui-theme">
+            <option value="default" ${(cfg.uiTheme || "default") === "default" ? "selected" : ""}>Por defecto</option>
+            <option value="liquid-glass" ${(cfg.uiTheme || "default") === "liquid-glass" ? "selected" : ""}>Liquid Glass</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-card">
         <h4>Tema de sintaxis 🎨</h4>
         <p class="muted">Colores del resaltado de código en la pantalla de Cambios.</p>
         <div class="add-repo">
@@ -174,6 +184,11 @@ function openSettings() {
     state.config = await window.monstro.setConfig({ token: $("#manual-token").value });
     toast("Token guardado", "ok");
     boot();
+  });
+  $("#ui-theme").addEventListener("change", async (event) => {
+    const uiTheme = event.target.value;
+    state.config = await window.monstro.setConfig({ uiTheme });
+    applyUiTheme(uiTheme);
   });
   $("#syntax-theme").addEventListener("change", async (event) => {
     const theme = event.target.value;
