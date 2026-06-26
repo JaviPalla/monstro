@@ -46,11 +46,18 @@ const SVG = `
 </svg>`;
 
 app.whenReady().then(async () => {
+  // La ventana se hace mayor que la región capturada (1024) a propósito: en una
+  // pantalla Retina, capturePage rellena la última fila/columna de la región con
+  // el fondo de la ventana cuando ese borde coincide con el borde del buffer,
+  // dejando una franja blanca a la derecha/abajo. Con padding extra el recorte de
+  // 1024 cae sobre contenido real (esquinas transparentes) y no sobre ese límite.
+  const PAD = 64;
   const win = new BrowserWindow({
-    width: 1024,
-    height: 1024,
+    width: 1024 + PAD,
+    height: 1024 + PAD,
     show: false,
     transparent: true,
+    backgroundColor: "#00000000",
     frame: false,
     webPreferences: { offscreen: true },
   });

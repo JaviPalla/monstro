@@ -52,6 +52,7 @@
     },
     "mac": {
       "category": "public.app-category.developer-tools",
+      "identity": "-",
       "target": ["dmg", "zip"]
     },
     "win": {
