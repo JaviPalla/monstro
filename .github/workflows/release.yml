@@ -1,0 +1,74 @@
+name: Release
+
+# Al publicar un tag v* : compila los binarios nativos (macOS + Windows) y crea
+# la release con ellos. Lanzable también a mano desde la pestaña Actions.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            dist: dist:mac
+            artifact: macos
+            files: |
+              dist/*.dmg
+              dist/*.zip
+          - os: windows-latest
+            dist: dist:win
+            artifact: windows
+            files: |
+              dist/*.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build ${{ matrix.artifact }}
+        run: npm run ${{ matrix.dist }}
+        env:
+          # Firma ad-hoc (mac.identity "-" en package.json): evita el "app dañada"
+          # en Apple Silicon sin certificado. Desactivamos el auto-descubrimiento
+          # para que no intente coger una identidad real del llavero del runner.
+          # Para firma+notarización real, añade los secrets CSC_LINK/CSC_KEY_PASSWORD
+          # y APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID y quita esta línea.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Monstro ${{ github.ref_name }}
+          files: artifacts/**/*
+          fail_on_unmatched_files: true
