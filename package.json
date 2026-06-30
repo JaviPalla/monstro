@@ -1,7 +1,7 @@
 {
   "name": "monstro",
   "productName": "Monstro",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "GitHub PRs para Mac, estilo Bitbucket. Merge commit siempre, squash jamás.",
   "main": "src/main.js",
   "scripts": {
@@ -53,10 +53,15 @@
     "afterPack": "scripts/adhoc-sign.js",
     "mac": {
       "category": "public.app-category.developer-tools",
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "nsis": {
       "oneClick": false,
