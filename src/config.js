@@ -18,6 +18,8 @@ const DEFAULTS = {
   uiTheme: "default",
   // Idioma de la interfaz: "es" | "en". null = seguir el idioma del sistema (app.getLocale()).
   language: null,
+  // Comprobar al iniciar si hay una versión nueva en GitHub Releases (solo informa + enlace, no instala).
+  checkUpdates: true,
   aiModel: "claude-opus-4-8",
   aiEffort: "high",
   lastRepo: null,

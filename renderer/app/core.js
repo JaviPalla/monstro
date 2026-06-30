@@ -147,12 +147,16 @@ function timeAgo(iso) {
   return t("ahora");
 }
 
-function toast(message, kind = "") {
+function toast(message, kind = "", onClick = null) {
   const el = document.createElement("div");
   el.className = `toast ${kind}`;
   el.textContent = message;
+  if (onClick) {
+    el.style.cursor = "pointer";
+    el.addEventListener("click", onClick);
+  }
   $("#toast-root").appendChild(el);
-  setTimeout(() => el.remove(), 4200);
+  setTimeout(() => el.remove(), onClick ? 9000 : 4200);
 }
 
 function copyText(text) {

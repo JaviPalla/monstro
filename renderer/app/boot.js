@@ -121,6 +121,12 @@ async function boot() {
   await refresh();
   hideSplash();
   schedulePoll();
+  // Aviso de versión nueva al arrancar (solo informa; descarga manual). Click en el toast → release.
+  if (!IS_SELFTEST && state.config.checkUpdates) {
+    window.monstro.checkUpdates().then((r) => {
+      if (r?.newer) toast(t("✨ Versión nueva disponible: v{v} — pulsa para descargar", { v: r.latest }), "ok", () => window.monstro.openExternal(r.url));
+    }).catch(() => {});
+  }
   if (IS_SELFTEST && SELFTEST_ROUTE === "history") enterHistory();
   if (IS_SELFTEST && SELFTEST_ROUTE === "merged") switchBucket("merged");
   if (IS_SELFTEST && SELFTEST_ROUTE === "milestones") enterMilestones();

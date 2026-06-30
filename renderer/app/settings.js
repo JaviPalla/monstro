@@ -116,6 +116,18 @@ function openSettings() {
       </div>
       ${isGitlab() ? cherryPickSettingsCard(cfg) : ""}
       <div class="settings-card">
+        <h4>${t("Actualizaciones")} ⬆️</h4>
+        <p class="muted">${t("Versión instalada:")} <b>v${esc(cfg.appVersion || "?")}</b></p>
+        <label style="display:block;margin:8px 0">
+          <input type="checkbox" id="check-updates" ${cfg.checkUpdates ? "checked" : ""} />
+          ${t("Comprobar al iniciar si hay una versión nueva")}
+        </label>
+        <div class="add-repo">
+          <button class="btn" id="check-updates-now">${t("Buscar actualizaciones ahora")}</button>
+        </div>
+        <p class="muted" id="update-status"></p>
+      </div>
+      <div class="settings-card">
         <h4>${t("Idioma")} 🌐</h4>
         <p class="muted">${t("Idioma de la interfaz. Por defecto sigue el idioma del sistema.")}</p>
         <div class="add-repo">
@@ -213,6 +225,25 @@ function openSettings() {
     }, 1);
   };
   renderSecToggles();
+  $("#check-updates").addEventListener("change", async (event) => {
+    state.config = await window.monstro.setConfig({ checkUpdates: event.target.checked });
+  });
+  $("#check-updates-now").addEventListener("click", async () => {
+    const btn = $("#check-updates-now");
+    const line = $("#update-status");
+    btn.disabled = true;
+    btn.textContent = t("Comprobando…");
+    try {
+      const r = await window.monstro.checkUpdates();
+      if (r.error) line.textContent = t("No se pudo comprobar: {detail}", { detail: r.error });
+      else if (r.newer) line.innerHTML = `✨ ${t("Hay una versión nueva: {v}", { v: `v${esc(r.latest)}` })} — <a href="#" id="update-link">${t("descargar ↗")}</a>`;
+      else line.textContent = t("Ya tienes la última versión (v{v})", { v: r.latest || r.current });
+      $("#update-link")?.addEventListener("click", (e) => { e.preventDefault(); window.monstro.openExternal(r.url); });
+    } finally {
+      btn.disabled = false;
+      btn.textContent = t("Buscar actualizaciones ahora");
+    }
+  });
   $("#app-language").addEventListener("change", (event) => {
     const value = event.target.value;
     setLanguage(value === "system" ? null : value);
