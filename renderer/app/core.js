@@ -99,6 +99,41 @@ const repoPlaceholder = () => (isGitlab() ? "group/subgroup/project" : "owner/re
 // Pre-validación de nombres de rama (UX); el backend valida con la misma regla en main.js.
 const BRANCH_RE = /^[\w./-]{1,200}$/;
 
+/* ============ apartados del menú (configurables: onboarding + Ajustes) ============ */
+// Única fuente de verdad de las secciones del sidebar: clave → cabecera + sus buckets + si es solo
+// GitLab. El onboarding pregunta cuáles incluir; config.sections (array) las habilita. null = todas.
+const MENU_SECTIONS = {
+  prs:        { label: "Pull requests",      icon: "🔀", navId: "nav-prs-section",        buckets: ['[data-bucket="open"]', '[data-bucket="mine"]', '[data-bucket="review"]', '[data-bucket="draft"]'], gitlabOnly: false },
+  historial:  { label: "Historial",          icon: "🗂️", navId: "nav-historial-section",  buckets: ['[data-bucket="merged"]', '[data-bucket="closed"]'], gitlabOnly: false },
+  historico:  { label: "Histórico (grafo)",  icon: "🕸️", navId: "nav-repo-section",       buckets: ["#bucket-history"], gitlabOnly: false },
+  milestones: { label: "Tareas por persona", icon: "👥", navId: "nav-milestones-section", buckets: ["#bucket-milestones"], gitlabOnly: true },
+  soporte:    { label: "Soporte",            icon: "🛟", navId: "nav-support-section",    buckets: ["#bucket-support", "#bucket-ops"], gitlabOnly: true },
+  releases:   { label: "Releases",           icon: "🚀", navId: "nav-releases-section",   buckets: ["#bucket-releases", "#bucket-releases-publish", "#bucket-releases-pipelines"], gitlabOnly: true },
+  local:      { label: "Trabajo local",      icon: "💻", navId: "nav-local-section",      buckets: ["#bucket-local-empezar", "#bucket-local-crear", "#bucket-local-vincular", "#bucket-local-historico"], gitlabOnly: true },
+};
+
+// Claves de sección válidas para el proveedor actual, en orden de menú (las GitLab-only se caen en GitHub).
+const availableSectionKeys = () =>
+  Object.keys(MENU_SECTIONS).filter((k) => !MENU_SECTIONS[k].gitlabOnly || isGitlab());
+
+// ¿Está habilitada la sección? Tiene que existir, ser válida para el proveedor y estar en config.sections
+// (null/undefined = todas habilitadas, retrocompat con instalaciones previas al onboarding de apartados).
+function sectionEnabled(key) {
+  const sec = MENU_SECTIONS[key];
+  if (!sec || (sec.gitlabOnly && !isGitlab())) return false;
+  const chosen = state.config?.sections;
+  return !Array.isArray(chosen) || chosen.includes(key);
+}
+
+// Aplica la visibilidad de TODO el menú a la vez: por proveedor (GitLab-only) + por elección del usuario.
+function applyMenuVisibility() {
+  for (const [key, sec] of Object.entries(MENU_SECTIONS)) {
+    const show = sectionEnabled(key);
+    const els = [document.getElementById(sec.navId), ...sec.buckets.map((s) => document.querySelector(s))];
+    els.forEach((el) => el && el.classList.toggle("hidden", !show));
+  }
+}
+
 function timeAgo(iso) {
   const seconds = Math.max(1, (Date.now() - new Date(iso).getTime()) / 1000);
   const units = [[31536000, "a"], [2592000, "mes"], [604800, "sem"], [86400, "d"], [3600, "h"], [60, "min"]];

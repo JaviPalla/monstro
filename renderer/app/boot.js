@@ -58,6 +58,9 @@ async function boot() {
   // Idioma (ES por defecto / del sistema): fija LANG y traduce el chrome estático del index.html.
   applyLang(state.config);
   localizeStatic();
+  // Rutas de captura de las pantallas de onboarding (no dependen de tener token/repos reales).
+  if (IS_SELFTEST && SELFTEST_ROUTE === "onboarding-token") { document.getElementById("splash")?.remove(); await renderWelcome(); notifySelftestOnce(); return; }
+  if (IS_SELFTEST && SELFTEST_ROUTE === "onboarding-sections") { document.getElementById("splash")?.remove(); await renderSectionPicker(); return; }
   // Instalación nueva (sin proveedor ni repos): primero elegimos GitHub o GitLab.
   // Los instalados de antes (con repos pero sin provider) siguen en GitHub por defecto.
   if (!state.config.provider && !state.config.repos.length) {
@@ -77,23 +80,8 @@ async function boot() {
   document.querySelector(`[data-bucket="${state.bucket}"]`)?.classList.add("active");
   state.draftKeys = new Set(await window.monstro.draftsKeys().catch(() => []));
   renderRepoSelect();
-  // Las vistas de Milestones y Releases son solo GitLab: no pintar entradas muertas en GitHub.
-  if (!isGitlab()) {
-    $("#nav-milestones-section")?.classList.add("hidden");
-    $("#bucket-milestones")?.classList.add("hidden");
-    $("#nav-support-section")?.classList.add("hidden");
-    $("#bucket-support")?.classList.add("hidden");
-    $("#bucket-ops")?.classList.add("hidden");
-    $("#nav-releases-section")?.classList.add("hidden");
-    $("#bucket-releases")?.classList.add("hidden");
-    $("#bucket-releases-publish")?.classList.add("hidden");
-    $("#bucket-releases-pipelines")?.classList.add("hidden");
-    $("#nav-local-section")?.classList.add("hidden");
-    $("#bucket-local-empezar")?.classList.add("hidden");
-    $("#bucket-local-crear")?.classList.add("hidden");
-    $("#bucket-local-vincular")?.classList.add("hidden");
-    $("#bucket-local-historico")?.classList.add("hidden");
-  }
+  // Visibilidad del menú: oculta lo que no aplica al proveedor (GitLab-only) y lo que el usuario no eligió.
+  applyMenuVisibility();
 
   const auth = await window.monstro.authStatus();
   state.authSource = auth.source;
@@ -111,6 +99,24 @@ async function boot() {
     await renderRepoPicker();
     hideSplash();
     return;
+  }
+  // Último paso del onboarding: elegir qué apartados del menú incluir (null = aún no preguntado).
+  if (state.config.sections == null && !IS_SELFTEST) {
+    await renderSectionPicker();
+    hideSplash();
+    return;
+  }
+  // Si la sección del bucket activo está deshabilitada (p. ej. un perfil de operaciones sin PRs),
+  // aterriza en el primer apartado disponible en vez de pintar una lista de PRs oculta.
+  const activeSection = ["merged", "closed"].includes(state.bucket) ? "historial" : "prs";
+  if (!sectionEnabled(activeSection)) {
+    const landing = firstAvailableLanding();
+    if (landing) {
+      hideSplash();
+      schedulePoll();
+      landing();
+      return;
+    }
   }
   await refresh();
   hideSplash();
@@ -385,19 +391,20 @@ function paletteEntries() {
       run: () => exitHistoryToPR(pr.number),
     });
   }
-  entries.push({ label: t("Ir a: Histórico"), hint: t("grafo de ramas"), run: enterHistory });
-  if (isGitlab()) entries.push({ label: t("Ir a: Milestones"), hint: t("tareas por persona"), run: enterMilestones });
-  if (isGitlab()) entries.push({ label: t("Ir a: Support"), hint: t("tareas por persona"), run: () => enterSupport("incidencias") });
-  if (isGitlab()) entries.push({ label: t("Ir a: Ops"), hint: t("tareas por persona"), run: () => enterSupport("operaciones") });
-  if (isGitlab()) entries.push({ label: t("Ir a: Releases · Ramas"), hint: t("generar release branches"), run: () => enterReleases("branches") });
-  if (isGitlab()) entries.push({ label: t("Ir a: Releases · Publicar"), hint: t("crear tag + release"), run: () => enterReleases("publish") });
-  if (isGitlab()) entries.push({ label: t("Ir a: Releases · Pipelines"), hint: t("estado de despliegue por proyecto"), run: () => enterReleases("pipelines") });
-  if (isGitlab()) entries.push({ label: t("Trabajo local: Empezar tarea"), hint: t("elegir Epic/Issue → plan → agentes"), run: () => enterLocal("empezar") });
-  if (isGitlab()) entries.push({ label: t("Trabajo local: Crear tarea"), hint: t("Issue/Epic + MR desde local"), run: () => enterLocal("crear") });
-  if (isGitlab()) entries.push({ label: t("Trabajo local: Vincular tarea"), hint: t("vincular local a una tarea existente"), run: () => enterLocal("vincular") });
-  if (isGitlab()) entries.push({ label: t("Trabajo local: Histórico"), hint: t("trabajos creados desde Monstro"), run: () => enterLocal("historico") });
+  if (sectionEnabled("historico")) entries.push({ label: t("Ir a: Histórico"), hint: t("grafo de ramas"), run: enterHistory });
+  if (sectionEnabled("milestones")) entries.push({ label: t("Ir a: Milestones"), hint: t("tareas por persona"), run: enterMilestones });
+  if (sectionEnabled("soporte")) entries.push({ label: t("Ir a: Support"), hint: t("tareas por persona"), run: () => enterSupport("incidencias") });
+  if (sectionEnabled("soporte")) entries.push({ label: t("Ir a: Ops"), hint: t("tareas por persona"), run: () => enterSupport("operaciones") });
+  if (sectionEnabled("releases")) entries.push({ label: t("Ir a: Releases · Ramas"), hint: t("generar release branches"), run: () => enterReleases("branches") });
+  if (sectionEnabled("releases")) entries.push({ label: t("Ir a: Releases · Publicar"), hint: t("crear tag + release"), run: () => enterReleases("publish") });
+  if (sectionEnabled("releases")) entries.push({ label: t("Ir a: Releases · Pipelines"), hint: t("estado de despliegue por proyecto"), run: () => enterReleases("pipelines") });
+  if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Empezar tarea"), hint: t("elegir Epic/Issue → plan → agentes"), run: () => enterLocal("empezar") });
+  if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Crear tarea"), hint: t("Issue/Epic + MR desde local"), run: () => enterLocal("crear") });
+  if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Vincular tarea"), hint: t("vincular local a una tarea existente"), run: () => enterLocal("vincular") });
+  if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Histórico"), hint: t("trabajos creados desde Monstro"), run: () => enterLocal("historico") });
+  const bucketSection = (b) => (["merged", "closed"].includes(b) ? "historial" : "prs");
   for (const [bucket, label] of [["open", t("Abiertas")], ["mine", t("Mías")], ["review", t("Para revisar")], ["draft", t("Borradores")], ["merged", t("Fusionadas")], ["closed", t("Cerradas")]]) {
-    entries.push({ label: t("Ir a: {label}", { label }), hint: t("bucket"), run: () => switchBucket(bucket) });
+    if (sectionEnabled(bucketSection(bucket))) entries.push({ label: t("Ir a: {label}", { label }), hint: t("bucket"), run: () => switchBucket(bucket) });
   }
   if ((state.config?.repos || []).length > 1) {
     entries.push({ label: t("Repo: ⭐ Todos los repos"), hint: t("vista agregada"), run: () => switchRepo(ALL_REPOS) });
@@ -408,6 +415,22 @@ function paletteEntries() {
   entries.push({ label: t("Refrescar"), hint: "R", run: refresh });
   entries.push({ label: t("Ajustes"), hint: "⚙", run: openSettings });
   return entries;
+}
+
+// Primer apartado habilitado (en orden de menú) y su acción de entrada. Para aterrizar cuando el
+// apartado por defecto (PRs) está oculto por la configuración del usuario.
+function firstAvailableLanding() {
+  const order = [
+    ["prs", () => switchBucket("open")],
+    ["historial", () => switchBucket("merged")],
+    ["historico", () => enterHistory()],
+    ["milestones", () => enterMilestones()],
+    ["soporte", () => enterSupport("incidencias")],
+    ["releases", () => enterReleases("branches")],
+    ["local", () => enterLocal("empezar")],
+  ];
+  const found = order.find(([key]) => sectionEnabled(key));
+  return found ? found[1] : null;
 }
 
 function switchBucket(bucket) {
@@ -538,10 +561,11 @@ document.addEventListener("keydown", (event) => {
     if (row) openDetail(Number(row.dataset.number));
     return;
   }
-  if (event.key === "h") return enterHistory();
-  if (event.key === "m" && isGitlab()) return enterMilestones();
+  if (event.key === "h" && sectionEnabled("historico")) return enterHistory();
+  if (event.key === "m" && sectionEnabled("milestones")) return enterMilestones();
   const bucketByDigit = { 1: "open", 2: "mine", 3: "review", 4: "draft", 5: "merged", 6: "closed" };
-  if (bucketByDigit[event.key]) switchBucket(bucketByDigit[event.key]);
+  const digitBucket = bucketByDigit[event.key];
+  if (digitBucket && sectionEnabled(["merged", "closed"].includes(digitBucket) ? "historial" : "prs")) switchBucket(digitBucket);
 });
 
 boot();

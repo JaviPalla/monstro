@@ -179,6 +179,11 @@ function wireIpc() {
     }
     if (typeof partial.lastRepo === "string") allowed.lastRepo = partial.lastRepo;
     if (typeof partial.lastBucket === "string") allowed.lastBucket = partial.lastBucket;
+    // Apartados del menú: enum cerrado de claves; el renderer manda solo las habilitadas.
+    if (Array.isArray(partial.sections)) {
+      const SECTION_KEYS = ["prs", "historial", "historico", "milestones", "soporte", "releases", "local"];
+      allowed.sections = partial.sections.filter((s) => SECTION_KEYS.includes(s));
+    }
     if (partial.cherryPick && typeof partial.cherryPick === "object") {
       const cp = partial.cherryPick;
       const branchRe = /^[\w./-]{1,200}$/;

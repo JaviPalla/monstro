@@ -22,6 +22,9 @@ const DEFAULTS = {
   aiEffort: "high",
   lastRepo: null,
   lastBucket: null,
+  // Apartados del menú habilitados (elegidos en el onboarding, editables en Ajustes).
+  // null = aún no elegido → se muestran todos los disponibles del proveedor (retrocompat).
+  sections: null,
   // Token manual SOLO como último recurso; lo normal es el CLI (gh/glab) o la env var.
   token: null,
   // Cherry-pick de hotfix tras merge (solo GitLab). Las MR de hotfix/* van a la release branch;
