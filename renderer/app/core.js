@@ -66,6 +66,10 @@ const state = {
   // OPE-20 "Empezar tarea": `tasks` = issues del grupo asignadas a mí; `startFilters` = filtros del
   // picker; `startSel` = tarea elegida; `planForm` = form/plan aprobable (null = picker visible).
   local: { tab: "crear", rootDir: null, repos: [], loading: false, info: {}, selected: new Set(), form: null, linkForm: null, history: [], historyDetail: null, milestones: null, groupLabels: null, historyStatus: {}, tasks: null, tasksLoading: false, startFilters: { query: "", showDone: false }, startSel: null, planForm: null, runView: null, runs: [], runsBadge: 0, mrStatuses: {} },
+  // Vista de Soporte (solo GitLab): tareas por persona de un proyecto suelto. `kind` = clave de
+  // config.support (apartado activo: "incidencias"=Support | "operaciones"=Ops). `labelFilter` =
+  // texto libre que filtra por etiqueta (substring, case-insensitive).
+  support: { kind: "incidencias", issues: [], loading: false, labelFilter: "", showClosed: false },
   prSnapshot: null, // nº → {reviewDecision, checks, reviewMe} para detectar cambios y notificar
   cursor: -1, // selección con teclado (j/k) en la lista
   draftKeys: new Set(), // "owner/repo#n" con borradores guardados → badge 📝 en la lista

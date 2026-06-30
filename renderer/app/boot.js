@@ -81,6 +81,9 @@ async function boot() {
   if (!isGitlab()) {
     $("#nav-milestones-section")?.classList.add("hidden");
     $("#bucket-milestones")?.classList.add("hidden");
+    $("#nav-support-section")?.classList.add("hidden");
+    $("#bucket-support")?.classList.add("hidden");
+    $("#bucket-ops")?.classList.add("hidden");
     $("#nav-releases-section")?.classList.add("hidden");
     $("#bucket-releases")?.classList.add("hidden");
     $("#bucket-releases-publish")?.classList.add("hidden");
@@ -115,6 +118,8 @@ async function boot() {
   if (IS_SELFTEST && SELFTEST_ROUTE === "history") enterHistory();
   if (IS_SELFTEST && SELFTEST_ROUTE === "merged") switchBucket("merged");
   if (IS_SELFTEST && SELFTEST_ROUTE === "milestones") enterMilestones();
+  if (IS_SELFTEST && SELFTEST_ROUTE === "support") enterSupport("incidencias");
+  if (IS_SELFTEST && SELFTEST_ROUTE === "ops") enterSupport("operaciones");
   if (IS_SELFTEST && SELFTEST_ROUTE === "milestones-summary") runMilestonesSummarySelftest();
   if (IS_SELFTEST && SELFTEST_ROUTE === "releases") enterReleases();
   if (IS_SELFTEST && SELFTEST_ROUTE === "releases-publish") enterReleases("publish");
@@ -352,7 +357,7 @@ $("#repo-select").addEventListener("change", (event) => {
 $("#search").addEventListener("input", (event) => {
   state.search = event.target.value;
   if (state.view === "milestones") renderMilestones();
-  else if (state.view === "releases" || state.view === "local") {/* estas vistas no usan el buscador */}
+  else if (["releases", "local", "support"].includes(state.view)) {/* estas vistas no usan el buscador global */}
   else renderList();
 });
 document.querySelectorAll(".bucket[data-bucket]").forEach((btn) =>
@@ -360,6 +365,8 @@ document.querySelectorAll(".bucket[data-bucket]").forEach((btn) =>
 );
 $("#bucket-history").addEventListener("click", enterHistory);
 $("#bucket-milestones").addEventListener("click", enterMilestones);
+$("#bucket-support").addEventListener("click", () => enterSupport("incidencias"));
+$("#bucket-ops").addEventListener("click", () => enterSupport("operaciones"));
 $("#bucket-releases").addEventListener("click", () => enterReleases("branches"));
 $("#bucket-releases-publish").addEventListener("click", () => enterReleases("publish"));
 $("#bucket-releases-pipelines").addEventListener("click", () => enterReleases("pipelines"));
@@ -380,6 +387,8 @@ function paletteEntries() {
   }
   entries.push({ label: t("Ir a: Histórico"), hint: t("grafo de ramas"), run: enterHistory });
   if (isGitlab()) entries.push({ label: t("Ir a: Milestones"), hint: t("tareas por persona"), run: enterMilestones });
+  if (isGitlab()) entries.push({ label: t("Ir a: Support"), hint: t("tareas por persona"), run: () => enterSupport("incidencias") });
+  if (isGitlab()) entries.push({ label: t("Ir a: Ops"), hint: t("tareas por persona"), run: () => enterSupport("operaciones") });
   if (isGitlab()) entries.push({ label: t("Ir a: Releases · Ramas"), hint: t("generar release branches"), run: () => enterReleases("branches") });
   if (isGitlab()) entries.push({ label: t("Ir a: Releases · Publicar"), hint: t("crear tag + release"), run: () => enterReleases("publish") });
   if (isGitlab()) entries.push({ label: t("Ir a: Releases · Pipelines"), hint: t("estado de despliegue por proyecto"), run: () => enterReleases("pipelines") });
@@ -420,8 +429,8 @@ function switchRepo(repo) {
   renderRepoSelect();
   closeDetail();
   if (state.view === "history") loadHistory();
-  // Milestones, Releases y Trabajo local son de grupo/global, no por repo: el cambio de repo no las afecta.
-  else if (state.view !== "milestones" && state.view !== "releases" && state.view !== "local") refresh();
+  // Milestones, Releases, Soporte y Trabajo local son de grupo/proyecto fijo, no por repo: el cambio no las afecta.
+  else if (!["milestones", "releases", "local", "support"].includes(state.view)) refresh();
 }
 
 function openPalette() {

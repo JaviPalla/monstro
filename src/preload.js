@@ -76,6 +76,7 @@ contextBridge.exposeInMainWorld("monstro", {
   milestoneIssues: (title, includeClosed) => ipcRenderer.invoke("milestones:issues", { title, includeClosed }),
   epicChildren: (workItemId) => ipcRenderer.invoke("milestones:epicChildren", { workItemId }),
   issueMRs: (workItemIds) => ipcRenderer.invoke("milestones:issueMRs", { workItemIds }),
+  projectIssues: (project) => ipcRenderer.invoke("support:list", { project }),
   groupLabels: () => ipcRenderer.invoke("issues:groupLabels"),
   groupProjects: () => ipcRenderer.invoke("issues:groupProjects"),
   updateIssue: (projectId, iid, patch) => ipcRenderer.invoke("issues:update", { projectId, iid, patch }),

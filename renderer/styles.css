@@ -622,6 +622,12 @@ body.is-mac .traffic-pad { display: block; width: 78px; }
   background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px;
 }
 .ms-status-bar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+/* Vista de Soporte: barra de filtros en fila (filtro de etiqueta + contador + refrescar). */
+.support-filters { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 12px; }
+.support-label-filter {
+  flex: 1; min-width: 160px; max-width: 280px; padding: 6px 10px; font-size: 13px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
+}
 /* Info del filtro: icono "i" en la esquina superior derecha del bloque, con popover en
    hover/focus que anima los tres estados. Hereda la fuente de la app (no serif). */
 .ms-filter-info {

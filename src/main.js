@@ -237,6 +237,15 @@ function wireIpc() {
       }
       allowed.local = next;
     }
+    if (partial.support && typeof partial.support === "object") {
+      const next = { ...current.support };
+      const pathRe = /^[\w.-]+(\/[\w.-]+)+$/;
+      for (const k of ["incidencias", "operaciones"]) {
+        const v = partial.support[k];
+        if (typeof v === "string") next[k] = v.trim() && pathRe.test(v.trim()) ? v.trim() : "";
+      }
+      allowed.support = next;
+    }
     const { token, ...rest } = config.save(allowed);
     return { ...rest, hasManualToken: Boolean(token) };
   });
@@ -545,6 +554,11 @@ function wireIpc() {
     gh().milestoneEpicChildren(workItemId),
   );
   ipcMain.handle("milestones:issueMRs", async (_event, { workItemIds }) => gh().issueMRs(workItemIds || []));
+  ipcMain.handle("support:list", async (_event, { project }) => {
+    // El path llega del config (whitelist), no del renderer; validamos formato por si acaso.
+    if (typeof project !== "string" || !/^[\w.-]+(\/[\w.-]+)+$/.test(project)) throw new Error("Proyecto de soporte inválido.");
+    return gh().projectIssues(project);
+  });
   ipcMain.handle("issues:groupLabels", async () => gh().groupLabels());
   ipcMain.handle("issues:groupProjects", async () => gh().groupProjects());
   ipcMain.handle("issues:update", async (_event, { projectId, iid, patch }) =>

@@ -78,6 +78,13 @@ const DEFAULTS = {
       appDateKey: "AppDate",
     },
   },
+  // Vista de Soporte (solo GitLab): boards "tareas por persona" de proyectos sueltos del namespace
+  // soporte (fuera del grupo de milestones). Cada clave = un apartado de la sidebar → su path de
+  // proyecto. "" = sin configurar (el apartado avisa de configurarlo).
+  support: {
+    incidencias: "soporte/incidencias", // apartado "Support"
+    operaciones: "soporte/operaciones", // apartado "Ops"
+  },
   // Trabajo local → GitLab (OPE-19): publicar trabajo de ramas/worktrees locales como Issues/Epics + MRs.
   local: {
     // Directorio raíz donde conviven todos los clones de GitLab (un nivel). null = sin configurar.
@@ -103,6 +110,7 @@ function load() {
     cfg.releases.ouicare = { ...DEFAULTS.releases.ouicare, ...(parsed.releases?.ouicare || {}) };
     // Merge profundo de local: un guardado parcial no debe pisar los defaults del resto de claves.
     cfg.local = { ...DEFAULTS.local, ...(parsed.local || {}) };
+    cfg.support = { ...DEFAULTS.support, ...(parsed.support || {}) };
     return cfg;
   } catch {
     return { ...DEFAULTS };
