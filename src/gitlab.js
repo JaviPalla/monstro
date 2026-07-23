@@ -597,47 +597,56 @@ async function updateOuicareAppDate({ projectPath, webConfigPath, appDateKey }, 
 }
 
 /**
- * Crea la release branch `${branchPrefix}${version}` en cada proyecto pedido, a partir de
+ * Crea la(s) release branch(es) `${branchPrefix}${version}[-mx]` en cada proyecto pedido, a partir de
  * `sourceBranch` (POST repository/branches con {branch, ref}). Replica auto-rb-branches.py.
- * `projects` = [{id,name}] donde id = path (o id numérico) del proyecto en el grupo. Si `ouicare`
- * viene con {enabled,date,...}, antes de ramificar se actualiza el AppDate en la rama origen.
- * NO atómico entre N proyectos: se aplican en serie y se reporta por-proyecto {id,name,ok,error?,
- * webUrl?}; un fallo a medias deja unos creados y otros no (igual que cherryPick). El token NUNCA
- * se hardcodea (a diferencia del script legacy): sale de resolveToken. Solo GitLab.
+ * `projects` = [{id,name}] donde id = path (o id numérico) del proyecto en el grupo. `variant` =
+ * "es" | "mx" | "both": España es la rama sin sufijo, México es la misma + `-mx` (así lo tenéis
+ * asociado a los despliegues; en GitLab TODAS las rb/ van en pareja rb/x + rb/x-mx). Ambas salen de
+ * la MISMA rama origen. Si `ouicare` viene con {enabled,date,...}, antes de ramificar se actualiza el
+ * AppDate en la rama origen. NO atómico entre N proyectos × M variantes: se aplican en serie y se
+ * reporta por-entrada {id,name,branch,ok,error?,webUrl?}; un fallo a medias deja unas creadas y otras
+ * no (igual que cherryPick). El token NUNCA se hardcodea (a diferencia del script legacy). Solo GitLab.
  */
-async function generateReleaseBranches({ projects, version, sourceBranch, ouicare }) {
-  const branch = `${releaseDefaults().branchPrefix}${version}`;
+async function generateReleaseBranches({ projects, version, sourceBranch, variant, ouicare }) {
+  const prefix = releaseDefaults().branchPrefix;
+  const suffixes = variant === "both" ? ["", "-mx"] : variant === "mx" ? ["-mx"] : [""];
+  const branches = suffixes.map((s) => `${prefix}${version}${s}`);
   const ref = sourceBranch || releaseDefaults().sourceBranch;
-  // Paso previo: AppDate de Ouicare en la rama origen, para que la nueva rama ya lo herede.
+  // Paso previo: AppDate de Ouicare en la rama origen, para que las nuevas ramas ya lo hereden.
   const appDate = ouicare && ouicare.enabled ? await updateOuicareAppDate(ouicare, ref, ouicare.date) : null;
   const results = [];
   for (const p of projects || []) {
-    try {
-      const created = await api("POST", `/projects/${proj(String(p.id))}/repository/branches`, { branch, ref });
-      results.push({ id: p.id, name: p.name || String(p.id), ok: true, branch, webUrl: created.web_url || null });
-    } catch (err) {
-      results.push({ id: p.id, name: p.name || String(p.id), ok: false, branch, error: String(err.message || err) });
+    for (const branch of branches) {
+      try {
+        const created = await api("POST", `/projects/${proj(String(p.id))}/repository/branches`, { branch, ref });
+        results.push({ id: p.id, name: p.name || String(p.id), branch, ok: true, webUrl: created.web_url || null });
+      } catch (err) {
+        results.push({ id: p.id, name: p.name || String(p.id), branch, ok: false, error: String(err.message || err) });
+      }
     }
   }
-  return { branch, ref, appDate, results };
+  return { branches, ref, appDate, results };
 }
 
 /* ---------- publicar releases (tag + release por proyecto) ---------- */
 
 /**
- * Siguiente tag CalVer para un proyecto dado un `base` (p.ej. "2026.06"): mira las releases
- * existentes, busca los tags `^<base>\.(\d+)$` y devuelve `<base>.<max+1>` (o `<base>.0` si no hay).
- * Así el patch se autoincrementa POR PROYECTO sin tener que teclear el semver a mano.
+ * Siguiente tag CalVer para un proyecto dado un `base` (p.ej. "2026.06") y un `suffix` opcional
+ * ("-mx" para México, "" para España): mira las releases existentes, busca los tags
+ * `^<base>\.(\d+)<suffix>$` y devuelve `<base>.<max+1><suffix>` (o `<base>.0<suffix>` si no hay).
+ * El patch se autoincrementa POR PROYECTO y el contador de España y México es INDEPENDIENTE
+ * (2026.07.0 y 2026.07.0-mx no chocan), igual que el histórico `042026-1.1.3` / `042026-1.1.3-mx`.
  */
-async function nextReleaseTag(projectId, base) {
+async function nextReleaseTag(projectId, base, suffix = "") {
   const releases = await api("GET", `/projects/${proj(String(projectId))}/releases?per_page=100`);
-  const re = new RegExp(`^${base.replace(/\./g, "\\.")}\\.(\\d+)$`);
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${esc(base)}\\.(\\d+)${esc(suffix)}$`);
   let max = -1;
   for (const r of releases || []) {
     const m = (r.tag_name || "").match(re);
     if (m) max = Math.max(max, Number(m[1]));
   }
-  return `${base}.${max + 1}`;
+  return `${base}.${max + 1}${suffix}`;
 }
 
 /**
@@ -648,10 +657,13 @@ async function nextReleaseTag(projectId, base) {
  * se aplica en serie y se reporta por-proyecto {id,name,ok,tag,releaseUrl?,error?}. Solo GitLab.
  */
 async function createReleases({ projects, ref, base, milestones, description, name }) {
+  // Variante México: si la rama de release acaba en `-mx`, el tag hereda el sufijo (así lo tenéis
+  // asociado a los despliegues). El contador del patch es independiente del de España (ver nextReleaseTag).
+  const suffix = /-mx$/i.test(ref || "") ? "-mx" : "";
   const results = [];
   for (const p of projects || []) {
     try {
-      const tag = await nextReleaseTag(p.id, base);
+      const tag = await nextReleaseTag(p.id, base, suffix);
       const body = { tag_name: tag, ref };
       if (Array.isArray(milestones) && milestones.length) body.milestones = milestones;
       if (description) body.description = description;
@@ -705,8 +717,15 @@ const TIER_RANK = { development: 0, testing: 1, staging: 2, production: 3, other
  *
  * GOTCHA verificado contra la instancia: `GET /environments` NO devuelve `last_deployment` (solo el
  * detalle por entorno lo trae). En vez de N llamadas al detalle, una a `/deployments?environment=`
- * por entorno: mismo coste y además deja filtrar el ruido de `skipped` (ramas feature que disparan
- * el job de deploy pero no despliegan nada).
+ * por entorno.
+ *
+ * GOTCHA 2 (lo que motivó este cambio): pedir el "último despliegue" a secas MIENTE. Un entorno
+ * acumula por encima del último deploy real un montón de `blocked` (jobs `when: manual` que nadie ha
+ * lanzado), `created`/`canceled` (pushes de ramas sueltas que disparan el pipeline) y `skipped`.
+ * Ninguno de esos desplegó NADA: production salía con `rb/072026` (un job manual sin lanzar) cuando
+ * lo que corre de verdad es el tag `2026.06.2`. La ÚNICA señal fiable de "qué versión hay ahí" es el
+ * último despliegue con `status=success`, así que filtramos por eso EN LA API (no en cliente: el
+ * success real puede estar decenas de deployments más abajo). Si no hay ninguno → "Sin despliegues".
  *
  * Coste: 1 + M llamadas por proyecto (M = entornos), las M en paralelo. Pensado para refresco bajo
  * demanda, NO para el poll. NO lanza por entorno: un fallo deja ese entorno sin deploy, no tumba la fila.
@@ -720,14 +739,12 @@ async function projectEnvironments(projectId) {
       try {
         const ds = await api(
           "GET",
-          `/projects/${id}/deployments?environment=${encodeURIComponent(e.name)}&order_by=created_at&sort=desc&per_page=5`,
+          `/projects/${id}/deployments?environment=${encodeURIComponent(e.name)}&status=success&order_by=created_at&sort=desc&per_page=1`,
         );
-        // El más reciente que de verdad desplegó; si todos fueron skipped, nos quedamos con el primero
-        // para no mentir diciendo "sin despliegues".
-        const d = (ds || []).find((x) => x.status !== "skipped") || (ds || [])[0];
+        const d = (ds || [])[0];
         if (d) {
           deployment = {
-            status: d.status, // created|running|success|failed|canceled|blocked|skipped
+            status: d.status, // siempre "success" (lo filtra la query); lo dejamos por claridad
             ref: d.ref || null,
             sha: d.sha ? String(d.sha).slice(0, 8) : null,
             createdAt: d.created_at || null,

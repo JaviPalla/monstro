@@ -1,7 +1,8 @@
 name: Tag & Release
 
-# Botón manual en la pestaña Actions: escribes la versión, esto sincroniza package.json,
-# commitea en main y crea el tag v<version>. El push del tag dispara release.yml (binarios + release).
+# Botón manual en Actions para forzar una versión CONCRETA (p.ej. saltar a 1.0.0), que es lo único
+# que auto-release.yml no cubre: aquel calcula la versión de los commits, este la impone.
+# Sincroniza package.json, commitea en main, crea el tag y publica.
 on:
   workflow_dispatch:
     inputs:
@@ -27,6 +28,17 @@ jobs:
           npm version "${{ inputs.version }}" --no-git-tag-version
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -am "chore(release): v${{ inputs.version }}"
+          git commit -am "chore(release): v${{ inputs.version }} [skip ci]"
           git tag "v${{ inputs.version }}"
           git push origin main --follow-tags
+
+  # Antes esto no existía: se daba por hecho que el push del tag dispararía release.yml, y NO lo
+  # hace — un push con el GITHUB_TOKEN no dispara workflows (protección anti-bucle de GitHub), así
+  # que el tag quedaba publicado sin instalables y había que lanzar el build a mano.
+  publish:
+    needs: tag
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: v${{ inputs.version }}
+    permissions:
+      contents: write

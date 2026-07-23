@@ -58,7 +58,7 @@ const state = {
   // {branchPrefix, sourceBranch, ouicare} del backend; `projects` = proyectos del grupo (groupProjects,
   // con icono) entre los que elegir; `selected` = paths elegidos; `appDate` = ISO (YYYY-MM-DD) para
   // el input nativo, se convierte a DDMMYYYY al enviar; `results` = reporte de la última generación.
-  releases: { defaults: null, projects: [], loading: false, running: false, seeded: false, selected: new Set(), version: "", sourceBranch: "", appDateEnabled: true, appDate: "", results: null, tab: "branches", publish: { ref: "", milestone: "", description: "", milestonesList: null, milestonesLoading: false, running: false, results: null, status: new Map(), poll: null }, pipelines: { data: new Map(), loading: new Set(), busy: new Set() } },
+  releases: { defaults: null, projects: [], loading: false, running: false, seeded: false, selected: new Set(), version: "", variant: "both", sourceBranch: "", appDateEnabled: true, appDate: "", results: null, tab: "branches", publish: { ref: "", milestone: "", description: "", milestonesList: null, milestonesLoading: false, running: false, results: null, status: new Map(), poll: null }, pipelines: { data: new Map(), loading: new Set(), busy: new Set() } },
   // Vista de Trabajo local (solo GitLab, OPE-19): publica trabajo de ramas/worktrees locales como
   // Issues/Epics + MRs. `tab`: "crear" (Issue/Epic nuevos) | "vincular" (a una tarea existente).
   // `rootDir` = directorio raíz donde conviven los clones; `repos` = lo escaneado por local:repos.

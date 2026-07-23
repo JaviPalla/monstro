@@ -1,0 +1,95 @@
+name: Auto release
+
+# En cada push a main: calcula la siguiente versión leyendo los commits (conventional commits),
+# bumpea package.json, crea el tag y llama a release.yml para construir los instalables y publicar.
+#
+# Por qué llama a release.yml en vez de dejar que lo dispare el push del tag: **un push hecho con
+# el GITHUB_TOKEN no dispara workflows** (protección anti-bucle de GitHub). Encadenarlos dejaría
+# tags publicados sin binarios — que es justo lo que pasaba con tag-release.yml.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false # nunca cancelar a medias: dejaría un tag creado y sin publicar
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.calc.outputs.tag }}
+      release: ${{ steps.calc.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # necesitamos los tags y el historial para calcular el bump
+
+      - name: Calcular versión
+        id: calc
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # El commit del propio bot ("chore(release): …") no debe generar otra release. Con el
+          # GITHUB_TOKEN no se redispara el workflow, pero lo comprobamos igual: si algún día se
+          # cambia a un PAT, esta guarda es lo único que evita un bucle infinito de releases.
+          SUBJECT="$(git log -1 --format=%s)"
+          if [[ "$SUBJECT" == chore\(release\):* ]]; then
+            echo "Commit de release del bot: no hacemos nada."
+            echo "release=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          LAST_TAG="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
+          RANGE="${LAST_TAG:+$LAST_TAG..HEAD}"
+          echo "Commits desde ${LAST_TAG:-el principio}:"; git log $RANGE --oneline || true
+
+          # El cálculo vive en scripts/next-version.js (probado en test-next-version.js): decide el
+          # bump por conventional commits y devuelve "" si nada de lo commiteado cambia lo que el
+          # usuario se instala (docs/chore/ci/refactor/test) — no vamos a quemar ~20 min de runner
+          # de macOS + Windows por un cambio de comentario.
+          RESULT="$(git log $RANGE --format='%s%n%b' | node scripts/next-version.js "${LAST_TAG#v}")"
+          if [[ -z "$RESULT" ]]; then
+            echo "Sin commits feat/fix/perf/BREAKING: no se publica release."
+            echo "release=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          BUMP="${RESULT% *}"; NEXT="${RESULT#* }"
+          echo "${LAST_TAG:-0.0.0} ($BUMP) → v$NEXT"
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEXT" >> "$GITHUB_OUTPUT"
+          echo "release=true" >> "$GITHUB_OUTPUT"
+
+      # Guard mínimo para no publicar a ciegas. Solo los tests que son node puro (sin electron ni
+      # red): así no hace falta `npm ci` aquí — son 2 segundos frente a los ~20 min del build.
+      # `npm test` NO sirve en CI: lanza Electron contra la API real y necesita token y pantalla.
+      - name: Tests unitarios
+        if: steps.calc.outputs.release == 'true'
+        run: node scripts/test-health-verdict.js && node scripts/test-next-version.js
+
+      - name: Bump + tag
+        if: steps.calc.outputs.release == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm version "${{ steps.calc.outputs.version }}" --no-git-tag-version --allow-same-version
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # [skip ci] por si algún día esto se pushea con un PAT: sin él, el commit de release
+          # volvería a disparar este mismo workflow.
+          git commit -am "chore(release): ${{ steps.calc.outputs.tag }} [skip ci]"
+          git tag "${{ steps.calc.outputs.tag }}"
+          git push origin HEAD:main --follow-tags
+
+  # Construye e implementa reutilizando release.yml: una sola definición del build.
+  publish:
+    needs: version
+    if: needs.version.outputs.release == 'true'
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.version.outputs.tag }}
+    permissions:
+      contents: write

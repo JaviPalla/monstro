@@ -8,6 +8,7 @@
     "start": "electron .",
     "doctor": "node scripts/doctor.js",
     "test": "node scripts/selftest-all.js",
+    "test:unit": "node scripts/test-health-verdict.js && node scripts/test-next-version.js && node scripts/test-summary-block.js",
     "selftest": "electron . --selftest",
     "icon": "electron scripts/make-icon.js",
     "dist": "electron-builder",

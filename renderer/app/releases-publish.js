@@ -50,6 +50,8 @@ function renderReleasePublish() {
   const allOn = selCount === projects.length && projects.length > 0;
   const refValid = Boolean(p.ref) && BRANCH_RE.test(p.ref);
   const base = calverBase(p.ref);
+  // Variante México: la rama rb/…-mx publica un tag con sufijo -mx (contador propio, lo resuelve el backend).
+  const mxSuffix = /-mx$/i.test(p.ref) ? "-mx" : "";
   const canRun = refValid && selCount > 0 && !p.running;
 
   const msOptions = [`<option value="">${t("Sin milestone")}</option>`]
@@ -81,7 +83,7 @@ function renderReleasePublish() {
       })
       .join("");
     resultsHtml = `
-      <div class="rel-summary ${cls}">Release <code>${esc(p.results.base)}.x</code> ${t("desde")} <code>${esc(p.results.ref)}</code> · ${ok === 1 ? t("{n} publicada", { n: ok }) : t("{n} publicadas", { n: ok })}${fail ? ` · ${t("{n} con error", { n: fail })}` : ""}</div>
+      <div class="rel-summary ${cls}">Release <code>${esc(p.results.base)}.x${/-mx$/i.test(p.results.ref) ? "-mx" : ""}</code> ${t("desde")} <code>${esc(p.results.ref)}</code> · ${ok === 1 ? t("{n} publicada", { n: ok }) : t("{n} publicadas", { n: ok })}${fail ? ` · ${t("{n} con error", { n: fail })}` : ""}</div>
       <div class="rel-pub-cards">${rowsHtml}</div>
       ${ok ? `<div class="rel-pub-cta"><button class="btn ghost" id="rel-pub-goto-pipelines">${t("Ver pipelines de despliegue")} →</button></div>` : ""}`;
   }
@@ -104,7 +106,7 @@ function renderReleasePublish() {
         </label>
         <div class="rel-preview-box">
           <span class="rel-label">${t("Tag a crear")}</span>
-          <code class="rel-branch-preview ${refValid ? "" : "invalid"}" id="rel-pub-preview">${esc(base)}.x</code>
+          <code class="rel-branch-preview ${refValid ? "" : "invalid"}" id="rel-pub-preview">${esc(base)}.x${esc(mxSuffix)}</code>
         </div>
       </div>
 
@@ -132,7 +134,7 @@ function renderReleasePublish() {
   const sync = () => {
     const valid = Boolean(p.ref) && BRANCH_RE.test(p.ref);
     const sel = projects.filter((proj) => r.selected.has(proj.path)).length;
-    preview.textContent = `${calverBase(p.ref)}.x`;
+    preview.textContent = `${calverBase(p.ref)}.x${/-mx$/i.test(p.ref) ? "-mx" : ""}`;
     preview.classList.toggle("invalid", !valid);
     $("#rel-pub-count").textContent = `${sel}/${projects.length}`;
     pubBtn.disabled = !(valid && sel > 0 && !p.running);
@@ -183,12 +185,13 @@ function confirmAndPublishReleases() {
   const targets = r.projects.filter((proj) => r.selected.has(proj.path));
   if (!targets.length) return;
   const base = calverBase(p.ref);
+  const mxSuffix = /-mx$/i.test(p.ref) ? "-mx" : "";
   const msNote = p.milestone ? `<div class="rel-confirm-note">🏷️ ${t("Milestone")}: <b>${esc(p.milestone)}</b></div>` : "";
   const root = $("#modal-root");
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>${t("Publicar")} <code>${esc(base)}.x</code> ${targets.length === 1 ? t("en {n} proyecto", { n: targets.length }) : t("en {n} proyectos", { n: targets.length })}</h3>
+        <h3>${t("Publicar")} <code>${esc(base)}.x${esc(mxSuffix)}</code> ${targets.length === 1 ? t("en {n} proyecto", { n: targets.length }) : t("en {n} proyectos", { n: targets.length })}</h3>
         <p class="muted">${t("Tag + release desde")} <code>${esc(p.ref)}</code>. ${t("El patch (<code>.0</code>, <code>.1</code>…) se calcula por proyecto. No atómico: si alguno falla, el resto sí se publica.")}</p>
         <ul class="rel-confirm-list">${targets.map((proj) => `<li>${esc(proj.name)} <span class="muted">${esc(proj.path)}</span></li>`).join("")}</ul>
         ${msNote ? `<div class="rel-confirm-notes">${msNote}</div>` : ""}

@@ -637,12 +637,15 @@ function wireIpc() {
   });
 
   ipcMain.handle("releases:defaults", async () => gh().releaseDefaults());
-  ipcMain.handle("releases:generate", async (_event, { version, sourceBranch, projects, ouicare }) => {
+  ipcMain.handle("releases:generate", async (_event, { version, sourceBranch, projects, variant, ouicare }) => {
     const { branchPrefix, sourceBranch: defSource, ouicare: cfgOuicare } = await gh().releaseDefaults();
     const v = typeof version === "string" ? version.trim() : "";
     if (!v) throw new Error("Falta el nombre de versión");
-    // Validamos el nombre de rama FINAL (prefijo + versión) con la misma regla que el resto de ramas.
+    const vr = ["es", "mx", "both"].includes(variant) ? variant : "es";
+    // Validamos el nombre de rama FINAL (prefijo + versión, y la variante -mx si aplica) con la misma
+    // regla que el resto de ramas.
     if (!BRANCH_RE.test(`${branchPrefix}${v}`)) throw new Error("Nombre de versión no válido");
+    if (vr !== "es" && !BRANCH_RE.test(`${branchPrefix}${v}-mx`)) throw new Error("Nombre de versión no válido");
     const src = typeof sourceBranch === "string" && sourceBranch.trim() ? sourceBranch.trim() : defSource;
     if (!BRANCH_RE.test(src)) throw new Error("Rama origen no válida");
     // Los proyectos los elige el renderer del grupo (paths). Validamos el FORMATO del id (path
@@ -662,7 +665,7 @@ function wireIpc() {
       if (!/^\d{8}$/.test(date)) throw new Error("Fecha de AppDate no válida (DDMMYYYY)");
       ouicareArg = { ...cfgOuicare, enabled: true, date };
     }
-    return gh().generateReleaseBranches({ projects: selected, version: v, sourceBranch: src, ouicare: ouicareArg });
+    return gh().generateReleaseBranches({ projects: selected, version: v, sourceBranch: src, variant: vr, ouicare: ouicareArg });
   });
 
   // Publicar release (tag + release) en N proyectos. Misma filosofía de validación que generate:

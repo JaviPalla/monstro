@@ -1187,6 +1187,9 @@ body.is-mac .traffic-pad { display: block; width: 78px; }
   border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; width: 100%;
 }
 .rel-field input:focus { outline: none; border-color: var(--accent); }
+.rel-variant { grid-column: 1 / -1; }
+.rel-variant-btns { display: flex; gap: 6px; }
+.rel-variant-btns .btn { flex: 1; padding: 8px 10px; }
 .rel-preview-box { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; }
 .rel-branch-preview { font-size: 13px !important; font-weight: 600; }
 .rel-branch-preview.invalid { color: var(--red); background: var(--red-bg); }

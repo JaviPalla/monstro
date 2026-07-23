@@ -77,6 +77,17 @@ function releaseBranchValid(version) {
   return Boolean(version) && BRANCH_RE.test(`${prefix}${version}`);
 }
 
+// Ramas a crear según la variante: España = rama sin sufijo, México = misma + `-mx`, Ambas = las dos
+// (en GitLab las rb/ van siempre en pareja rb/x + rb/x-mx). Mismo sufijo que aplica el backend.
+function releaseVariantSuffixes(variant) {
+  return variant === "both" ? ["", "-mx"] : variant === "mx" ? ["-mx"] : [""];
+}
+function releaseBranchList() {
+  const r = state.releases;
+  const prefix = r.defaults?.branchPrefix || "rb/";
+  return releaseVariantSuffixes(r.variant).map((s) => `${prefix}${r.version || ""}${s}`);
+}
+
 function renderReleases() {
   if (state.view !== "releases") return;
   const r = state.releases;
@@ -108,7 +119,6 @@ function renderReleases() {
   const allOn = selCount === projects.length && projects.length > 0;
   const valid = releaseBranchValid(r.version);
   const canRun = valid && selCount > 0 && !r.running;
-  const branchPreview = `${prefix}${r.version || ""}`;
 
   // Panel AppDate de Ouicare: solo visible si Ouicare está entre los seleccionados.
   const appDateHtml = ouicareSelected
@@ -137,12 +147,13 @@ function renderReleases() {
     const rowsHtml = r.results.results
       .map((res) =>
         res.ok
-          ? `<div class="rel-res-row ok">✓ ${esc(res.name)} ${res.webUrl ? `<a data-url="${esc(res.webUrl)}" href="#">${t("ver rama")}</a>` : ""}</div>`
-          : `<div class="rel-res-row err" title="${esc(res.error || "")}">✕ ${esc(res.name)}: ${esc(res.error || t("error"))}</div>`,
+          ? `<div class="rel-res-row ok">✓ ${esc(res.name)} <code>${esc(res.branch)}</code> ${res.webUrl ? `<a data-url="${esc(res.webUrl)}" href="#">${t("ver rama")}</a>` : ""}</div>`
+          : `<div class="rel-res-row err" title="${esc(res.error || "")}">✕ ${esc(res.name)} <code>${esc(res.branch)}</code>: ${esc(res.error || t("error"))}</div>`,
       )
       .join("");
+    const branchesLabel = (r.results.branches || []).map((b) => `<code>${esc(b)}</code>`).join(" · ");
     resultsHtml = `
-      <div class="rel-summary ${cls}">${t("Rama")} <code>${esc(r.results.branch)}</code> ${t("desde")} <code>${esc(r.results.ref)}</code> · ${ok} ${ok === 1 ? t("creada") : t("creadas")}${fail ? ` · ${t("{fail} con error", { fail })}` : ""}</div>
+      <div class="rel-summary ${cls}">${(r.results.branches || []).length > 1 ? t("Ramas") : t("Rama")} ${branchesLabel} ${t("desde")} <code>${esc(r.results.ref)}</code> · ${ok} ${ok === 1 ? t("creada") : t("creadas")}${fail ? ` · ${t("{fail} con error", { fail })}` : ""}</div>
       <div class="rel-results">${adHtml}${rowsHtml}</div>`;
   }
 
@@ -162,9 +173,17 @@ function renderReleases() {
           <span class="rel-label">${t("Rama origen")}</span>
           <input type="text" id="rel-source" value="${esc(r.sourceBranch)}" placeholder="development" ${r.running ? "disabled" : ""} autocomplete="off" />
         </label>
+        <div class="rel-field rel-variant" role="group" aria-label="${t("Variante")}">
+          <span class="rel-label">${t("Variante")}</span>
+          <div class="rel-variant-btns">
+            <button class="btn ${r.variant === "es" ? "btn-primary" : "ghost"}" data-variant="es" ${r.running ? "disabled" : ""}>${t("España")}</button>
+            <button class="btn ${r.variant === "mx" ? "btn-primary" : "ghost"}" data-variant="mx" ${r.running ? "disabled" : ""}>${t("México")}</button>
+            <button class="btn ${r.variant === "both" ? "btn-primary" : "ghost"}" data-variant="both" ${r.running ? "disabled" : ""}>${t("Ambas")}</button>
+          </div>
+        </div>
         <div class="rel-preview-box">
-          <span class="rel-label">${t("Rama a crear")}</span>
-          <code class="rel-branch-preview ${valid ? "" : "invalid"}" id="rel-branch-preview">${esc(branchPreview)}</code>
+          <span class="rel-label">${releaseBranchList().length > 1 ? t("Ramas a crear") : t("Rama a crear")}</span>
+          <code class="rel-branch-preview ${valid ? "" : "invalid"}" id="rel-branch-preview">${esc(releaseBranchList().join(" · "))}</code>
         </div>
       </div>
 
@@ -188,7 +207,7 @@ function renderReleases() {
   const syncControls = () => {
     const v = releaseBranchValid(r.version);
     const sel = projects.filter((p) => r.selected.has(p.path)).length;
-    preview.textContent = `${prefix}${r.version || ""}`;
+    preview.textContent = releaseBranchList().join(" · ");
     preview.classList.toggle("invalid", !v);
     $("#rel-sel-count").textContent = `${sel}/${projects.length}`;
     genBtn.disabled = !(v && sel > 0 && !r.running);
@@ -200,6 +219,13 @@ function renderReleases() {
   $("#rel-source")?.addEventListener("input", (event) => {
     r.sourceBranch = event.target.value.trim();
   });
+  // Selector de variante (España / México / Ambas). Re-render: cambia el preview de ramas y el modal.
+  list.querySelectorAll(".rel-variant-btns [data-variant]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      r.variant = btn.dataset.variant;
+      renderReleases();
+    }),
+  );
   // Clic en chip = alternar selección. Re-render (la visibilidad del panel AppDate depende de Ouicare).
   list.querySelectorAll(".ms-proj-chip[data-path]").forEach((chip) =>
     chip.addEventListener("click", () => {
@@ -238,8 +264,7 @@ function renderReleases() {
 function confirmAndGenerateReleases() {
   const r = state.releases;
   if (!releaseBranchValid(r.version)) return;
-  const prefix = r.defaults.branchPrefix || "rb/";
-  const branch = `${prefix}${r.version}`;
+  const branches = releaseBranchList();
   const source = r.sourceBranch || r.defaults.sourceBranch || "development";
   const targets = r.projects.filter((p) => r.selected.has(p.path));
   if (!targets.length) return;
@@ -253,7 +278,7 @@ function confirmAndGenerateReleases() {
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>${t("Crear")} <code>${esc(branch)}</code> ${targets.length === 1 ? t("en 1 proyecto") : t("en {n} proyectos", { n: targets.length })}</h3>
+        <h3>${t("Crear")} ${branches.map((b) => `<code>${esc(b)}</code>`).join(" · ")} ${targets.length === 1 ? t("en 1 proyecto") : t("en {n} proyectos", { n: targets.length })}</h3>
         <p class="muted">${t("Desde la rama")} <code>${esc(source)}</code>. ${t("Se aplica proyecto a proyecto (no atómico): si alguno falla, el resto sí se crea.")}</p>
         <ul class="rel-confirm-list">${targets.map((p) => `<li>${esc(p.name)} <span class="muted">${esc(p.path)}</span></li>`).join("")}</ul>
         ${noteHtml}
@@ -286,7 +311,7 @@ async function runReleaseGeneration() {
       ouicarePath && r.selected.has(ouicarePath) && r.appDateEnabled
         ? { enabled: true, date: isoToAppDate(r.appDate) }
         : { enabled: false };
-    r.results = await window.monstro.generateReleaseBranches({ version: r.version, sourceBranch: r.sourceBranch, projects, ouicare });
+    r.results = await window.monstro.generateReleaseBranches({ version: r.version, sourceBranch: r.sourceBranch, variant: r.variant, projects, ouicare });
     const ok = r.results.results.filter((x) => x.ok).length;
     const fail = r.results.results.length - ok;
     toast(fail ? t("{ok} creada(s), {fail} con error", { ok, fail }) : t("{ok} release branch(es) creada(s)", { ok }), fail ? "warn" : "ok");

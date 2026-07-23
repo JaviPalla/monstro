@@ -126,22 +126,13 @@ async function probeEnvHealth() {
   renderEnvironments();
 }
 
-// Semáforo de la capa 1. `stale` = el deploy fue bien pero hace demasiado: ámbar, porque un entorno
-// congelado meses suele ser un olvido, no una virtud.
+// Semáforo de la capa 1. Aquí `deployment` es SIEMPRE el último despliegue con éxito (projectEnvironments
+// filtra por status=success), así que solo hay dos verdictos: sano o rancio. `stale` = el deploy fue
+// bien pero hace demasiado: ámbar, porque un entorno congelado meses suele ser un olvido, no una virtud.
 function deployVerdict(deployment, staleDays) {
   if (!deployment) return { cls: "none", ico: "·", label: t("Sin despliegues") };
-  const { status, createdAt } = deployment;
-  if (status === "failed") return { cls: "err", ico: "✕", label: t("Despliegue fallido") };
-  if (status === "canceled") return { cls: "err", ico: "⊘", label: t("Despliegue cancelado") };
-  // `blocked` NO es actividad: es un job `when: manual` esperando a que alguien lo lance, y puede
-  // quedarse así para siempre. Pintarlo como "en curso" hacía parecer que se estaba desplegando
-  // algo. Estado propio y apagado: informa sin dar falsa sensación de movimiento.
-  if (status === "blocked") return { cls: "waiting", ico: "▸", label: t("Despliegue manual pendiente") };
-  if (status === "running" || status === "created") {
-    return { cls: "run", ico: "◔", label: t("Despliegue en curso") };
-  }
-  const days = createdAt ? (Date.now() - new Date(createdAt).getTime()) / 86400000 : 0;
-  if (createdAt && days > staleDays) return { cls: "stale", ico: "✓", label: t("Desplegado hace mucho") };
+  const days = deployment.createdAt ? (Date.now() - new Date(deployment.createdAt).getTime()) / 86400000 : 0;
+  if (deployment.createdAt && days > staleDays) return { cls: "stale", ico: "✓", label: t("Desplegado hace mucho") };
   return { cls: "ok", ico: "✓", label: t("Desplegado correctamente") };
 }
 
@@ -253,7 +244,6 @@ function renderEnvironments() {
         <span class="env-legend">
           <span class="env-key ok">✓</span> ${t("desplegado")}
           <span class="env-key stale">✓</span> ${t("rancio")}
-          <span class="env-key err">✕</span> ${t("fallido")}
           <span class="env-sep">·</span>
           <span class="env-health up">●</span> ${t("responde")}
           <span class="env-health unknown">◍</span> ${t("sin verificar")}
