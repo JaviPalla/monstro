@@ -826,6 +826,27 @@ body.is-mac .traffic-pad { display: block; width: 78px; }
 .ms-task-mr.open { color: #1a7f37; border-color: #1a7f37; background: rgba(26, 127, 55, 0.12); }
 .ms-task-mr.closed { color: #cf222e; border-color: #cf222e; background: rgba(207, 34, 46, 0.12); }
 .ms-task-mr:hover { filter: brightness(1.08); }
+/* Menú de acciones rápidas por tarea (desplegable nativo <details>). */
+.ms-task-menu { flex: 0 0 auto; position: relative; margin-top: -1px; }
+.ms-task-menu-btn {
+  list-style: none; cursor: pointer; user-select: none; line-height: 1.4; font-weight: 700;
+  color: var(--text-muted); border: 1px solid var(--border); border-radius: 6px;
+  padding: 0 7px; background: var(--gray-bg);
+}
+.ms-task-menu-btn::-webkit-details-marker { display: none; }
+.ms-task-menu-btn:hover { color: var(--text); border-color: var(--text-muted); }
+.ms-task-menu[open] .ms-task-menu-btn { color: var(--text); border-color: var(--text-muted); }
+.ms-task-menu-pop {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 200px;
+  display: flex; flex-direction: column; padding: 4px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.ms-menu-item {
+  text-align: left; cursor: pointer; font: inherit; color: var(--text);
+  border: 0; border-radius: 6px; padding: 6px 9px; background: transparent;
+}
+.ms-menu-item:hover { background: var(--gray-bg); }
 .ms-epic-tag {
   flex: 0 0 auto; margin-top: 1px; font-size: 10px; font-weight: 700; letter-spacing: 0.4px;
   text-transform: uppercase; border-radius: 6px; padding: 1px 7px;

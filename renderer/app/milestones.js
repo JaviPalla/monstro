@@ -137,6 +137,15 @@ function milestoneCard(iss, statusSet) {
   const key = issueKey(iss);
   const selected = state.milestones.selected.has(key);
   const copyBtn = `<button class="ms-task-copy" data-url="${esc(iss.webUrl)}" title="${t("Copiar enlace")}">⧉</button>`;
+  // Menú de acciones rápidas (desplegable nativo): avanzar el estado de flujo o cerrar la tarea.
+  const menuBtn = `<details class="ms-task-menu">
+        <summary class="ms-task-menu-btn" title="${t("Acciones")}">⋯</summary>
+        <div class="ms-task-menu-pop">
+          <button class="ms-menu-item" data-act="pending-check">${t("Marcar como pending check")}</button>
+          <button class="ms-menu-item" data-act="finished">${t("Marcar como finished")}</button>
+          <button class="ms-menu-item" data-act="close">${t("Cerrar (comprobada)")}</button>
+        </div>
+      </details>`;
   const title = `<button class="ms-task-title" data-url="${esc(iss.webUrl)}" title="${t("Abrir en GitLab")}">
           ${esc(iss.title)} <span class="ms-iid">#${iss.iid}</span>
         </button>`;
@@ -172,9 +181,18 @@ function milestoneCard(iss, statusSet) {
         ${title}
         ${mrButtons(iss.mrs)}
         ${copyBtn}
+        ${menuBtn}
       </div>
       ${chips ? `<div class="ms-task-labels">${chips}</div>` : ""}
     </div>`;
+}
+
+// Etiqueta canónica de cada fase (la primera de su grupo en config.doneLabels): "pending check"
+// (esperando comprobación) y "finished" (terminada). Los 3 variantes de pending check viven en
+// el mismo grupo; el menú usa la base.
+function canonicalDoneLabels() {
+  const { pendingCheck, finished } = splitDoneLabels(state.config?.milestones?.doneLabels || []);
+  return { pendingCheck: [...pendingCheck], finished: [...finished] };
 }
 
 // Cablea los botones de una tarjeta (o de un contenedor de hijos recién inyectado): título/MR
@@ -546,6 +564,22 @@ function renderMilestones() {
       if (event.target.checked) m.selected.add(key);
       else m.selected.delete(key);
       renderMilestones();
+    }),
+  );
+
+  // Acciones rápidas por tarea (menú ⋯): avanzar estado de flujo o cerrar.
+  list.querySelectorAll(".ms-menu-item").forEach((item) =>
+    item.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const key = event.target.closest(".ms-task").dataset.key;
+      const { pendingCheck, finished } = canonicalDoneLabels();
+      const patch =
+        item.dataset.act === "pending-check"
+          ? { addLabels: pendingCheck.slice(0, 1), removeLabels: finished }
+          : item.dataset.act === "finished"
+            ? { addLabels: finished.slice(0, 1), removeLabels: pendingCheck }
+            : { stateEvent: "close" };
+      applyIssuePatch([key], patch); // recarga el milestone (cierra el menú de paso)
     }),
   );
 

@@ -1090,6 +1090,7 @@ async function updateIssue(projectId, iid, patch) {
   // milestone_id: 0 desasigna el milestone; un id real lo asigna (los de grupo valen).
   if ("milestoneId" in patch) body.milestone_id = patch.milestoneId == null ? 0 : patch.milestoneId;
   if (patch.assigneeIds) body.assignee_ids = patch.assigneeIds.length ? patch.assigneeIds : [0];
+  if (patch.stateEvent) body.state_event = patch.stateEvent; // "close" / "reopen"
   const updated = await api("PUT", `/projects/${projectId}/issues/${iid}`, body);
   return mapIssue(updated);
 }
