@@ -90,6 +90,31 @@ const DEFAULTS = {
     incidencias: "soporte/incidencias", // apartado "Support"
     operaciones: "soporte/operaciones", // apartado "Ops"
   },
+  // Vista de Entornos (solo GitLab): matriz proyecto × entorno con el último despliegue (capa 1) y
+  // una sonda HTTP opcional contra el external_url del entorno (capa 2).
+  environments: {
+    // Última selección de proyectos (paths), recordada entre sesiones. null = los de releases.
+    selectedProjects: null,
+    // Ruta de sonda por proyecto (path del proyecto → ruta, p.ej. "/health"). Sin entrada = se
+    // sondea la raíz, que casi nunca sirve: en una SPA devuelve 200 con el index.html (no prueba
+    // nada) y en estas APIs devuelve 404 (parecerían caídas estando sanas). Las tres APIs .NET
+    // exponen el endpoint de ASP.NET Core HealthChecks en /health, que responde "Healthy" en
+    // text/plain — verificado en los 14 entornos ES y MX.
+    healthPaths: {
+      "OpenSaludGroup/openhealthcareapi": "/health",
+      "OpenSaludGroup/microservices/notifications_api": "/health",
+      "OpenSaludGroup/microservices/usermanagement_api": "/health",
+    },
+    // Texto que debe aparecer en el cuerpo para dar la sonda por buena (path del proyecto → texto).
+    // Es la prueba positiva: sin esto, un 200 solo dice que hay un servidor web escuchando.
+    healthExpect: {
+      "OpenSaludGroup/openhealthcareapi": "Healthy",
+      "OpenSaludGroup/microservices/notifications_api": "Healthy",
+      "OpenSaludGroup/microservices/usermanagement_api": "Healthy",
+    },
+    // Días sin desplegar tras los que un entorno se marca como rancio (ámbar) aunque el deploy fuera OK.
+    staleDays: 45,
+  },
   // Trabajo local → GitLab (OPE-19): publicar trabajo de ramas/worktrees locales como Issues/Epics + MRs.
   local: {
     // Directorio raíz donde conviven todos los clones de GitLab (un nivel). null = sin configurar.
@@ -113,6 +138,8 @@ function load() {
     // Merge profundo de releases (incl. la clave anidada ouicare): un guardado parcial no debe pisar defaults.
     cfg.releases = { ...DEFAULTS.releases, ...(parsed.releases || {}) };
     cfg.releases.ouicare = { ...DEFAULTS.releases.ouicare, ...(parsed.releases?.ouicare || {}) };
+    // Merge profundo de environments: un guardado parcial no debe pisar los defaults del resto de claves.
+    cfg.environments = { ...DEFAULTS.environments, ...(parsed.environments || {}) };
     // Merge profundo de local: un guardado parcial no debe pisar los defaults del resto de claves.
     cfg.local = { ...DEFAULTS.local, ...(parsed.local || {}) };
     cfg.support = { ...DEFAULTS.support, ...(parsed.support || {}) };

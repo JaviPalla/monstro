@@ -352,7 +352,7 @@ function openSettings() {
 // como availableSectionKeys(). Solo se aplican las claves válidas para el proveedor actual.
 const SECTION_PRESETS = {
   desarrollo: ["prs", "historial", "historico", "milestones", "releases", "local"],
-  operaciones: ["soporte", "milestones", "historico"],
+  operaciones: ["soporte", "milestones", "historico", "entornos"],
 };
 
 /** Filas de toggles (botón por apartado, estilo .repo-option) reutilizadas en onboarding y Ajustes. */

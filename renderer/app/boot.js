@@ -136,6 +136,7 @@ async function boot() {
   if (IS_SELFTEST && SELFTEST_ROUTE === "releases") enterReleases();
   if (IS_SELFTEST && SELFTEST_ROUTE === "releases-publish") enterReleases("publish");
   if (IS_SELFTEST && SELFTEST_ROUTE === "releases-pipelines") enterReleases("pipelines");
+  if (IS_SELFTEST && SELFTEST_ROUTE === "entornos") enterEnvironments();
   if (IS_SELFTEST && SELFTEST_ROUTE === "local") runLocalSelftest();
   if (IS_SELFTEST && SELFTEST_ROUTE === "local-vincular") runLocalLinkSelftest();
   if (IS_SELFTEST && (SELFTEST_ROUTE === "local-historico" || SELFTEST_ROUTE === "local-historico-detail")) runLocalHistorySelftest();
@@ -368,7 +369,7 @@ $("#repo-select").addEventListener("change", (event) => {
 $("#search").addEventListener("input", (event) => {
   state.search = event.target.value;
   if (state.view === "milestones") renderMilestones();
-  else if (["releases", "local", "support"].includes(state.view)) {/* estas vistas no usan el buscador global */}
+  else if (["releases", "local", "support", "environments"].includes(state.view)) {/* estas vistas no usan el buscador global */}
   else renderList();
 });
 document.querySelectorAll(".bucket[data-bucket]").forEach((btn) =>
@@ -377,6 +378,7 @@ document.querySelectorAll(".bucket[data-bucket]").forEach((btn) =>
 $("#bucket-history").addEventListener("click", enterHistory);
 $("#bucket-milestones").addEventListener("click", () => enterMilestones("tasks"));
 $("#bucket-milestones-summary").addEventListener("click", () => enterMilestones("summary"));
+$("#bucket-entornos").addEventListener("click", () => enterEnvironments());
 $("#bucket-support").addEventListener("click", () => enterSupport("incidencias"));
 $("#bucket-ops").addEventListener("click", () => enterSupport("operaciones"));
 $("#bucket-releases").addEventListener("click", () => enterReleases("branches"));
@@ -405,6 +407,7 @@ function paletteEntries() {
   if (sectionEnabled("releases")) entries.push({ label: t("Ir a: Releases · Ramas"), hint: t("generar release branches"), run: () => enterReleases("branches") });
   if (sectionEnabled("releases")) entries.push({ label: t("Ir a: Releases · Publicar"), hint: t("crear tag + release"), run: () => enterReleases("publish") });
   if (sectionEnabled("releases")) entries.push({ label: t("Ir a: Releases · Pipelines"), hint: t("estado de despliegue por proyecto"), run: () => enterReleases("pipelines") });
+  if (sectionEnabled("entornos")) entries.push({ label: t("Ir a: Entornos"), hint: t("salud de los entornos por proyecto"), run: () => enterEnvironments() });
   if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Empezar tarea"), hint: t("elegir Epic/Issue → plan → agentes"), run: () => enterLocal("empezar") });
   if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Crear tarea"), hint: t("Issue/Epic + MR desde local"), run: () => enterLocal("crear") });
   if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Vincular tarea"), hint: t("vincular local a una tarea existente"), run: () => enterLocal("vincular") });
@@ -434,6 +437,7 @@ function firstAvailableLanding() {
     ["milestones", () => enterMilestones("tasks")],
     ["soporte", () => enterSupport("incidencias")],
     ["releases", () => enterReleases("branches")],
+    ["entornos", () => enterEnvironments()],
     ["local", () => enterLocal("empezar")],
   ];
   const found = order.find(([key]) => sectionEnabled(key));
@@ -460,7 +464,7 @@ function switchRepo(repo) {
   closeDetail();
   if (state.view === "history") loadHistory();
   // Milestones, Releases, Soporte y Trabajo local son de grupo/proyecto fijo, no por repo: el cambio no las afecta.
-  else if (!["milestones", "releases", "local", "support"].includes(state.view)) refresh();
+  else if (!["milestones", "releases", "local", "support", "environments"].includes(state.view)) refresh();
 }
 
 function openPalette() {

@@ -8,6 +8,7 @@ const agents = require("./agents");
 const ai = require("./ai");
 const config = require("./config");
 const drafts = require("./drafts");
+const health = require("./health");
 const local = require("./local");
 const localHistory = require("./localhistory");
 const provider = require("./provider");
@@ -24,7 +25,11 @@ const SELFTEST_ROUTE = (process.argv.find((a) => a.startsWith("--selftest-route=
 // La ruta de resumen espera a una IA (lenta con Opus); la de releases proxea los avatares del grupo
 // entero (groupProjects). Ambas necesitan más margen que los 20s por defecto.
 const SELFTEST_TIMEOUT_MS =
-  SELFTEST_ROUTE === "milestones-summary" ? 240000 : SELFTEST_ROUTE.startsWith("releases") || SELFTEST_ROUTE.startsWith("local") ? 60000 : 20000;
+  SELFTEST_ROUTE === "milestones-summary"
+    ? 240000
+    : SELFTEST_ROUTE.startsWith("releases") || SELFTEST_ROUTE.startsWith("local") || SELFTEST_ROUTE === "entornos"
+      ? 60000
+      : 20000;
 
 let win = null;
 
@@ -204,7 +209,7 @@ function wireIpc() {
     if (typeof partial.lastBucket === "string") allowed.lastBucket = partial.lastBucket;
     // Apartados del menú: enum cerrado de claves; el renderer manda solo las habilitadas.
     if (Array.isArray(partial.sections)) {
-      const SECTION_KEYS = ["prs", "historial", "historico", "milestones", "soporte", "releases", "local"];
+      const SECTION_KEYS = ["prs", "historial", "historico", "milestones", "soporte", "releases", "entornos", "local"];
       allowed.sections = partial.sections.filter((s) => SECTION_KEYS.includes(s));
     }
     if (partial.cherryPick && typeof partial.cherryPick === "object") {
@@ -264,6 +269,28 @@ function wireIpc() {
         next.rootDir = null;
       }
       allowed.local = next;
+    }
+    if (partial.environments && typeof partial.environments === "object") {
+      const e = partial.environments;
+      const next = { ...current.environments };
+      const projId = /^[\w.-]+(\/[\w.-]+)*$/;
+      if (Array.isArray(e.selectedProjects)) {
+        next.selectedProjects = e.selectedProjects.filter((p) => typeof p === "string" && projId.test(p));
+      } else if (e.selectedProjects === null) {
+        next.selectedProjects = null;
+      }
+      // Rutas de sonda y textos esperados: mapa proyecto → string. Descartamos claves que no sean
+      // paths de proyecto para que el renderer no pueda meter basura en el config.
+      for (const key of ["healthPaths", "healthExpect"]) {
+        if (!e[key] || typeof e[key] !== "object") continue;
+        const map = {};
+        for (const [proj, val] of Object.entries(e[key])) {
+          if (projId.test(proj) && typeof val === "string" && val.trim()) map[proj] = val.trim().slice(0, 300);
+        }
+        next[key] = map;
+      }
+      if (Number.isInteger(e.staleDays) && e.staleDays >= 1) next.staleDays = e.staleDays;
+      allowed.environments = next;
     }
     if (partial.support && typeof partial.support === "object") {
       const next = { ...current.support };
@@ -674,6 +701,64 @@ function wireIpc() {
     if (typeof projectId !== "string" || !PATH_RE.test(projectId)) throw new Error("Proyecto no válido");
     if (!/^\d+$/.test(String(jobId))) throw new Error("Job no válido");
     return gh().playJob(projectId, jobId);
+  });
+
+  // Entornos de un proyecto + su último despliegue (capa 1 de la vista de Entornos). Solo GitLab.
+  ipcMain.handle("env:list", async (_event, { projectId }) => {
+    const PATH_RE = /^[\w.-]+(\/[\w.-]+)+$|^\d+$/;
+    if (typeof projectId !== "string" || !PATH_RE.test(projectId)) throw new Error("Proyecto no válido");
+    return gh().projectEnvironments(projectId);
+  });
+
+  // Sonda de salud de un entorno (capa 2). Vive en el main porque el renderer está sandboxed y la CSP
+  // le prohíbe salir a hosts externos. `url` viene del external_url de GitLab (validamos protocolo);
+  // el PATH y el texto esperado salen de CONFIG, no del renderer.
+  //
+  // GOTCHA que motiva el veredicto de tres estados: las SPA sirven index.html con 200 en CUALQUIER
+  // ruta (verificado: dashboard.opensalud.es devuelve 200 en /health y en /esto-no-existe). Un 200
+  // con content-type HTML NO demuestra que la app esté sana — solo que nginx está en pie. Por eso
+  // "responde HTML pero no se puede verificar" es `unknown` (ámbar), nunca `up`. Un health check que
+  // miente es peor que no tenerlo.
+  ipcMain.handle("env:health", async (_event, { url, project }) => {
+    if (typeof url !== "string" || !/^https?:\/\//.test(url)) throw new Error("URL no válida");
+    const cfg = config.load();
+    const probePath = cfg.environments?.healthPaths?.[project] || "";
+    const expect = cfg.environments?.healthExpect?.[project] || "";
+    let target;
+    try {
+      target = new URL(probePath, url.endsWith("/") ? url : `${url}/`).toString();
+    } catch {
+      throw new Error("URL no válida");
+    }
+    const started = Date.now();
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const res = await fetch(target, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "monstro-app" } });
+      const ms = Date.now() - started;
+      const type = res.headers.get("content-type") || "";
+      let bodyMatched = null;
+      if (expect && res.ok) bodyMatched = (await res.text()).slice(0, 200000).includes(expect);
+      const { status, note } = health.healthVerdict({
+        ok: res.ok,
+        httpStatus: res.status,
+        contentType: type,
+        expect,
+        bodyMatched,
+      });
+      return { status, httpStatus: res.status, ms, contentType: type, url: target, note };
+    } catch (err) {
+      const aborted = err.name === "AbortError";
+      return {
+        status: "down",
+        httpStatus: 0,
+        ms: Date.now() - started,
+        url: target,
+        note: aborted ? "Sin respuesta (timeout 8s)" : String(err.message || err),
+      };
+    } finally {
+      clearTimeout(timer);
+    }
   });
 
   ipcMain.handle("shell:open", (_event, url) => {

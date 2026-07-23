@@ -447,6 +447,10 @@ async function releaseStatus() {
   throw new Error("La creación de releases solo está disponible en GitLab.");
 }
 
+async function projectEnvironments() {
+  throw new Error("La vista de Entornos solo está disponible en GitLab.");
+}
+
 async function releasePipeline() {
   throw new Error("Las pipelines de releases solo están disponibles en GitLab.");
 }
@@ -577,6 +581,7 @@ module.exports = {
   nextReleaseTag,
   createReleases,
   releaseStatus,
+  projectEnvironments,
   releasePipeline,
   playJob,
   createSnippet,

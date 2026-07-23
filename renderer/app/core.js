@@ -70,6 +70,9 @@ const state = {
   // config.support (apartado activo: "incidencias"=Support | "operaciones"=Ops). `labelFilter` =
   // texto libre que filtra por etiqueta (substring, case-insensitive).
   support: { kind: "incidencias", issues: [], loading: false, labelFilter: "", showClosed: false },
+  // Vista de Entornos (solo GitLab): matriz proyecto × entorno. `data` = path de proyecto → entornos
+  // (capa 1, GitLab). `health` = "path|entorno" → resultado de la sonda HTTP (capa 2, bajo demanda).
+  environments: { projects: [], selected: new Set(), seeded: false, loading: false, data: new Map(), health: new Map(), probing: false },
   prSnapshot: null, // nº → {reviewDecision, checks, reviewMe} para detectar cambios y notificar
   cursor: -1, // selección con teclado (j/k) en la lista
   draftKeys: new Set(), // "owner/repo#n" con borradores guardados → badge 📝 en la lista
@@ -109,6 +112,7 @@ const MENU_SECTIONS = {
   milestones: { label: "Tareas por persona", icon: "👥", navId: "nav-milestones-section", buckets: ["#bucket-milestones", "#bucket-milestones-summary"], gitlabOnly: true },
   soporte:    { label: "Soporte",            icon: "🛟", navId: "nav-support-section",    buckets: ["#bucket-support", "#bucket-ops"], gitlabOnly: true },
   releases:   { label: "Releases",           icon: "🚀", navId: "nav-releases-section",   buckets: ["#bucket-releases", "#bucket-releases-publish", "#bucket-releases-pipelines"], gitlabOnly: true },
+  entornos:   { label: "Entornos",           icon: "🌡️", navId: "nav-entornos-section",   buckets: ["#bucket-entornos"], gitlabOnly: true },
   local:      { label: "Trabajo local",      icon: "💻", navId: "nav-local-section",      buckets: ["#bucket-local-empezar", "#bucket-local-crear", "#bucket-local-vincular", "#bucket-local-historico"], gitlabOnly: true },
 };
 

@@ -683,16 +683,72 @@ async function releaseStatus(projectId, ref) {
   let environments = [];
   try {
     const envs = await api("GET", `/projects/${id}/environments?per_page=20`);
+    // Solo nombre/estado: es lo único que pinta el panel de Publicar. (El listado de entornos NO
+    // devuelve `last_deployment` — solo el detalle por entorno; ver projectEnvironments.)
     environments = (envs || []).map((e) => ({
       name: e.name,
       state: e.state, // "available" | "stopped"
-      lastDeploy: e.last_deployment?.created_at || null,
       webUrl: e.external_url || null,
     }));
   } catch {
     environments = [];
   }
   return { pipeline, environments };
+}
+
+// Orden de columnas de la vista de Entornos: por tier (lo pronto primero), luego alfabético. GitLab
+// devuelve los entornos en orden de creación, que no dice nada al mirarlos en una matriz.
+const TIER_RANK = { development: 0, testing: 1, staging: 2, production: 3, other: 4 };
+
+/**
+ * Entornos de un proyecto con su ÚLTIMO despliegue (vista de Entornos).
+ *
+ * GOTCHA verificado contra la instancia: `GET /environments` NO devuelve `last_deployment` (solo el
+ * detalle por entorno lo trae). En vez de N llamadas al detalle, una a `/deployments?environment=`
+ * por entorno: mismo coste y además deja filtrar el ruido de `skipped` (ramas feature que disparan
+ * el job de deploy pero no despliegan nada).
+ *
+ * Coste: 1 + M llamadas por proyecto (M = entornos), las M en paralelo. Pensado para refresco bajo
+ * demanda, NO para el poll. NO lanza por entorno: un fallo deja ese entorno sin deploy, no tumba la fila.
+ */
+async function projectEnvironments(projectId) {
+  const id = proj(String(projectId));
+  const envs = await api("GET", `/projects/${id}/environments?states=available&per_page=100`);
+  const out = await Promise.all(
+    (envs || []).map(async (e) => {
+      let deployment = null;
+      try {
+        const ds = await api(
+          "GET",
+          `/projects/${id}/deployments?environment=${encodeURIComponent(e.name)}&order_by=created_at&sort=desc&per_page=5`,
+        );
+        // El más reciente que de verdad desplegó; si todos fueron skipped, nos quedamos con el primero
+        // para no mentir diciendo "sin despliegues".
+        const d = (ds || []).find((x) => x.status !== "skipped") || (ds || [])[0];
+        if (d) {
+          deployment = {
+            status: d.status, // created|running|success|failed|canceled|blocked|skipped
+            ref: d.ref || null,
+            sha: d.sha ? String(d.sha).slice(0, 8) : null,
+            createdAt: d.created_at || null,
+            user: d.user?.name || null,
+            pipelineUrl: d.deployable?.pipeline?.web_url || null,
+          };
+        }
+      } catch {
+        deployment = null;
+      }
+      return {
+        name: e.name,
+        tier: e.tier || "other",
+        state: e.state,
+        externalUrl: e.external_url || null,
+        webUrl: e.project?.web_url ? `${e.project.web_url}/-/environments/${e.id}` : null,
+        deployment,
+      };
+    }),
+  );
+  return out.sort((a, b) => (TIER_RANK[a.tier] ?? 9) - (TIER_RANK[b.tier] ?? 9) || a.name.localeCompare(b.name));
 }
 
 /**
@@ -1391,6 +1447,7 @@ module.exports = {
   nextReleaseTag,
   createReleases,
   releaseStatus,
+  projectEnvironments,
   releasePipeline,
   playJob,
   createSnippet,

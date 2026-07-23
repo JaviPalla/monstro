@@ -1772,3 +1772,87 @@ body[data-ui-theme="liquid-glass"] .toast {
     -webkit-backdrop-filter: blur(20px) saturate(180%);
   }
 }
+
+/* ── Vista de Entornos (solo GitLab): matriz proyecto × entorno ────────────────────────────────
+   Cada celda combina las dos señales: el recuadro = último despliegue (capa 1, GitLab), el punto
+   de la derecha = sonda HTTP del external_url (capa 2). El punto solo aparece si hay URL. */
+.sec-entornos { color: var(--green); }
+
+.env-filters { flex-direction: column; align-items: stretch; gap: 10px; }
+.env-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.env-legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); }
+.env-legend .env-key { font-weight: 700; margin-left: 6px; }
+.env-legend .env-key.ok { color: var(--green); }
+.env-legend .env-key.stale { color: var(--yellow); }
+.env-legend .env-key.err { color: var(--red); }
+.env-legend .env-health { margin-left: 6px; }
+.env-sep { opacity: 0.5; margin: 0 2px; }
+
+.env-table { width: 100%; border-collapse: separate; border-spacing: 6px; }
+.env-table th.env-col, .env-cell { max-width: 210px; }
+.env-table th.env-col {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+  color: var(--text-muted); text-align: center; padding-bottom: 2px; white-space: nowrap;
+}
+.env-table th.env-proj {
+  display: flex; align-items: center; gap: 7px; text-align: left; font-size: 13px; font-weight: 600;
+  min-width: 190px; padding-right: 8px;
+}
+.env-proj-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.env-cell { padding: 0; }
+.env-cell.empty { background: none; }
+
+/* El recuadro es un botón: abre la pipeline del deploy (o la URL del entorno si no hay). */
+.env-box {
+  display: flex; flex-direction: column; gap: 3px;
+  width: 100%; min-height: 44px; padding: 6px 9px; font: inherit; text-align: left; cursor: pointer;
+  color: var(--text); background: var(--bg-raised);
+  border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 8px;
+}
+.env-box-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.env-box-bot { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.env-box:disabled { cursor: default; opacity: 0.6; }
+.env-box:not(:disabled):hover { border-color: var(--accent); }
+.env-box.ok { border-left-color: var(--green); background: var(--green-bg); }
+.env-box.stale { border-left-color: var(--yellow); background: var(--yellow-bg); }
+.env-box.err { border-left-color: var(--red); background: var(--red-bg); }
+.env-box.run { border-left-color: var(--accent); }
+/* Job manual pendiente: informa, pero apagado — no está pasando nada ahora mismo. */
+.env-box.waiting { border-left-color: var(--text-muted); opacity: 0.8; }
+.env-box.waiting .env-ico { color: var(--text-muted); }
+.env-box.none { opacity: 0.55; }
+.env-ico { font-weight: 700; font-size: 12px; }
+.env-box.ok .env-ico { color: var(--green); }
+.env-box.stale .env-ico { color: var(--yellow); }
+.env-box.err .env-ico { color: var(--red); }
+.env-box.run .env-ico { color: var(--accent); }
+.env-ref {
+  font-size: 11px; padding: 1px 5px; border-radius: 5px; background: rgba(127, 127, 127, 0.14);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
+  /* Un ref largo (features/400-…) ensanchaba toda la columna de la matriz. El tooltip lleva el completo. */
+  max-width: 170px;
+}
+.env-ref.muted { background: none; color: var(--text-muted); }
+.env-when { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+
+/* Punto de salud. `unknown` es ámbar a propósito: 200 con HTML NO es prueba de que la app esté
+   sana (una SPA sirve index.html en cualquier ruta), así que no se pinta verde. */
+.env-health { font-size: 12px; line-height: 1; }
+.env-health.up { color: var(--green); }
+.env-health.unknown { color: var(--yellow); }
+.env-health.down { color: var(--red); }
+.env-health.probing { color: var(--text-muted); opacity: 0.6; }
+
+.env-loading, .env-err { font-size: 12px; color: var(--text-muted); padding: 8px 4px; display: inline-block; }
+.env-err { color: var(--red); }
+
+/* Selector de proyectos plegable: el grupo tiene decenas de proyectos y la matriz es lo importante. */
+.env-picker > summary {
+  cursor: pointer; font-size: 13px; font-weight: 600; padding: 2px 0;
+  list-style: none; display: flex; align-items: center; gap: 8px;
+}
+.env-picker > summary::-webkit-details-marker { display: none; }
+.env-picker > summary::before { content: "▸"; font-size: 10px; color: var(--text-muted); transition: transform 0.15s; }
+.env-picker[open] > summary::before { transform: rotate(90deg); }
+.env-picker-n { font-weight: 400; color: var(--text-muted); font-size: 12px; }
+.env-picker .ms-proj-chips { margin-top: 10px; }

@@ -89,6 +89,8 @@ contextBridge.exposeInMainWorld("monstro", {
   releaseStatus: (projectId, ref) => ipcRenderer.invoke("releases:status", { projectId, ref }),
   releasePipeline: (projectId, ref) => ipcRenderer.invoke("releases:pipeline", { projectId, ref }),
   playReleaseJob: (projectId, jobId) => ipcRenderer.invoke("releases:playJob", { projectId, jobId }),
+  projectEnvironments: (projectId) => ipcRenderer.invoke("env:list", { projectId }),
+  envHealth: (url, project) => ipcRenderer.invoke("env:health", { url, project }),
   openExternal: (url) => ipcRenderer.invoke("shell:open", url),
   checkUpdates: () => ipcRenderer.invoke("update:check"),
   notify: (title, body) => ipcRenderer.invoke("notify", { title, body }),
