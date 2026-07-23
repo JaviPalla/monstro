@@ -120,6 +120,22 @@ function summaryEmailMarkdown(title, included) {
   return `# ${heading}\n\n${lines.join("\n")}\n`;
 }
 
+// Espeja el resumen en la descripción del milestone de GitLab: el contenido completo + el enlace
+// al snippet si ya se publicó. Es un espejo, no la fuente de verdad — manda el localStorage, así
+// que se re-escribe al generar y al publicar (que es cuando aparece el enlace). Fallo = solo aviso:
+// el resumen local sigue intacto y el siguiente intento lo vuelve a subir.
+async function syncSummaryToMilestone(title) {
+  const stored = loadSummary(title);
+  const included = (stored?.items || []).filter((it) => it.included);
+  if (!included.length) return;
+  const link = stored.snippetUrl ? `> ${t("Enlace para compartir:")} ${stored.snippetUrl}\n\n` : "";
+  try {
+    await window.monstro.saveMilestoneSummary(title, link + summaryEmailMarkdown(title, included));
+  } catch (err) {
+    toast(`${t("Resumen guardado en local, pero no en el milestone:")} ${String(err.message || err)}`, "err");
+  }
+}
+
 // Vista (HTML) de la sub-pestaña Resumen. Estado: cargando IA / sin generar / generado.
 function milestoneSummaryHtml() {
   const m = state.milestones;
@@ -253,6 +269,7 @@ async function generateMilestoneSummary(title) {
       })),
     };
     saveSummary(title, stored);
+    if (!IS_SELFTEST) await syncSummaryToMilestone(title); // espejo en GitLab (no escribe en selftest)
   } catch (err) {
     toast(`${t("Error generando el resumen:")} ${String(err.message || err)}`, "err");
   } finally {
@@ -398,6 +415,12 @@ function wireMilestoneSummary() {
     btn.textContent = t("Publicando…");
     try {
       const { url } = await window.monstro.publishMilestoneSnippet(`${t("Novedades —")} ${title}`, markdown);
+      // Guarda el enlace y re-espeja el milestone: así su descripción queda con el contenido YA
+      // editado (titulares, orden, incluidas) más el enlace al snippet recién creado.
+      const fresh = loadSummary(title) || stored;
+      fresh.snippetUrl = url;
+      saveSummary(title, fresh);
+      await syncSummaryToMilestone(title);
       copyText(url);
       toast(t("Snippet publicado · enlace copiado"), "ok");
       window.monstro.openExternal(url);

@@ -1311,6 +1311,37 @@ async function createSnippet({ title, contentMarkdown }) {
   return { url: snippet.web_url };
 }
 
+// Marcadores del bloque que gestiona Monstro dentro de la descripción del milestone: todo lo que
+// haya escrito una persona fuera de ellos se conserva; el bloque se reemplaza entero al regenerar.
+const SUMMARY_START = "<!-- monstro:summary:start -->";
+const SUMMARY_END = "<!-- monstro:summary:end -->";
+
+function mergeSummaryBlock(description, contentMarkdown) {
+  const block = `${SUMMARY_START}\n${contentMarkdown.trim()}\n${SUMMARY_END}`;
+  const start = description.indexOf(SUMMARY_START);
+  const end = description.indexOf(SUMMARY_END);
+  if (start === -1 || end === -1 || end < start) return description.trim() ? `${description.trim()}\n\n${block}\n` : `${block}\n`;
+  return `${description.slice(0, start)}${block}${description.slice(end + SUMMARY_END.length)}`;
+}
+
+/**
+ * Espeja el resumen (enlace al snippet + contenido) en la descripción del milestone de grupo.
+ * Resuelve el milestone por título en el backend (el renderer no manda ids) y hace el PUT sobre
+ * SU grupo, no sobre el configurado: con `include_ancestors=true` el milestone puede vivir en un
+ * grupo padre y el PUT al hijo daría 404. Solo GitLab.
+ */
+async function saveMilestoneSummary({ milestoneTitle, contentMarkdown }) {
+  const group = milestonesGroup();
+  if (!group) throw new Error("No hay grupo configurado para milestones (revisa repos o config.milestones.group).");
+  const ms = await apiAll(`/groups/${encodeURIComponent(group)}/milestones?state=active&include_ancestors=true`);
+  const found = ms.find((m) => m.title === milestoneTitle);
+  if (!found) throw new Error(`No se encontró el milestone "${milestoneTitle}" en el grupo ${group}.`);
+  const updated = await api("PUT", `/groups/${found.group_id}/milestones/${found.id}`, {
+    description: mergeSummaryBlock(found.description || "", contentMarkdown || ""),
+  });
+  return { url: updated.web_url };
+}
+
 module.exports = {
   resolveToken,
   invalidateTokenCache,
@@ -1363,4 +1394,6 @@ module.exports = {
   releasePipeline,
   playJob,
   createSnippet,
+  saveMilestoneSummary,
+  mergeSummaryBlock, // expuesto solo para scripts/test-summary-block.js
 };

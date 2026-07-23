@@ -667,17 +667,7 @@ body.is-mac .traffic-pad { display: block; width: 78px; }
 .ms-toggles .ms-counter { margin-left: auto; }
 .ms-toggles .icon-btn { margin-left: 0; }
 
-/* Sub-pestañas de la vista de milestones (Tareas | Resumen), bajo el rail. */
-.ms-tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
-.ms-tab {
-  background: transparent; border: none; color: var(--text-muted); cursor: pointer;
-  font-size: 13px; font-weight: 600; padding: 8px 14px; border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-.ms-tab:hover { color: var(--text); }
-.ms-tab.active { color: var(--text); border-bottom-color: var(--accent); }
-
-/* Sub-pestaña Resumen. */
+/* Vista Resumen del milestone (entrada de menú propia). */
 .ms-summary { display: flex; flex-direction: column; gap: 14px; }
 .ms-sum-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ms-sum-title { margin: 0; font-size: 16px; }

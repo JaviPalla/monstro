@@ -82,6 +82,7 @@ contextBridge.exposeInMainWorld("monstro", {
   updateIssue: (projectId, iid, patch) => ipcRenderer.invoke("issues:update", { projectId, iid, patch }),
   summarizeMilestone: (milestoneTitle, issues) => ipcRenderer.invoke("milestones:summary", { milestoneTitle, issues }),
   publishMilestoneSnippet: (title, contentMarkdown) => ipcRenderer.invoke("milestones:publishSnippet", { title, contentMarkdown }),
+  saveMilestoneSummary: (milestoneTitle, contentMarkdown) => ipcRenderer.invoke("milestones:saveSummary", { milestoneTitle, contentMarkdown }),
   releasesDefaults: () => ipcRenderer.invoke("releases:defaults"),
   generateReleaseBranches: (payload) => ipcRenderer.invoke("releases:generate", payload),
   createReleases: (payload) => ipcRenderer.invoke("releases:create", payload),

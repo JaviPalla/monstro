@@ -106,7 +106,7 @@ const MENU_SECTIONS = {
   prs:        { label: "Pull requests",      icon: "🔀", navId: "nav-prs-section",        buckets: ['[data-bucket="open"]', '[data-bucket="mine"]', '[data-bucket="review"]', '[data-bucket="draft"]'], gitlabOnly: false },
   historial:  { label: "Historial",          icon: "🗂️", navId: "nav-historial-section",  buckets: ['[data-bucket="merged"]', '[data-bucket="closed"]'], gitlabOnly: false },
   historico:  { label: "Histórico (grafo)",  icon: "🕸️", navId: "nav-repo-section",       buckets: ["#bucket-history"], gitlabOnly: false },
-  milestones: { label: "Tareas por persona", icon: "👥", navId: "nav-milestones-section", buckets: ["#bucket-milestones"], gitlabOnly: true },
+  milestones: { label: "Tareas por persona", icon: "👥", navId: "nav-milestones-section", buckets: ["#bucket-milestones", "#bucket-milestones-summary"], gitlabOnly: true },
   soporte:    { label: "Soporte",            icon: "🛟", navId: "nav-support-section",    buckets: ["#bucket-support", "#bucket-ops"], gitlabOnly: true },
   releases:   { label: "Releases",           icon: "🚀", navId: "nav-releases-section",   buckets: ["#bucket-releases", "#bucket-releases-publish", "#bucket-releases-pipelines"], gitlabOnly: true },
   local:      { label: "Trabajo local",      icon: "💻", navId: "nav-local-section",      buckets: ["#bucket-local-empezar", "#bucket-local-crear", "#bucket-local-vincular", "#bucket-local-historico"], gitlabOnly: true },

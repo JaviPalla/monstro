@@ -1,14 +1,15 @@
 "use strict";
 
-async function enterMilestones() {
+async function enterMilestones(tab = "tasks") {
   if (!isGitlab()) {
     toast(t("La vista de Milestones solo está disponible en GitLab"), "");
     return;
   }
   state.view = "milestones";
+  state.milestones.tab = tab;
   closeDetail();
   document.querySelectorAll(".bucket").forEach((b) => b.classList.remove("active"));
-  $("#bucket-milestones")?.classList.add("active");
+  $(tab === "summary" ? "#bucket-milestones-summary" : "#bucket-milestones")?.classList.add("active");
   await loadMilestones();
 }
 
@@ -460,13 +461,9 @@ function renderMilestones() {
     })
     .join("");
 
-  // Sub-pestañas (Tareas | Resumen): el rail se mantiene en ambas para poder cambiar de milestone.
+  // Tareas o Resumen: son dos entradas de menú distintas (state.milestones.tab), pero comparten el
+  // rail de milestones para poder cambiar de milestone sin salir de la vista.
   const tab = m.tab === "summary" ? "summary" : "tasks";
-  const tabsHtml = `
-    <div class="ms-tabs">
-      <button class="ms-tab ${tab === "tasks" ? "active" : ""}" data-mstab="tasks">${t("Tareas")}</button>
-      <button class="ms-tab ${tab === "summary" ? "active" : ""}" data-mstab="summary">${t("Resumen")}</button>
-    </div>`;
 
   const tasksBodyHtml = `
     <div class="ms-filters">
@@ -490,17 +487,7 @@ function renderMilestones() {
 
   list.innerHTML = `
     <div class="ms-rail">${railHtml || `<span class="muted">${t("Sin milestones activos")}</span>`}</div>
-    ${tabsHtml}
     ${tab === "summary" ? milestoneSummaryHtml() : tasksBodyHtml}`;
-
-  list.querySelectorAll(".ms-tab").forEach((btn) =>
-    btn.addEventListener("click", () => {
-      const next = btn.dataset.mstab;
-      if (m.tab === next) return;
-      m.tab = next;
-      renderMilestones();
-    }),
-  );
 
   // Clic en una tarjeta del rail = ver ese milestone (además de ser drop target para mover issues).
   list.querySelectorAll(".ms-drop-ms").forEach((item) =>

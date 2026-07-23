@@ -129,7 +129,7 @@ async function boot() {
   }
   if (IS_SELFTEST && SELFTEST_ROUTE === "history") enterHistory();
   if (IS_SELFTEST && SELFTEST_ROUTE === "merged") switchBucket("merged");
-  if (IS_SELFTEST && SELFTEST_ROUTE === "milestones") enterMilestones();
+  if (IS_SELFTEST && SELFTEST_ROUTE === "milestones") enterMilestones("tasks");
   if (IS_SELFTEST && SELFTEST_ROUTE === "support") enterSupport("incidencias");
   if (IS_SELFTEST && SELFTEST_ROUTE === "ops") enterSupport("operaciones");
   if (IS_SELFTEST && SELFTEST_ROUTE === "milestones-summary") runMilestonesSummarySelftest();
@@ -332,15 +332,14 @@ async function runLocalAgentsSelftest() {
   }
 }
 
-// Selftest E2E del resumen: abre Milestones, cambia a la pestaña Resumen, dispara la generación
-// con IA (real) y solo captura cuando termina. Bloquea el notify automático de renderMilestones
-// poniendo selftestNotified=true hasta que el resumen está pintado.
+// Selftest E2E del resumen: abre Milestones · Resumen, dispara la generación con IA (real) y solo
+// captura cuando termina. Bloquea el notify automático de renderMilestones poniendo
+// selftestNotified=true hasta que el resumen está pintado.
 async function runMilestonesSummarySelftest() {
   state.selftestNotified = true; // suprime el notify temprano del board/loading
   try {
-    await enterMilestones();
+    await enterMilestones("summary");
     const m = state.milestones;
-    m.tab = "summary";
     await ensureProjects(); // iconos de proyecto listos para la captura
     // Reutiliza el resumen ya persistido si existe (no re-gasta tokens al repetir el selftest).
     if (m.selectedTitle && !loadSummary(m.selectedTitle)) await generateMilestoneSummary(m.selectedTitle);
@@ -376,7 +375,8 @@ document.querySelectorAll(".bucket[data-bucket]").forEach((btn) =>
   btn.addEventListener("click", () => switchBucket(btn.dataset.bucket)),
 );
 $("#bucket-history").addEventListener("click", enterHistory);
-$("#bucket-milestones").addEventListener("click", enterMilestones);
+$("#bucket-milestones").addEventListener("click", () => enterMilestones("tasks"));
+$("#bucket-milestones-summary").addEventListener("click", () => enterMilestones("summary"));
 $("#bucket-support").addEventListener("click", () => enterSupport("incidencias"));
 $("#bucket-ops").addEventListener("click", () => enterSupport("operaciones"));
 $("#bucket-releases").addEventListener("click", () => enterReleases("branches"));
@@ -398,7 +398,8 @@ function paletteEntries() {
     });
   }
   if (sectionEnabled("historico")) entries.push({ label: t("Ir a: Histórico"), hint: t("grafo de ramas"), run: enterHistory });
-  if (sectionEnabled("milestones")) entries.push({ label: t("Ir a: Milestones"), hint: t("tareas por persona"), run: enterMilestones });
+  if (sectionEnabled("milestones")) entries.push({ label: t("Ir a: Milestones"), hint: t("tareas por persona"), run: () => enterMilestones("tasks") });
+  if (sectionEnabled("milestones")) entries.push({ label: t("Ir a: Milestones · Resumen"), hint: t("resumen del milestone"), run: () => enterMilestones("summary") });
   if (sectionEnabled("soporte")) entries.push({ label: t("Ir a: Support"), hint: t("tareas por persona"), run: () => enterSupport("incidencias") });
   if (sectionEnabled("soporte")) entries.push({ label: t("Ir a: Ops"), hint: t("tareas por persona"), run: () => enterSupport("operaciones") });
   if (sectionEnabled("releases")) entries.push({ label: t("Ir a: Releases · Ramas"), hint: t("generar release branches"), run: () => enterReleases("branches") });
@@ -430,7 +431,7 @@ function firstAvailableLanding() {
     ["prs", () => switchBucket("open")],
     ["historial", () => switchBucket("merged")],
     ["historico", () => enterHistory()],
-    ["milestones", () => enterMilestones()],
+    ["milestones", () => enterMilestones("tasks")],
     ["soporte", () => enterSupport("incidencias")],
     ["releases", () => enterReleases("branches")],
     ["local", () => enterLocal("empezar")],

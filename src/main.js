@@ -600,6 +600,15 @@ function wireIpc() {
     gh().createSnippet({ title, contentMarkdown }),
   );
 
+  ipcMain.handle("milestones:saveSummary", async (_event, { milestoneTitle, contentMarkdown }) => {
+    if (typeof milestoneTitle !== "string" || !milestoneTitle.trim()) throw new Error("Milestone inválido.");
+    if (typeof contentMarkdown !== "string" || !contentMarkdown.trim()) throw new Error("Resumen vacío.");
+    // El resumen acaba en la descripción de un milestone compartido: cap defensivo por si un
+    // milestone gigante genera un markdown desmedido (GitLab lo rechazaría con un 500 opaco).
+    if (contentMarkdown.length > 100000) throw new Error("El resumen es demasiado largo para la descripción del milestone.");
+    return gh().saveMilestoneSummary({ milestoneTitle: milestoneTitle.trim(), contentMarkdown });
+  });
+
   ipcMain.handle("releases:defaults", async () => gh().releaseDefaults());
   ipcMain.handle("releases:generate", async (_event, { version, sourceBranch, projects, ouicare }) => {
     const { branchPrefix, sourceBranch: defSource, ouicare: cfgOuicare } = await gh().releaseDefaults();

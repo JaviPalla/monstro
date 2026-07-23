@@ -459,6 +459,10 @@ async function createSnippet() {
   throw new Error("Publicar el resumen como snippet solo está disponible en GitLab.");
 }
 
+async function saveMilestoneSummary() {
+  throw new Error("Guardar el resumen en el milestone solo está disponible en GitLab.");
+}
+
 /**
  * Stubs de paridad: el flujo de Trabajo local (crear Issue + MR desde una rama local) es solo-GitLab
  * (la UI lo oculta cuando provider !== "gitlab"). Fallamos explícito en vez de en silencio.
@@ -576,6 +580,7 @@ module.exports = {
   releasePipeline,
   playJob,
   createSnippet,
+  saveMilestoneSummary,
   createIssue,
   createMergeRequest,
   createEpic,
