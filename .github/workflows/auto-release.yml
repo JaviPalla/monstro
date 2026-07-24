@@ -81,7 +81,10 @@ jobs:
           # [skip ci] por si algún día esto se pushea con un PAT: sin él, el commit de release
           # volvería a disparar este mismo workflow.
           git commit -am "chore(release): ${{ steps.calc.outputs.tag }} [skip ci]"
-          git tag "${{ steps.calc.outputs.tag }}"
+          # Tag ANOTADO a propósito: `--follow-tags` solo empuja tags anotados. Con uno
+          # lightweight el tag se quedaría en el runner y release.yml haría checkout de una ref
+          # inexistente (git fetch → exit 1). Anotado = viaja con el push.
+          git tag -a "${{ steps.calc.outputs.tag }}" -m "${{ steps.calc.outputs.tag }}"
           git push origin HEAD:main --follow-tags
 
   # Construye e implementa reutilizando release.yml: una sola definición del build.

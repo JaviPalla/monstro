@@ -29,7 +29,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -am "chore(release): v${{ inputs.version }} [skip ci]"
-          git tag "v${{ inputs.version }}"
+          # Tag ANOTADO: `--follow-tags` solo empuja los anotados. Uno lightweight no viajaría
+          # con el push y release.yml haría checkout de una ref inexistente (git fetch → exit 1).
+          git tag -a "v${{ inputs.version }}" -m "v${{ inputs.version }}"
           git push origin main --follow-tags
 
   # Antes esto no existía: se daba por hecho que el push del tag dispararía release.yml, y NO lo
