@@ -11,12 +11,12 @@ function renderRepoSelect() {
     .join("");
 }
 
-/** Aplica el tema de sintaxis al <body> (lo consume styles.css vía [data-syntax-theme]). */
+/** Aplica el tema de sintaxis al <body> (lo consume css/prs.css vía [data-syntax-theme]). */
 function applyTheme(theme) {
   document.body.dataset.syntaxTheme = theme || "one-dark";
 }
 
-/** Aplica el tema visual de interfaz al <body> (lo consume styles.css vía [data-ui-theme]). */
+/** Aplica el tema visual de interfaz al <body> (lo consume css/theme-glass.css vía [data-ui-theme]). */
 function applyUiTheme(uiTheme) {
   document.body.dataset.uiTheme = uiTheme || "default";
 }

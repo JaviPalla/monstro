@@ -1,0 +1,37 @@
+/* vista de histórico (el algoritmo de carriles vive en renderer/graph.js) */
+/* ---------- histórico ---------- */
+.history-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.branch-chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.branch-chip {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+  color: var(--text-muted); background: var(--gray-bg);
+  border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; cursor: pointer;
+}
+.branch-chip.on { color: var(--branch-text); background: var(--branch-bg); border-color: var(--branch-text); }
+.graph-wrap {
+  display: flex; background: var(--bg-raised);
+  border: 1px solid var(--border); border-radius: 12px; overflow-x: auto;
+}
+.graph-svg { flex-shrink: 0; }
+.graph-rows { flex: 1; min-width: 0; }
+.graph-row {
+  display: flex; align-items: center; gap: 8px;
+  height: 38px; padding: 0 12px; cursor: pointer;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+}
+.graph-row:hover { background: var(--bg-hover); }
+.graph-row.selected { background: var(--branch-bg); }
+.graph-msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.graph-meta { margin-left: auto; flex-shrink: 0; font-size: 11px; color: var(--text-muted); }
+.graph-meta code { font-size: 10.5px; }
+.ref-pill { flex-shrink: 0; }
+.pr-pill {
+  flex-shrink: 0; font: inherit; font-size: 11px; font-weight: 600;
+  color: var(--purple); background: var(--purple-bg);
+  border: none; border-radius: 999px; padding: 2px 8px; cursor: pointer;
+}
+.modal-input {
+  font: inherit; color: var(--text); background: var(--gray-bg);
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
+}
+

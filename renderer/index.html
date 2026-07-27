@@ -6,7 +6,17 @@
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src https: data:; font-src 'self'" />
   <title>Monstro</title>
-  <link rel="stylesheet" href="styles.css" />
+  <!-- El orden importa: es el mismo en el que estaban las secciones del CSS original y la cascada depende de él. -->
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/prs.css" />
+  <link rel="stylesheet" href="css/history.css" />
+  <link rel="stylesheet" href="css/milestones.css" />
+  <link rel="stylesheet" href="css/onboarding.css" />
+  <link rel="stylesheet" href="css/widgets.css" />
+  <link rel="stylesheet" href="css/releases.css" />
+  <link rel="stylesheet" href="css/local.css" />
+  <link rel="stylesheet" href="css/theme-glass.css" />
+  <link rel="stylesheet" href="css/environments.css" />
 </head>
 <body>
   <div id="splash">
@@ -113,6 +123,12 @@
   <script src="app/support.js"></script>
   <script src="app/releases.js"></script>
   <script src="app/local.js"></script>
+  <script src="app/local-history.js"></script>
+  <script src="app/local-render.js"></script>
+  <script src="app/local-form.js"></script>
+  <script src="app/local-link.js"></script>
+  <script src="app/local-start.js"></script>
+  <script src="app/local-runs.js"></script>
   <script src="app/releases-publish.js"></script>
   <script src="app/releases-pipelines.js"></script>
   <script src="app/environments.js"></script>

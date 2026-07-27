@@ -1,0 +1,136 @@
+/* releases: generar ramas, publicar tag+release, pipelines */
+/* ---------- releases (generar release branches) ---------- */
+.dot-release { background: linear-gradient(135deg, var(--orange, #bf8700), var(--red)); }
+.rel-view { max-width: 720px; margin: 0 auto; padding: 8px 4px 40px; }
+.rel-field-full { margin: 4px 0 8px; }
+.rel-field-full textarea { resize: vertical; width: 100%; }
+/* Estado por release: pipeline + entornos */
+.rel-pipe { font-weight: 700; margin-right: 2px; }
+.rel-pipe.ok { color: var(--green); }
+.rel-pipe.err { color: var(--red); }
+.rel-pipe.pending { color: var(--yellow); }
+.rel-pipe.muted { color: var(--text-muted); }
+.rel-envs { display: inline-flex; gap: 4px; margin-left: 6px; }
+.rel-env {
+  font-size: 11px; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border); color: var(--text-muted);
+}
+.rel-env.up { border-color: var(--green); color: var(--green); }
+.rel-head h2 { margin-bottom: 4px; }
+.rel-sub { color: var(--text-muted); font-size: 13px; line-height: 1.5; }
+.rel-view code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+  background: var(--gray-bg); padding: 1px 5px; border-radius: 5px;
+}
+.rel-form {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px;
+  align-items: end; margin: 18px 0 8px;
+}
+.rel-field { display: flex; flex-direction: column; gap: 5px; }
+.rel-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.rel-field input[type="text"] {
+  font: inherit; color: var(--text); background: var(--gray-bg);
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; width: 100%;
+}
+.rel-field input:focus { outline: none; border-color: var(--accent); }
+.rel-variant { grid-column: 1 / -1; }
+.rel-variant-btns { display: flex; gap: 6px; }
+.rel-variant-btns .btn { flex: 1; padding: 8px 10px; }
+.rel-preview-box { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; }
+.rel-branch-preview { font-size: 13px !important; font-weight: 600; }
+.rel-branch-preview.invalid { color: var(--red); background: var(--red-bg); }
+
+.rel-projects-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 22px 0 8px; font-weight: 600; font-size: 13px;
+}
+.rel-count { color: var(--text-muted); font-weight: 500; margin-left: 4px; }
+/* Selector de proyectos: chips reutilizando .ms-proj-filter / .ms-proj-chip del filtro del resumen. */
+.rel-projects { margin-bottom: 4px; }
+
+/* AppDate de Ouicare (solo si Ouicare está seleccionado). */
+.rel-appdate {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
+  margin: 16px 0 4px; padding: 10px 12px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--yellow-bg);
+}
+.rel-appdate-toggle { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.rel-appdate-toggle input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+.rel-appdate input[type="date"] {
+  font: inherit; color: var(--text); background: var(--bg-raised);
+  border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px;
+}
+.rel-appdate .muted { flex-basis: 100%; }
+
+.rel-summary { margin: 18px 0 4px; padding: 10px 12px; border-radius: 9px; font-size: 13px; border: 1px solid var(--border); }
+.rel-summary.ok { background: var(--green-bg); border-color: var(--green); }
+.rel-summary.warn { background: var(--yellow-bg); border-color: var(--yellow); }
+.rel-summary.err { background: var(--red-bg); border-color: var(--red); }
+.rel-results { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; font-size: 13px; }
+.rel-res-row.ok { color: var(--green); }
+.rel-res-row.err { color: var(--red); }
+.rel-res-row a { color: var(--accent); margin-left: 6px; }
+.rel-actions { margin-top: 22px; }
+
+.rel-confirm-list { margin: 10px 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+.rel-confirm-notes { margin: 8px 0; display: flex; flex-direction: column; gap: 6px; }
+.rel-confirm-note { font-size: 12px; color: var(--text); background: var(--yellow-bg); padding: 6px 9px; border-radius: 7px; }
+
+/* Estado de pipeline/entornos (Publicar) + tarjetas de resultado (OPE-25). */
+.rel-pipe { font-weight: 700; }
+.rel-pipe.ok { color: var(--green); }
+.rel-pipe.err { color: var(--red); }
+.rel-pipe.pending { color: var(--yellow); }
+.rel-pipe.muted { color: var(--text-muted); }
+.rel-env { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); }
+.rel-env.up { border-color: var(--green); color: var(--green); }
+.rel-envs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+
+.rel-pub-cards { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.rel-pub-card { padding: 10px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--bg-raised); font-size: 13px; }
+.rel-pub-card.err { border-color: var(--red); color: var(--red); }
+.rel-pub-cardtop { display: flex; align-items: center; gap: 8px; }
+.rel-pub-name { color: var(--text); }
+.rel-pub-tag { font-size: 12px; }
+.rel-pub-cardbtns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.rel-pub-btn {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;
+  padding: 4px 10px; border-radius: 7px; border: 1px solid var(--border); color: var(--text); text-decoration: none;
+}
+.rel-pub-btn:hover { border-color: var(--accent); background: var(--bg-hover); }
+.rel-pub-btn.pipe { border-color: var(--accent); color: var(--accent); }
+.rel-pub-pending { font-size: 12px; }
+.rel-pub-cta { margin-top: 12px; }
+
+/* Vista Pipelines de despliegue (tablero por proyecto). */
+.rel-pl-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin-top: 12px; }
+.rel-pl-card { padding: 12px 14px; border-radius: 11px; border: 1px solid var(--border); background: var(--bg-raised); }
+.rel-pl-cardhead { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 8px; }
+.rel-pl-projname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rel-pl-relrow { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.rel-pl-rel { font: inherit; font-size: 12px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 4px 7px; max-width: 100%; }
+.rel-pl-pipehead { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 8px; }
+.rel-pl-state { color: var(--text-muted); font-size: 12px; }
+.rel-pl-pipelink { margin-left: auto; color: var(--accent); font-size: 12px; cursor: pointer; }
+.rel-pl-empty, .rel-pl-loading { font-size: 13px; padding: 4px 0; }
+.rel-pl-loading { animation: loading-pulse 1.3s ease-in-out infinite; }
+.rel-stages { display: flex; flex-direction: column; gap: 8px; }
+.rel-stage-name { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 3px; }
+.rel-stage-jobs { display: flex; flex-direction: column; gap: 3px; }
+.rel-job { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
+.rel-job-ico { width: 14px; text-align: center; font-weight: 700; }
+.rel-job.ok .rel-job-ico { color: var(--green); }
+.rel-job.err .rel-job-ico { color: var(--red); }
+.rel-job.pending .rel-job-ico { color: var(--yellow); }
+.rel-job.manual .rel-job-ico { color: var(--accent); }
+.rel-job.muted .rel-job-ico { color: var(--text-muted); }
+.rel-job-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rel-job-play {
+  font: inherit; font-size: 11px; cursor: pointer; padding: 1px 7px; border-radius: 6px;
+  border: 1px solid var(--accent); color: var(--accent); background: transparent;
+}
+.rel-job-play:hover:not(:disabled) { background: var(--accent); color: #fff; }
+.rel-job-play:disabled { opacity: 0.5; cursor: default; }
+.rel-job-log { font-size: 11px; color: var(--text-muted); cursor: pointer; text-decoration: none; }
+.rel-job-log:hover { color: var(--accent); }
+
+/* ============ Trabajo local → GitLab (OPE-19) ============ */
