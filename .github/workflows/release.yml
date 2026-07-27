@@ -46,6 +46,7 @@ jobs:
             # propósito: en macOS el update in-place es imposible con firma ad-hoc — src/updater.js.
             files: |
               dist/*.exe
+              dist/*.exe.blockmap
               dist/latest.yml
     runs-on: ${{ matrix.os }}
     env:
@@ -84,6 +85,26 @@ jobs:
           # Para firma+notarización real, añade los secrets CSC_LINK/CSC_KEY_PASSWORD
           # y APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID y quita esta línea.
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      # El CI en verde NO prueba que el auto-update funcione: electron-updater descarga el asset
+      # cuyo nombre pone `path:` en latest.yml, y si no existe da 404 y el update falla en
+      # silencio. Pasó con el artifactName por defecto de NSIS ("Monstro Setup 0.5.0.exe"):
+      # electron-builder escribe los espacios como guiones en el yml y GitHub los sube como
+      # puntos, así que los tres nombres eran distintos. Con `nsis.artifactName` sin espacios
+      # coinciden; este guard es para enterarnos aquí y no en la máquina del usuario.
+      - name: Comprobar que latest.yml apunta al .exe real
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          node -e "
+          const fs = require('fs');
+          const p = (fs.readFileSync('dist/latest.yml', 'utf8').match(/^path: (.+)$/m) || [])[1];
+          if (!p) throw new Error('latest.yml sin campo path');
+          if (!fs.existsSync('dist/' + p.trim())) {
+            throw new Error('latest.yml apunta a ' + p.trim() + ', que no existe. En dist/: ' + fs.readdirSync('dist').join(', '));
+          }
+          console.log('latest.yml -> ' + p.trim() + ' OK');
+          "
 
       - uses: actions/upload-artifact@v4
         with:
