@@ -28,9 +28,13 @@
 const fs = require("fs");
 const path = require("path");
 const { Readable } = require("stream");
-const { app, shell } = require("electron");
 const { isNewer } = require("./version");
 const pkg = require("../package.json");
+
+// electron se requiere DENTRO de las funciones que lo usan, no arriba: así el self-check del
+// final corre con node pelado y sin node_modules, que es como lo ejecuta el CI (el job de
+// versión no hace `npm ci` a propósito). Con el require arriba, MODULE_NOT_FOUND.
+const electron = () => require("electron");
 
 const REPO = (String(pkg.repository?.url || "").match(/github\.com[/:]([^/]+\/[^/.]+)/) || [])[1] || null;
 
@@ -75,7 +79,7 @@ async function latestRelease() {
 
 /** Solo informa: no descarga ni instala nada. Contrato estable, lo consume el toast de arranque. */
 async function check() {
-  const current = app.getVersion();
+  const current = electron().app.getVersion();
   try {
     const json = await latestRelease();
     const latest = String(json.tag_name || "").replace(/^v/, "");
@@ -128,6 +132,7 @@ async function download(url, dest, expectedSize, onProgress) {
 }
 
 async function installMac(onProgress) {
+  const { app, shell } = electron();
   const json = await latestRelease();
   const asset = pickMacAsset(json.assets);
   if (!asset) {

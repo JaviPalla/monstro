@@ -66,11 +66,13 @@ jobs:
       # Guard mínimo para no publicar a ciegas. Solo los tests que son node puro (sin electron ni
       # red): así no hace falta `npm ci` aquí — son 2 segundos frente a los ~20 min del build.
       # `npm test` NO sirve en CI: lanza Electron contra la API real y necesita token y pantalla.
-      # `npm run test:unit` y no la lista a mano: se habían desincronizado ya una vez (el script
-      # tenía test-summary-block y esto no). Todos son node puro, así que sigue sin hacer falta npm ci.
+      # `test:nodeps` y NO `test:unit`: aquí no hay `npm ci`, así que solo pueden correr los tests
+      # que no requieren electron ni red. test-summary-block sí lo requiere (arrastra gitlab.js →
+      # config.js → electron) y por eso queda fuera. El nombre del script es el recordatorio: si
+      # algún día se "unifica" con test:unit, este job vuelve a morir con MODULE_NOT_FOUND.
       - name: Tests unitarios
         if: steps.calc.outputs.release == 'true'
-        run: npm run test:unit
+        run: npm run test:nodeps
 
       - name: Bump + tag
         if: steps.calc.outputs.release == 'true'
