@@ -25,10 +25,12 @@ jobs:
       - name: Bump version + tag
         run: |
           set -e
-          npm version "${{ inputs.version }}" --no-git-tag-version
+          npm version "${{ inputs.version }}" --no-git-tag-version --allow-same-version
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -am "chore(release): v${{ inputs.version }} [skip ci]"
+          # `|| true`: reetiquetar la versión que ya hay en package.json es legítimo (el tag se
+          # perdió, el commit no) y sin esto `git commit` sale 1 y `set -e` mata el job.
+          git commit -am "chore(release): v${{ inputs.version }} [skip ci]" || echo "package.json ya estaba en esta versión: solo etiquetamos."
           # Tag ANOTADO: `--follow-tags` solo empuja los anotados. Uno lightweight no viajaría
           # con el push y release.yml haría checkout de una ref inexistente (git fetch → exit 1).
           git tag -a "v${{ inputs.version }}" -m "v${{ inputs.version }}"

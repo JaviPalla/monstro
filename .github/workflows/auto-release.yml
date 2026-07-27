@@ -80,7 +80,12 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # [skip ci] por si algún día esto se pushea con un PAT: sin él, el commit de release
           # volvería a disparar este mismo workflow.
-          git commit -am "chore(release): ${{ steps.calc.outputs.tag }} [skip ci]"
+          # `|| true`: si package.json ya está en esa versión no hay diff y `git commit` sale 1,
+          # que con `set -e` mataba el step y dejaba la release sin tag NI build. Pasa en cuanto
+          # el tag y package.json divergen (p.ej. un run que commiteó el bump pero no empujó el
+          # tag): la versión actual se lee del tag, pero se persiste en package.json. El commit es
+          # opcional; el tag y el push son lo único imprescindible.
+          git commit -am "chore(release): ${{ steps.calc.outputs.tag }} [skip ci]" || echo "package.json ya estaba en esta versión: solo etiquetamos."
           # Tag ANOTADO a propósito: `--follow-tags` solo empuja tags anotados. Con uno
           # lightweight el tag se quedaría en el runner y release.yml haría checkout de una ref
           # inexistente (git fetch → exit 1). Anotado = viaja con el push.
