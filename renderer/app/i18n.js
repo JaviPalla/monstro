@@ -67,6 +67,13 @@ const I18N_EN = {
   "ahora": "now",
   "Copiado": "Copied",
   "Copiado para el correo": "Copied for email",
+  // --- actualización de la app ---
+  "✨ Versión nueva disponible: v{v} — pulsa para actualizar": "✨ New version available: v{v} — click to update",
+  "⬇️ Descargando v{v}…{extra}": "⬇️ Downloading v{v}…{extra}",
+  "✅ Actualizada — reiniciando…": "✅ Updated — restarting…",
+  "✅ v{v} descargada — arrástrala a Aplicaciones": "✅ v{v} downloaded — drag it to Applications",
+  "No se pudo actualizar: {e}": "Could not update: {e}",
+  "error desconocido": "unknown error",
 };
 
 // Cadenas de los módulos del renderer (generadas y fusionadas, OPE-24).

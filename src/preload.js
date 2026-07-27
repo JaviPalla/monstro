@@ -93,6 +93,13 @@ contextBridge.exposeInMainWorld("monstro", {
   envHealth: (url, project) => ipcRenderer.invoke("env:health", { url, project }),
   openExternal: (url) => ipcRenderer.invoke("shell:open", url),
   checkUpdates: () => ipcRenderer.invoke("update:check"),
+  installUpdate: () => ipcRenderer.invoke("update:install"),
+  // Progreso de la descarga del update (%). Devuelve un de-suscriptor.
+  onUpdateProgress: (cb) => {
+    const listener = (_e, percent) => cb(percent);
+    ipcRenderer.on("update:progress", listener);
+    return () => ipcRenderer.removeListener("update:progress", listener);
+  },
   notify: (title, body) => ipcRenderer.invoke("notify", { title, body }),
   dockBadge: (text) => ipcRenderer.invoke("dock:badge", text),
   selftestRenderComplete: () => ipcRenderer.send("selftest:render-complete"),

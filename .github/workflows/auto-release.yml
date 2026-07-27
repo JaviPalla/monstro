@@ -66,9 +66,11 @@ jobs:
       # Guard mínimo para no publicar a ciegas. Solo los tests que son node puro (sin electron ni
       # red): así no hace falta `npm ci` aquí — son 2 segundos frente a los ~20 min del build.
       # `npm test` NO sirve en CI: lanza Electron contra la API real y necesita token y pantalla.
+      # `npm run test:unit` y no la lista a mano: se habían desincronizado ya una vez (el script
+      # tenía test-summary-block y esto no). Todos son node puro, así que sigue sin hacer falta npm ci.
       - name: Tests unitarios
         if: steps.calc.outputs.release == 'true'
-        run: node scripts/test-health-verdict.js && node scripts/test-next-version.js
+        run: npm run test:unit
 
       - name: Bump + tag
         if: steps.calc.outputs.release == 'true'

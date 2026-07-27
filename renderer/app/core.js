@@ -151,7 +151,9 @@ function timeAgo(iso) {
   return t("ahora");
 }
 
-function toast(message, kind = "", onClick = null) {
+// Devuelve el elemento: `sticky` (para progreso en vivo, p.ej. la descarga de un update, que
+// puede durar más que el timeout) no se auto-borra y lo quita quien lo creó.
+function toast(message, kind = "", onClick = null, sticky = false) {
   const el = document.createElement("div");
   el.className = `toast ${kind}`;
   el.textContent = message;
@@ -160,7 +162,8 @@ function toast(message, kind = "", onClick = null) {
     el.addEventListener("click", onClick);
   }
   $("#toast-root").appendChild(el);
-  setTimeout(() => el.remove(), onClick ? 9000 : 4200);
+  if (!sticky) setTimeout(() => el.remove(), onClick ? 9000 : 4200);
+  return el;
 }
 
 function copyText(text) {

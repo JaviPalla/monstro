@@ -8,7 +8,7 @@
     "start": "electron .",
     "doctor": "node scripts/doctor.js",
     "test": "node scripts/selftest-all.js",
-    "test:unit": "node scripts/test-health-verdict.js && node scripts/test-next-version.js && node scripts/test-summary-block.js",
+    "test:unit": "node scripts/test-health-verdict.js && node scripts/test-next-version.js && node scripts/test-summary-block.js && node src/version.js && node src/updater.js",
     "selftest": "electron . --selftest",
     "icon": "electron scripts/make-icon.js",
     "dist": "electron-builder",
@@ -37,7 +37,8 @@
     "electron-builder": "^25.1.8"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.104.1"
+    "@anthropic-ai/sdk": "^0.104.1",
+    "electron-updater": "^6.8.9"
   },
   "build": {
     "appId": "com.javipalla.monstro",
@@ -52,6 +53,13 @@
       "output": "dist"
     },
     "afterPack": "scripts/adhoc-sign.js",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "JaviPalla",
+        "repo": "monstro"
+      }
+    ],
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [

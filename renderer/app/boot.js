@@ -21,6 +21,36 @@ function applyUiTheme(uiTheme) {
   document.body.dataset.uiTheme = uiTheme || "default";
 }
 
+let updating = false;
+/**
+ * Actualiza la app al pulsar el toast de versión nueva. Lo que pasa después depende de la
+ * plataforma y lo decide `src/updater.js`: en Windows instala y reinicia, en macOS baja el .dmg
+ * y lo abre (la firma ad-hoc impide el update in-place — el porqué está en ese módulo).
+ */
+async function startUpdate(info) {
+  if (updating) return; // el toast vive 9s: clicks de más no lanzan otra descarga
+  updating = true;
+  const label = (extra = "") => t("⬇️ Descargando v{v}…{extra}", { v: info.latest, extra });
+  const el = toast(label(), "", null, true);
+  const off = window.monstro.onUpdateProgress((p) => {
+    el.textContent = label(` ${p}%`);
+  });
+  try {
+    const r = await window.monstro.installUpdate();
+    if (!r?.ok) throw new Error(r.error || t("error desconocido"));
+    el.remove();
+    if (r.mode === "restart") toast(t("✅ Actualizada — reiniciando…"), "ok");
+    else if (r.mode === "dmg") toast(t("✅ v{v} descargada — arrástrala a Aplicaciones", { v: info.latest }), "ok");
+  } catch (err) {
+    el.remove();
+    // Con enlace a la release: si la descarga falla, al menos que pueda bajarla a mano.
+    toast(t("No se pudo actualizar: {e}", { e: String(err.message || err) }), "err", () => window.monstro.openExternal(info.url));
+  } finally {
+    off();
+    updating = false;
+  }
+}
+
 const SPLASH_AT = Date.now();
 function hideSplash() {
   const el = document.getElementById("splash");
@@ -121,10 +151,10 @@ async function boot() {
   await refresh();
   hideSplash();
   schedulePoll();
-  // Aviso de versión nueva al arrancar (solo informa; descarga manual). Click en el toast → release.
+  // Aviso de versión nueva al arrancar. Click en el toast → actualiza (ver startUpdate).
   if (!IS_SELFTEST && state.config.checkUpdates) {
     window.monstro.checkUpdates().then((r) => {
-      if (r?.newer) toast(t("✨ Versión nueva disponible: v{v} — pulsa para descargar", { v: r.latest }), "ok", () => window.monstro.openExternal(r.url));
+      if (r?.newer) toast(t("✨ Versión nueva disponible: v{v} — pulsa para actualizar", { v: r.latest }), "ok", () => startUpdate(r));
     }).catch(() => {});
   }
   if (IS_SELFTEST && SELFTEST_ROUTE === "history") enterHistory();

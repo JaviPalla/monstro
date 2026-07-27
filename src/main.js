@@ -12,8 +12,7 @@ const health = require("./health");
 const local = require("./local");
 const localHistory = require("./localhistory");
 const provider = require("./provider");
-const { isNewer } = require("./version");
-const pkg = require("../package.json");
+const updater = require("./updater");
 
 // Proveedor activo (GitHub o GitLab) según config; se resuelve en cada llamada.
 const gh = () => provider.current();
@@ -155,23 +154,24 @@ function wireIpc() {
     return { ...rest, hasManualToken: Boolean(token), systemLocale: app.getLocale(), appVersion: app.getVersion() };
   });
 
-  // Comprueba si hay una versión nueva en las Releases de GitHub (repo de la propia app, público,
-  // sin token: es independiente del proveedor configurado). No instala nada — solo informa + enlace.
-  ipcMain.handle("update:check", async () => {
-    const current = app.getVersion();
-    const m = String(pkg.repository?.url || "").match(/github\.com[/:]([^/]+\/[^/.]+)/);
-    if (!m) return { current, error: "repositorio desconocido" };
+  // Comprueba si hay una versión nueva en las Releases de GitHub. No instala nada — solo informa.
+  ipcMain.handle("update:check", () => updater.check());
+
+  // Actualizar (lo dispara el click en el toast de versión nueva). El renderer NO manda ninguna
+  // URL: solo pide "actualiza" y updater.js resuelve el asset contra la API del propio repo —
+  // descargar y abrir un binario jamás con una ruta que venga del renderer.
+  ipcMain.handle("update:install", async () => {
     try {
-      const res = await fetch(`https://api.github.com/repos/${m[1]}/releases/latest`, {
-        headers: { "User-Agent": "Monstro", Accept: "application/vnd.github+json" },
+      return await updater.install((percent) => {
+        if (!win || win.isDestroyed()) return;
+        // Barra de progreso nativa en el Dock/barra de tareas, gratis: el toast solo lleva el %.
+        win.setProgressBar(percent / 100);
+        win.webContents.send("update:progress", percent);
       });
-      if (!res.ok) return { current, error: `GitHub ${res.status}` };
-      const json = await res.json();
-      const latest = String(json.tag_name || "").replace(/^v/, "");
-      if (!latest) return { current, error: "sin releases publicadas" };
-      return { current, latest, url: json.html_url, newer: isNewer(latest, current) };
     } catch (err) {
-      return { current, error: String(err.message || err) };
+      return { ok: false, error: String(err.message || err) };
+    } finally {
+      if (win && !win.isDestroyed()) win.setProgressBar(-1);
     }
   });
 

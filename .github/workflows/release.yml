@@ -40,8 +40,13 @@ jobs:
           - os: windows-latest
             dist: dist:win
             artifact: windows
+            # latest.yml = metadata que electron-updater necesita para detectar la versión nueva
+            # (lo genera electron-builder por tener `build.publish` en package.json). Sin él, el
+            # auto-update de Windows no ve ninguna release. `latest-mac.yml` NO se publica a
+            # propósito: en macOS el update in-place es imposible con firma ad-hoc — src/updater.js.
             files: |
               dist/*.exe
+              dist/latest.yml
     runs-on: ${{ matrix.os }}
     env:
       # Tag efectivo: el que nos pasa auto-release.yml, o el del push del tag.
