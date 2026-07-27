@@ -71,7 +71,7 @@ const I18N_EN = {
   "✨ Versión nueva disponible: v{v} — pulsa para actualizar": "✨ New version available: v{v} — click to update",
   "⬇️ Descargando v{v}…{extra}": "⬇️ Downloading v{v}…{extra}",
   "✅ Actualizada — reiniciando…": "✅ Updated — restarting…",
-  "✅ v{v} descargada — arrástrala a Aplicaciones": "✅ v{v} downloaded — drag it to Applications",
+  "✅ v{v} descargada — cerrando Monstro, arrástrala a Aplicaciones": "✅ v{v} downloaded — quitting Monstro, drag it to Applications",
   "No se pudo actualizar: {e}": "Could not update: {e}",
   "error desconocido": "unknown error",
 };

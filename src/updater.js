@@ -148,6 +148,11 @@ async function installMac(onProgress) {
   // openPath y no openExternal: es una ruta local, y el Finder monta el .dmg.
   const err = await shell.openPath(dest);
   if (err) throw new Error(err);
+  // Y nos vamos: macOS no deja reemplazar una app EN EJECUCIÓN, así que con Monstro vivo el arrastre
+  // a Aplicaciones falla ("no se puede sustituir porque está abierta") justo después de haberse
+  // bajado 115 MB. El .dmg ya está montado por el Finder, que es otro proceso y sobrevive al quit.
+  // El margen es para que el invoke conteste y el renderer pinte el aviso (igual que installWindows).
+  setTimeout(() => app.quit(), 1200);
   return { ok: true, mode: "dmg", path: dest };
 }
 

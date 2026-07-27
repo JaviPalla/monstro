@@ -24,8 +24,9 @@ function applyUiTheme(uiTheme) {
 let updating = false;
 /**
  * Actualiza la app al pulsar el toast de versión nueva. Lo que pasa después depende de la
- * plataforma y lo decide `src/updater.js`: en Windows instala y reinicia, en macOS baja el .dmg
- * y lo abre (la firma ad-hoc impide el update in-place — el porqué está en ese módulo).
+ * plataforma y lo decide `src/updater.js`: en Windows instala y reinicia, en macOS baja el .dmg,
+ * lo abre y CIERRA la app (la firma ad-hoc impide el update in-place, y con Monstro abierta macOS
+ * no deja arrastrarla a Aplicaciones — el porqué está en ese módulo).
  */
 async function startUpdate(info) {
   if (updating) return; // el toast vive 9s: clicks de más no lanzan otra descarga
@@ -40,7 +41,7 @@ async function startUpdate(info) {
     if (!r?.ok) throw new Error(r.error || t("error desconocido"));
     el.remove();
     if (r.mode === "restart") toast(t("✅ Actualizada — reiniciando…"), "ok");
-    else if (r.mode === "dmg") toast(t("✅ v{v} descargada — arrástrala a Aplicaciones", { v: info.latest }), "ok");
+    else if (r.mode === "dmg") toast(t("✅ v{v} descargada — cerrando Monstro, arrástrala a Aplicaciones", { v: info.latest }), "ok");
   } catch (err) {
     el.remove();
     // Con enlace a la release: si la descarga falla, al menos que pueda bajarla a mano.

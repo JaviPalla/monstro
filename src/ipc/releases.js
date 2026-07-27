@@ -8,6 +8,8 @@ const provider = require("../provider");
 
 const gh = () => provider.current();
 
+const BRANCH_RE = /^[\w./-]{1,200}$/;
+
 function register() {
   ipcMain.handle("releases:defaults", async () => gh().releaseDefaults());
   ipcMain.handle("releases:generate", async (_event, { version, sourceBranch, projects, variant, ouicare }) => {
