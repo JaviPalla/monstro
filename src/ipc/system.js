@@ -3,7 +3,7 @@
 // Handlers IPC de sistema: abrir enlaces, notificaciones y badge del dock.
 // Se registran desde wireIpc() en src/main.js.
 
-const { app, ipcMain, Notification } = require("electron");
+const { app, ipcMain, Notification, shell } = require("electron");
 
 function register() {
   ipcMain.handle("shell:open", (_event, url) => {

@@ -81,11 +81,33 @@ for (const file of fs.readdirSync(ipcDir).filter((f) => f.endsWith(".js")).sort(
 // Un payload con TODAS las claves que usan los handlers, cada una con un valor que pasa las
 // validaciones de formato. Es lo que hace que la ejecución llegue hasta el fondo del handler en vez
 // de morir en el primer `throw` de validación — el BRANCH_RE que faltaba vivía justo detrás de uno.
+// Cada clave que falte aquí es un trozo de handler que no se ejecuta: `prepareLocalBranch` se
+// escapó de la primera versión de este check por no traer `projectPath`.
+const PROJECT = {
+  id: "grupo/proyecto",
+  name: "proyecto",
+  dir: "/tmp/monstro-check",
+  projectPath: "grupo/proyecto",
+  sourceBranch: "development",
+  targetBranch: "development",
+  newBranch: "feat/x",
+  commitMessage: "c",
+  title: "t",
+  push: false,
+};
+
 const PAYLOAD = {
   version: "072026",
   sourceBranch: "development",
-  projects: [{ id: "grupo/proyecto", name: "proyecto" }],
+  targetBranch: "development",
+  newBranch: "feat/x",
+  commitMessage: "c",
+  // Dos proyectos porque una Epic exige un mínimo de 2; cada uno trae a la vez las claves del
+  // formato {id,name} de releases y las de {dir,projectPath,…} de trabajo local.
+  projects: [PROJECT, { ...PROJECT, id: "grupo/otro", projectPath: "grupo/otro" }],
   projectId: "grupo/proyecto",
+  projectPath: "grupo/proyecto",
+  dir: "/tmp/monstro-check",
   variant: "both",
   base: "2026.07",
   ref: "rb/072026",
@@ -93,27 +115,53 @@ const PAYLOAD = {
   branch: "development",
   jobId: "1",
   milestones: ["2026.07"],
+  milestoneId: 1,
+  labels: ["l"],
+  checklist: ["c"],
   description: "d",
+  epicTitle: "epic",
+  epicDescription: "d",
   name: "n",
   repo: "grupo/proyecto",
   number: 1,
-  url: "https://example.invalid",
+  url: "https://example.invalid/x",
   path: "grupo/proyecto",
   body: "b",
   title: "t",
   id: "1",
+  push: false,
 };
+
+// Algunos handlers no reciben un objeto sino un escalar: `shell:open` toma la URL suelta y
+// cortocircuita en `typeof url === "string"`, así que con el objeto nunca llegaba a `shell`.
+const ARGS = [PAYLOAD, "https://example.invalid/x", undefined];
+
+// Los ReferenceError no siempre suben: los handlers que mutan N proyectos envuelven cada ítem en su
+// propio try/catch y devuelven `{ok:false, error}` (patrón de todo el repo, las mutaciones no son
+// atómicas). Ahí el bug viaja DENTRO del resultado, no como excepción — hay que mirar los dos sitios.
+function referenceErrorsIn(value, seen = new Set()) {
+  if (!value || typeof value !== "object" || seen.has(value)) return [];
+  seen.add(value);
+  const found = [];
+  for (const v of Object.values(value)) {
+    if (typeof v === "string" && /is not defined/.test(v)) found.push(v);
+    else found.push(...referenceErrorsIn(v, seen));
+  }
+  return found;
+}
 
 const bugs = [];
 let ran = 0;
 
 (async () => {
   for (const [channel, fn] of handlers) {
-    // Dos formas: el payload rico (llega al fondo) y sin argumentos (dispara los caminos de guarda).
-    for (const arg of [PAYLOAD, undefined]) {
+    // El payload rico llega al fondo, el escalar cubre los handlers de un solo argumento, y sin
+    // argumentos se recorren los caminos de guarda.
+    for (const arg of ARGS) {
       ran++;
       try {
-        await fn({}, arg);
+        const result = await fn({}, arg);
+        for (const msg of referenceErrorsIn(result)) bugs.push(`${channel}: ${msg} (tragado en el resultado)`);
       } catch (err) {
         if (err instanceof ReferenceError) bugs.push(`${channel}: ${err.message}`);
       }

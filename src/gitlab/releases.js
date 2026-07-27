@@ -178,29 +178,48 @@ async function releasePipeline(projectId, ref) {
     createdAt: r.released_at || r.created_at || null,
     webUrl: r._links?.self || null,
   }));
-  const tag = ref || releases[0]?.tag || null;
+  // Con `ref` explícito mandas tú (has elegido esa release en el selector). Sin él NO vale quedarse
+  // con la más reciente: hay proyectos cuyo CI publica una release por cada push a `rb/*` (tags
+  // `rama/timestamp` de release-cli) que no disparan pipeline ninguna, y como esas son siempre las
+  // más nuevas la vista se quedaba clavada en "esta release no tiene pipeline" para siempre.
+  // Probamos las siguientes hasta dar con una que sí tenga. Tope de 5: en el peor caso son 5
+  // llamadas y sobra para atravesar la racha de tags automáticos.
+  const candidates = ref ? [ref] : releases.slice(0, 5).map((r) => r.tag).filter(Boolean);
+  let tag = ref || releases[0]?.tag || null;
   let pipeline = null;
-  if (tag) {
-    try {
-      const pipes = await api("GET", `/projects/${id}/pipelines?ref=${encodeURIComponent(tag)}&per_page=1`);
-      const p = (pipes || [])[0];
-      if (p) {
-        const jobsRaw = await api("GET", `/projects/${id}/pipelines/${p.id}/jobs?per_page=100`).catch(() => []);
-        const jobs = (jobsRaw || []).map((j) => ({
-          id: j.id,
-          name: j.name,
-          stage: j.stage,
-          status: j.status, // GitLab raw (success/failed/manual/running/…): el renderer lo mapea a icono.
-          manual: j.status === "manual",
-          webUrl: j.web_url || null,
-        }));
-        pipeline = { id: p.id, state: mapPipeline({ status: p.status })?.state || "EXPECTED", webUrl: p.web_url || null, jobs };
-      }
-    } catch {
-      pipeline = null;
-    }
+  for (const candidate of candidates) {
+    const found = await pipelineFor(id, candidate);
+    if (!found) continue;
+    tag = candidate;
+    pipeline = found;
+    break;
   }
   return { releases, tag, pipeline };
+}
+
+/**
+ * La pipeline de un tag concreto con sus jobs, o null si no la hay. Devuelve null también si la
+ * llamada falla: un tag problemático no debe tumbar la fila entera — el llamante prueba el siguiente.
+ */
+async function pipelineFor(id, tag) {
+  if (!tag) return null;
+  try {
+    const pipes = await api("GET", `/projects/${id}/pipelines?ref=${encodeURIComponent(tag)}&per_page=1`);
+    const p = (pipes || [])[0];
+    if (!p) return null;
+    const jobsRaw = await api("GET", `/projects/${id}/pipelines/${p.id}/jobs?per_page=100`).catch(() => []);
+    const jobs = (jobsRaw || []).map((j) => ({
+      id: j.id,
+      name: j.name,
+      stage: j.stage,
+      status: j.status, // GitLab raw (success/failed/manual/running/…): el renderer lo mapea a icono.
+      manual: j.status === "manual",
+      webUrl: j.web_url || null,
+    }));
+    return { id: p.id, state: mapPipeline({ status: p.status })?.state || "EXPECTED", webUrl: p.web_url || null, jobs };
+  } catch {
+    return null;
+  }
 }
 
 /** Lanza un job manual de CI (▶). Devuelve el job actualizado. Solo GitLab. */

@@ -14,7 +14,7 @@ const provider = require("../provider");
 const gh = () => provider.current();
 
 function register(ctx) {
-  const { SELFTEST, localRootGuard } = ctx;
+  const { SELFTEST, localRootGuard, prepareLocalBranch } = ctx;
   ipcMain.handle("local:pickRoot", async () => {
     const res = await dialog.showOpenDialog(ctx.win, { properties: ["openDirectory"], title: "Directorio raíz de tus repos" });
     if (res.canceled || !res.filePaths[0]) return { rootDir: config.load().local.rootDir };

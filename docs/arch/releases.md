@@ -46,6 +46,8 @@ Selftest route `--selftest-route=releases` (60s timeout — `groupProjects` avat
 
 **Status panel**: after publishing, `startReleaseStatusPoll` calls `releaseStatus(projectId, tag)` per OK project (pipeline via `/pipelines?ref=<tag>` → `mapPipeline`; environments via `/environments`), polling every `pollSeconds` and **stopping when all pipelines hit a terminal state SUCCESS/FAILURE/ERROR or after ~20 ticks** (avoids endless polling when a project has no tag CI); a pipeline transitioning to FAILURE/ERROR fires **toast + OS `notify`** ONCE (detectAndNotify pattern), skipped under selftest.
 
+**Deploy pipelines tab** (`releasePipeline(projectId, ref)` → `releases-pipelines.js`): with an explicit `ref` the caller wins (you picked that release in the selector). **Without one it does NOT just take the newest release** — dashboard's CI publishes a release-cli tag (`rb/072026/<timestamp>`) on every push to `rb/*`, and those never trigger a pipeline, so the newest release is permanently pipeline-less and the tab was stuck on "esta release no tiene pipeline". It walks the **first 5** releases via `pipelineFor()` until one has a pipeline. A failing tag returns null rather than throwing, so the loop just moves on.
+
 **Validation** (`releases:create`/`releases:status`): `base` `^\d{4}\.\d{2}$`, `ref`/tag `BRANCH_RE`, project ids path-or-numeric, milestone titles sanitized; token perms are the real write boundary. GitHub stubs (`nextReleaseTag`/`createReleases`/`releaseStatus`) throw for parity.
 
 Selftest route `--selftest-route=releases-publish` (60s, calls `enterReleases("publish")`).
