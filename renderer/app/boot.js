@@ -168,6 +168,19 @@ async function boot() {
   if (IS_SELFTEST && SELFTEST_ROUTE === "releases-publish") enterReleases("publish");
   if (IS_SELFTEST && SELFTEST_ROUTE === "releases-pipelines") enterReleases("pipelines");
   if (IS_SELFTEST && SELFTEST_ROUTE === "entornos") enterEnvironments();
+  if (IS_SELFTEST && SELFTEST_ROUTE === "propuestas") enterProposals();
+  if (IS_SELFTEST && SELFTEST_ROUTE.startsWith("ajustes")) {
+    openSettings();
+    // La tarjeta de la bandeja queda muy por debajo del viewport y la captura solo ve lo visible.
+    if (SELFTEST_ROUTE === "ajustes-propuestas") {
+      $(".mail-help")?.setAttribute("open", "");
+      $(".mail-help")?.scrollIntoView({ block: "center" });
+    }
+    // Los toggles se pintan tras openSettings(), así que hay que esperar al frame siguiente.
+    if (SELFTEST_ROUTE === "ajustes-secciones") {
+      requestAnimationFrame(() => $("#settings-sections")?.lastElementChild?.scrollIntoView({ block: "center" }));
+    }
+  }
   if (IS_SELFTEST && SELFTEST_ROUTE === "local") runLocalSelftest();
   if (IS_SELFTEST && SELFTEST_ROUTE === "local-vincular") runLocalLinkSelftest();
   if (IS_SELFTEST && (SELFTEST_ROUTE === "local-historico" || SELFTEST_ROUTE === "local-historico-detail")) runLocalHistorySelftest();
@@ -410,6 +423,7 @@ $("#bucket-history").addEventListener("click", enterHistory);
 $("#bucket-milestones").addEventListener("click", () => enterMilestones("tasks"));
 $("#bucket-milestones-summary").addEventListener("click", () => enterMilestones("summary"));
 $("#bucket-entornos").addEventListener("click", () => enterEnvironments());
+$("#bucket-propuestas").addEventListener("click", () => enterProposals());
 $("#bucket-support").addEventListener("click", () => enterSupport("incidencias"));
 $("#bucket-ops").addEventListener("click", () => enterSupport("operaciones"));
 $("#bucket-releases").addEventListener("click", () => enterReleases("branches"));
@@ -443,6 +457,7 @@ function paletteEntries() {
   if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Crear tarea"), hint: t("Issue/Epic + MR desde local"), run: () => enterLocal("crear") });
   if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Vincular tarea"), hint: t("vincular local a una tarea existente"), run: () => enterLocal("vincular") });
   if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Histórico"), hint: t("trabajos creados desde Monstro"), run: () => enterLocal("historico") });
+  if (sectionEnabled("propuestas")) entries.push({ label: t("Ir a: Propuestas"), hint: t("correos de propuestas → Epic"), run: () => enterProposals() });
   const bucketSection = (b) => (["merged", "closed"].includes(b) ? "historial" : "prs");
   for (const [bucket, label] of [["open", t("Abiertas")], ["mine", t("Mías")], ["review", t("Para revisar")], ["draft", t("Borradores")], ["merged", t("Fusionadas")], ["closed", t("Cerradas")]]) {
     if (sectionEnabled(bucketSection(bucket))) entries.push({ label: t("Ir a: {label}", { label }), hint: t("bucket"), run: () => switchBucket(bucket) });
@@ -470,6 +485,7 @@ function firstAvailableLanding() {
     ["releases", () => enterReleases("branches")],
     ["entornos", () => enterEnvironments()],
     ["local", () => enterLocal("empezar")],
+    ["propuestas", () => enterProposals()],
   ];
   const found = order.find(([key]) => sectionEnabled(key));
   return found ? found[1] : null;

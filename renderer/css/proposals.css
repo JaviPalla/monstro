@@ -1,0 +1,74 @@
+/* Bandeja de propuestas: lista de correos y borrador de Epic. Reutiliza .btn/.lf-field/.empty. */
+
+.prop-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.prop-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.prop-subject {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.prop-preview {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* El código de device login se teclea a mano en otro dispositivo: grande y monoespaciado. */
+.prop-code {
+  font-family: ui-monospace, monospace;
+  font-size: 28px;
+  letter-spacing: 4px;
+  user-select: text;
+}
+
+/* Instrucciones de Azure en Ajustes: <details> nativo, sin JS de acordeón. */
+.mail-help {
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.mail-help summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+
+.mail-help ol {
+  margin: 10px 0 12px 20px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.mail-help li {
+  margin-bottom: 6px;
+}
+
+.prop-task {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.prop-task-title {
+  font-weight: 600;
+}
+
+.prop-check {
+  margin: 6px 0 0 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+}

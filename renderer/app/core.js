@@ -51,6 +51,9 @@ const state = {
   selftestNotified: false,
   selftestOpenedDetail: false,
   history: { branches: [], enabled: new Set(), layout: null, rows: [], loading: false, selectedOid: null },
+  // Bandeja de propuestas (solo GitLab): correos de Outlook → Epic + tareas hijas, siempre como
+  // borrador hasta que el usuario confirma. `login` guarda el device code mientras se autoriza.
+  proposals: { status: null, emails: [], loading: false, error: "", login: null, draft: null, busy: false, results: null },
   // Vista de Milestones (solo GitLab): tareas (issues) del milestone agrupadas por persona.
   // filters.status: Map<label, "include"|"exclude"> (chip tri-estado); se siembra con doneLabels en "exclude".
   milestones: { list: [], selectedTitle: null, issues: [], loading: false, labels: [], selected: new Set(), filters: { status: new Map(), showClosed: false, showUnassigned: false, sortPriority: false, seeded: false }, tab: "tasks", summaryLoading: false, summaryPreviewExpanded: false, projects: null },
@@ -114,6 +117,7 @@ const MENU_SECTIONS = {
   releases:   { label: "Releases",           icon: "🚀", navId: "nav-releases-section",   buckets: ["#bucket-releases", "#bucket-releases-publish", "#bucket-releases-pipelines"], gitlabOnly: true },
   entornos:   { label: "Entornos",           icon: "🌡️", navId: "nav-entornos-section",   buckets: ["#bucket-entornos"], gitlabOnly: true },
   local:      { label: "Trabajo local",      icon: "💻", navId: "nav-local-section",      buckets: ["#bucket-local-empezar", "#bucket-local-crear", "#bucket-local-vincular", "#bucket-local-historico"], gitlabOnly: true },
+  propuestas: { label: "Propuestas",         icon: "📥", navId: "nav-propuestas-section", buckets: ["#bucket-propuestas"], gitlabOnly: true },
 };
 
 // Claves de sección válidas para el proveedor actual, en orden de menú (las GitLab-only se caen en GitHub).

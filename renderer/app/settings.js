@@ -92,6 +92,28 @@ function openSettings() {
           <button class="btn" id="save-token">${t("Guardar")}</button>
         </div>
       </div>
+      ${isGitlab() ? `<div class="settings-card">
+        <h4>${t("Bandeja de propuestas")} 📥</h4>
+        <p class="muted">${t("Cuenta de Outlook donde llegan las propuestas. Necesita un registro de aplicación en Azure AD como cliente público con el permiso Mail.ReadWrite.")}</p>
+        <details class="mail-help">
+          <summary>${t("¿De dónde saco el Client ID?")}</summary>
+          <ol>
+            <li>${t("Abre el portal de Azure → Microsoft Entra ID → Registros de aplicaciones → Nuevo registro.")}</li>
+            <li>${t("Ponle nombre (p.ej. Monstro) y deja el Redirect URI VACÍO: el flujo por código de dispositivo no usa ninguno.")}</li>
+            <li>${t("Tras registrar, copia el «Id. de aplicación (cliente)» → ese es el Client ID. El «Id. de directorio (inquilino)» es el Tenant (o deja «common»).")}</li>
+            <li>${t("Permisos de API → Agregar permiso → Microsoft Graph → Permisos delegados → Mail.ReadWrite.")}</li>
+            <li>${t("Autenticación → Configuración avanzada → «Permitir flujos de cliente público» = Sí. Sin esto el código de dispositivo falla.")}</li>
+            <li>${t("Si tu organización lo exige, pide a un administrador que conceda el consentimiento.")}</li>
+          </ol>
+          <button class="btn" id="open-azure">${t("Abrir registros de aplicaciones en Azure")}</button>
+        </details>
+        <div class="add-repo">
+          <input type="text" id="mail-client-id" placeholder="${t("Client ID de Azure")}" value="${esc(cfg.mail?.clientId || "")}" />
+          <input type="text" id="mail-tenant" placeholder="${t("Tenant (common)")}" value="${esc(cfg.mail?.tenant || "")}" />
+          <input type="text" id="mail-folder" placeholder="${t("Carpeta (inbox)")}" value="${esc(cfg.mail?.folder || "")}" />
+          <button class="btn" id="save-mail">${t("Guardar")}</button>
+        </div>
+      </div>` : ""}
       <div class="settings-card">
         <h4>${t("Apartados del menú")} 🧭</h4>
         <p class="muted">${t("Activa u oculta secciones de la barra lateral. Tiene que quedar al menos una.")}</p>
@@ -212,6 +234,16 @@ function openSettings() {
     state.config = await window.monstro.setConfig({ token: $("#manual-token").value });
     toast(t("Token guardado"), "ok");
     boot();
+  });
+  // Deep link a la lista de registros de aplicaciones: ahorra tres saltos de menú en el portal.
+  $("#open-azure")?.addEventListener("click", () =>
+    window.monstro.openExternal("https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"),
+  );
+  $("#save-mail")?.addEventListener("click", async () => {
+    state.config = await window.monstro.setConfig({
+      mail: { clientId: $("#mail-client-id").value, tenant: $("#mail-tenant").value, folder: $("#mail-folder").value },
+    });
+    toast(t("Bandeja de propuestas guardada"), "ok");
   });
   // Apartados del menú: edición en vivo (mínimo 1). Guarda y reaplica visibilidad sin recargar.
   const secSel = new Set(cfg.sections || availableSectionKeys());
@@ -351,7 +383,7 @@ function openSettings() {
 // Presets de rol: pre-marcan un conjunto de apartados; el usuario luego afina. "todo" se calcula
 // como availableSectionKeys(). Solo se aplican las claves válidas para el proveedor actual.
 const SECTION_PRESETS = {
-  desarrollo: ["prs", "historial", "historico", "milestones", "releases", "local"],
+  desarrollo: ["prs", "historial", "historico", "milestones", "releases", "local", "propuestas"],
   operaciones: ["soporte", "milestones", "historico", "entornos"],
 };
 

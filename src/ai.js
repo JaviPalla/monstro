@@ -489,6 +489,91 @@ async function proposeEpic({ projects }) {
   };
 }
 
+/* ---------- propuestas por correo → Epic + tareas hijas ---------- */
+
+// El schema se construye por llamada porque `projectPath` va como enum con los proyectos REALES del
+// grupo: así el modelo no puede inventarse un path que luego reviente al crear la issue.
+function emailEpicSchema(projectPaths) {
+  return {
+    type: "object",
+    properties: {
+      epicTitle: { type: "string", description: "Título conciso de la Epic, en español, que resuma la propuesta del correo." },
+      epicDescription: { type: "string", description: "Descripción (markdown) de la Epic en español: qué se pide y por qué, a nivel de propósito." },
+      tasks: {
+        type: "array",
+        description: "Una tarea por proyecto que haya que tocar. Solo los proyectos realmente implicados.",
+        items: {
+          type: "object",
+          properties: {
+            projectPath: { type: "string", enum: projectPaths, description: "Proyecto de GitLab donde va la tarea." },
+            title: { type: "string", description: "Título de la tarea, en español." },
+            description: { type: "string", description: "Descripción (markdown) del trabajo en ESE proyecto, en español." },
+            checklist: { type: "array", items: { type: "string" }, description: "2 a 8 puntos a comprobar." },
+          },
+          required: ["projectPath", "title", "description", "checklist"],
+          additionalProperties: false,
+        },
+      },
+      labels: labelsSchema,
+    },
+    required: ["epicTitle", "epicDescription", "tasks", "labels"],
+    additionalProperties: false,
+  };
+}
+
+const MAX_EMAIL_CHARS = 20_000;
+
+function buildEmailPrompt(email, projectPaths) {
+  return `Eres un ingeniero senior que recibe por correo una PROPUESTA DE FUNCIONALIDAD de una persona de negocio y la convierte en una EPIC de GitLab con sus tareas hijas.
+
+Proyectos disponibles (usa el path EXACTO, y solo los que de verdad haya que tocar):
+${projectPaths.map((p) => `- ${p}`).join("\n")}
+
+Devuelve, todo en ESPAÑOL:
+- "epicTitle" y "epicDescription": el PROPÓSITO de la propuesta (qué se pide y por qué), no el detalle de implementación.
+- "tasks": una tarea por proyecto implicado, con "title", "description" y "checklist" (2-8 puntos a comprobar).
+La "description" describe el propósito a nivel general: NO menciones servicios, funciones, clases ni ficheros concretos. Si hace falta detalle técnico, exprésalo a nivel de ENDPOINTS.
+Si el correo es ambiguo, refléjalo en la descripción como pregunta abierta en vez de inventarte requisitos.
+Además, a nivel raíz:
+${labelsGuide} (aplican a toda la Epic)
+
+Responde SOLO con un objeto JSON con esta forma (sin prosa ni cercos):
+{"epicTitle": string, "epicDescription": string, "labels": [string], "tasks": [{"projectPath": string, "title": string, "description": string, "checklist": [string]}]}
+
+## Correo
+Asunto: ${email.subject}
+De: ${email.from}
+
+${(email.body || "").slice(0, MAX_EMAIL_CHARS)}`;
+}
+
+// Propuesta IA a partir de UN correo: Epic + tareas hijas por proyecto. Devuelve un BORRADOR — no
+// crea nada en GitLab hasta que el usuario lo confirma en la vista.
+async function proposeFromEmail({ email, projectPaths }) {
+  const paths = (Array.isArray(projectPaths) ? projectPaths : []).filter((p) => typeof p === "string" && p.trim());
+  if (!paths.length) throw new Error("No hay proyectos del grupo con los que montar la Epic.");
+  if (!email || !email.subject) throw new Error("El correo no tiene contenido que analizar.");
+  const { data, backend, model, effort } = await runStructured(buildEmailPrompt(email, paths), emailEpicSchema(paths));
+  const known = new Set(paths);
+  return {
+    epicTitle: typeof data.epicTitle === "string" ? data.epicTitle.trim() : "",
+    epicDescription: typeof data.epicDescription === "string" ? data.epicDescription : "",
+    labels: (Array.isArray(data.labels) ? data.labels : []).filter((x) => SUGGESTED_LABELS.includes(x)),
+    tasks: (Array.isArray(data.tasks) ? data.tasks : [])
+      .filter((task) => known.has(task?.projectPath))
+      .map((task) => ({
+        projectPath: task.projectPath,
+        title: typeof task.title === "string" ? task.title.trim() : "",
+        description: typeof task.description === "string" ? task.description : "",
+        checklist: (Array.isArray(task.checklist) ? task.checklist : []).filter((c) => typeof c === "string" && c.trim()).slice(0, 8),
+      }))
+      .filter((task) => task.title),
+    backend,
+    model,
+    effort,
+  };
+}
+
 /* ---------- plan de "Empezar tarea" (OPE-20) ---------- */
 
 const PLAN_SCHEMA = {
@@ -674,4 +759,4 @@ function isAiEffort(level) {
   return ALL_EFFORTS.includes(level);
 }
 
-module.exports = { generateReview, summarizeMilestone, proposeTask, proposeEpic, proposePlan, planAgents, backendStatus, ping, isAiModel, isAiEffort };
+module.exports = { generateReview, summarizeMilestone, proposeTask, proposeEpic, proposeFromEmail, proposePlan, planAgents, backendStatus, ping, isAiModel, isAiEffort };

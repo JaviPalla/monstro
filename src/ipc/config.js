@@ -27,10 +27,12 @@ function register(ctx) {
   });
 
   ipcMain.handle("config:get", () => {
-    const { token, ...rest } = config.load();
+    const { token, mail, ...rest } = config.load();
+    // El refreshToken de Outlook se trata como el token del proveedor: jamás cruza al renderer.
+    const mailSafe = { clientId: mail.clientId, tenant: mail.tenant, folder: mail.folder };
     // systemLocale = idioma del SO (BCP-47, p.ej. "es-ES"); el renderer lo usa como
     // idioma por defecto cuando config.language es null.
-    return { ...rest, hasManualToken: Boolean(token), systemLocale: app.getLocale(), appVersion: app.getVersion() };
+    return { ...rest, mail: mailSafe, hasManualToken: Boolean(token), systemLocale: app.getLocale(), appVersion: app.getVersion() };
   });
 
   // Comprueba si hay una versión nueva en las Releases de GitHub. No instala nada — solo informa.
@@ -77,6 +79,15 @@ function register(ctx) {
     if (typeof partial.gitlabBaseUrl === "string" && /^https:\/\/[\w.-]+/.test(partial.gitlabBaseUrl.trim())) {
       allowed.gitlabBaseUrl = partial.gitlabBaseUrl.trim().replace(/\/+$/, "");
       gh().invalidateTokenCache();
+    }
+    // Bandeja de propuestas: solo los tres ajustes visibles. El refreshToken lo escribe src/mail.js,
+    // nunca el renderer.
+    if (partial.mail && typeof partial.mail === "object") {
+      const m = {};
+      for (const key of ["clientId", "tenant", "folder"]) {
+        if (typeof partial.mail[key] === "string") m[key] = partial.mail[key].trim() || null;
+      }
+      if (Object.keys(m).length) allowed.mail = { ...current.mail, ...m };
     }
     if (typeof partial.aiModel === "string" && ai.isAiModel(partial.aiModel)) allowed.aiModel = partial.aiModel;
     if (typeof partial.aiEffort === "string" && ai.isAiEffort(partial.aiEffort)) allowed.aiEffort = partial.aiEffort;

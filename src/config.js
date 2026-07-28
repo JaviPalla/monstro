@@ -29,6 +29,17 @@ const DEFAULTS = {
   sections: null,
   // Token manual SOLO como último recurso; lo normal es el CLI (gh/glab) o la env var.
   token: null,
+  // Bandeja de propuestas (Outlook / Microsoft 365 vía Graph). El refreshToken se trata como el
+  // token del proveedor: vive aquí a 0600 y nunca se manda al renderer.
+  mail: {
+    // App registration de Azure AD: public client con permiso delegado Mail.ReadWrite.
+    clientId: null,
+    // "common" sirve para cualquier tenant; ponlo explícito si la app es single-tenant.
+    tenant: "common",
+    // Carpeta del buzón de la que leer: well-known name ("inbox") o nombre visible de la carpeta.
+    folder: "inbox",
+    refreshToken: null,
+  },
   // Cherry-pick de hotfix tras merge (solo GitLab). Las MR de hotfix/* van a la release branch;
   // su contenido se replica a otras ramas (development + la rama hermana -mx, derivada del destino).
   cherryPick: {
@@ -143,6 +154,7 @@ function load() {
     // Merge profundo de local: un guardado parcial no debe pisar los defaults del resto de claves.
     cfg.local = { ...DEFAULTS.local, ...(parsed.local || {}) };
     cfg.support = { ...DEFAULTS.support, ...(parsed.support || {}) };
+    cfg.mail = { ...DEFAULTS.mail, ...(parsed.mail || {}) };
     return cfg;
   } catch {
     return { ...DEFAULTS };

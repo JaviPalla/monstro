@@ -60,6 +60,7 @@ const STUBBED = new Set([
   "../health",
   "../local",
   "../localhistory",
+  "../mail",
   "../provider",
   "../updater",
 ]);
@@ -121,6 +122,11 @@ const PAYLOAD = {
   description: "d",
   epicTitle: "epic",
   epicDescription: "d",
+  // Bandeja de propuestas: `tasks` reusa PROJECT (ya trae projectPath y title).
+  tasks: [PROJECT],
+  email: { id: "m1", subject: "s", from: "a@b.c", body: "b" },
+  messageId: "m1",
+  deviceCode: "dc",
   name: "n",
   repo: "grupo/proyecto",
   number: 1,
