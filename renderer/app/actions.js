@@ -16,6 +16,21 @@ async function updateBranch(pr) {
   }
 }
 
+/** Alterna borrador ⇄ lista para review. Extraída del botón del detalle porque la paleta (⌘P) la reusa. */
+async function toggleDraftState(pr) {
+  const btn = $("#act-draft-toggle");
+  if (btn) btn.disabled = true;
+  try {
+    const result = await window.monstro.setPrDraft(pr.id, !pr.isDraft);
+    toast(result.isDraft ? t("#{n} convertida a borrador", { n: pr.number }) : t("#{n} lista para review 🚀", { n: pr.number }), "ok");
+    await refresh();
+    openDetail(pr.number, state.detailTab);
+  } catch (err) {
+    toast(t("No se pudo cambiar el estado: {e}", { e: String(err.message || err) }), "err");
+    if (btn) btn.disabled = false;
+  }
+}
+
 /** Mi review APPROVED más reciente en la PR, si existe (para poder retirarla). */
 function myApprovedReview(pr) {
   return (

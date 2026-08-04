@@ -246,7 +246,8 @@ function revertPRModal(pr) {
   $("#modal-confirm").addEventListener("click", async () => {
     root.innerHTML = "";
     try {
-      const revert = await window.monstro.revertPR(state.repo, pr.number);
+      // detailRepo(), no state.repo: en la vista "Todos los repos" state.repo es "__all__".
+      const revert = await window.monstro.revertPR(detailRepo(), pr.number);
       if (revert.number) {
         toast(t("PR de revert creada: #{n}", { n: revert.number }), "ok");
         exitHistoryToPR(revert.number);

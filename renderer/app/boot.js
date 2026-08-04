@@ -169,6 +169,15 @@ async function boot() {
   if (IS_SELFTEST && SELFTEST_ROUTE === "releases-pipelines") enterReleases("pipelines");
   if (IS_SELFTEST && SELFTEST_ROUTE === "entornos") enterEnvironments();
   if (IS_SELFTEST && SELFTEST_ROUTE === "propuestas") enterProposals();
+  if (IS_SELFTEST && SELFTEST_ROUTE.startsWith("palette")) {
+    openPalette();
+    // `palette-q:<texto>` abre la paleta ya filtrada, para capturar grupos que no caben arriba.
+    const query = SELFTEST_ROUTE.startsWith("palette-q:") ? SELFTEST_ROUTE.slice("palette-q:".length) : "";
+    if (query) {
+      $("#palette-input").value = query;
+      $("#palette-input").dispatchEvent(new Event("input"));
+    }
+  }
   if (IS_SELFTEST && SELFTEST_ROUTE.startsWith("ajustes")) {
     openSettings();
     // La tarjeta de la bandeja queda muy por debajo del viewport y la captura solo ve lo visible.
@@ -434,44 +443,6 @@ $("#bucket-local-empezar").addEventListener("click", () => enterLocal("empezar")
 $("#bucket-local-crear").addEventListener("click", () => enterLocal("crear"));
 $("#bucket-local-vincular").addEventListener("click", () => enterLocal("vincular"));
 $("#bucket-local-historico").addEventListener("click", () => enterLocal("historico"));
-/* ============ paleta de comandos (⌘K) ============ */
-function paletteEntries() {
-  const entries = [];
-  for (const pr of state.openPrs) {
-    entries.push({
-      label: `#${pr.number} ${pr.title}`,
-      hint: `${pr.headRefName} → ${pr.baseRefName}`,
-      run: () => exitHistoryToPR(pr.number),
-    });
-  }
-  if (sectionEnabled("historico")) entries.push({ label: t("Ir a: Histórico"), hint: t("grafo de ramas"), run: enterHistory });
-  if (sectionEnabled("milestones")) entries.push({ label: t("Ir a: Milestones"), hint: t("tareas por persona"), run: () => enterMilestones("tasks") });
-  if (sectionEnabled("milestones")) entries.push({ label: t("Ir a: Milestones · Resumen"), hint: t("resumen del milestone"), run: () => enterMilestones("summary") });
-  if (sectionEnabled("soporte")) entries.push({ label: t("Ir a: Support"), hint: t("tareas por persona"), run: () => enterSupport("incidencias") });
-  if (sectionEnabled("soporte")) entries.push({ label: t("Ir a: Ops"), hint: t("tareas por persona"), run: () => enterSupport("operaciones") });
-  if (sectionEnabled("releases")) entries.push({ label: t("Ir a: Releases · Ramas"), hint: t("generar release branches"), run: () => enterReleases("branches") });
-  if (sectionEnabled("releases")) entries.push({ label: t("Ir a: Releases · Publicar"), hint: t("crear tag + release"), run: () => enterReleases("publish") });
-  if (sectionEnabled("releases")) entries.push({ label: t("Ir a: Releases · Pipelines"), hint: t("estado de despliegue por proyecto"), run: () => enterReleases("pipelines") });
-  if (sectionEnabled("entornos")) entries.push({ label: t("Ir a: Entornos"), hint: t("salud de los entornos por proyecto"), run: () => enterEnvironments() });
-  if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Empezar tarea"), hint: t("elegir Epic/Issue → plan → agentes"), run: () => enterLocal("empezar") });
-  if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Crear tarea"), hint: t("Issue/Epic + MR desde local"), run: () => enterLocal("crear") });
-  if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Vincular tarea"), hint: t("vincular local a una tarea existente"), run: () => enterLocal("vincular") });
-  if (sectionEnabled("local")) entries.push({ label: t("Trabajo local: Histórico"), hint: t("trabajos creados desde Monstro"), run: () => enterLocal("historico") });
-  if (sectionEnabled("propuestas")) entries.push({ label: t("Ir a: Propuestas"), hint: t("correos de propuestas → Epic"), run: () => enterProposals() });
-  const bucketSection = (b) => (["merged", "closed"].includes(b) ? "historial" : "prs");
-  for (const [bucket, label] of [["open", t("Abiertas")], ["mine", t("Mías")], ["review", t("Para revisar")], ["draft", t("Borradores")], ["merged", t("Fusionadas")], ["closed", t("Cerradas")]]) {
-    if (sectionEnabled(bucketSection(bucket))) entries.push({ label: t("Ir a: {label}", { label }), hint: t("bucket"), run: () => switchBucket(bucket) });
-  }
-  if ((state.config?.repos || []).length > 1) {
-    entries.push({ label: t("Repo: ⭐ Todos los repos"), hint: t("vista agregada"), run: () => switchRepo(ALL_REPOS) });
-  }
-  for (const repo of state.config?.repos || []) {
-    entries.push({ label: t("Repo: {repo}", { repo }), hint: t("cambiar repositorio"), run: () => switchRepo(repo) });
-  }
-  entries.push({ label: t("Refrescar"), hint: "R", run: refresh });
-  entries.push({ label: t("Ajustes"), hint: "⚙", run: openSettings });
-  return entries;
-}
 
 // Primer apartado habilitado (en orden de menú) y su acción de entrada. Para aterrizar cuando el
 // apartado por defecto (PRs) está oculto por la configuración del usuario.
@@ -514,53 +485,6 @@ function switchRepo(repo) {
   else if (!["milestones", "releases", "local", "support", "environments"].includes(state.view)) refresh();
 }
 
-function openPalette() {
-  const root = $("#modal-root");
-  let results = [];
-  let cursor = 0;
-  root.innerHTML = `
-    <div class="modal-backdrop" id="palette-backdrop">
-      <div class="palette">
-        <input type="text" id="palette-input" placeholder="${esc(t("Busca PRs, repos o acciones…  (Esc para cerrar)"))}" autocomplete="off" />
-        <div id="palette-results"></div>
-      </div>
-    </div>`;
-  const input = $("#palette-input");
-  const resultsBox = $("#palette-results");
-
-  const renderResults = () => {
-    const q = input.value.trim().toLowerCase();
-    results = paletteEntries().filter((e) => !q || `${e.label} ${e.hint}`.toLowerCase().includes(q)).slice(0, 12);
-    cursor = Math.min(cursor, Math.max(0, results.length - 1));
-    resultsBox.innerHTML = results
-      .map(
-        (e, i) => `<div class="palette-item ${i === cursor ? "active" : ""}" data-i="${i}">
-          <span>${esc(e.label)}</span><span class="muted">${esc(e.hint)}</span>
-        </div>`,
-      )
-      .join("") || `<div class="palette-item muted">${esc(t("Sin resultados"))}</div>`;
-    resultsBox.querySelectorAll(".palette-item[data-i]").forEach((el) =>
-      el.addEventListener("click", () => {
-        root.innerHTML = "";
-        results[Number(el.dataset.i)]?.run();
-      }),
-    );
-  };
-
-  input.addEventListener("input", () => { cursor = 0; renderResults(); });
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "ArrowDown") { cursor = Math.min(cursor + 1, results.length - 1); renderResults(); event.preventDefault(); }
-    if (event.key === "ArrowUp") { cursor = Math.max(cursor - 1, 0); renderResults(); event.preventDefault(); }
-    if (event.key === "Enter") { const entry = results[cursor]; root.innerHTML = ""; entry?.run(); }
-    if (event.key === "Escape") root.innerHTML = "";
-  });
-  $("#palette-backdrop").addEventListener("click", (event) => {
-    if (event.target.id === "palette-backdrop") root.innerHTML = "";
-  });
-  renderResults();
-  input.focus();
-}
-
 /* ============ atajos de teclado ============ */
 function visiblePRRows() {
   return [...list.querySelectorAll(".pr-row")];
@@ -577,7 +501,7 @@ function moveCursor(delta) {
 function openCheatsheet() {
   const root = $("#modal-root");
   const rows = [
-    ["⌘K", t("Paleta de comandos (PRs, repos, acciones)")],
+    ["⌘P", t("Paleta de comandos: todas las acciones de la app")],
     ["j / k", t("Moverse por la lista")],
     ["Enter", t("Abrir la PR seleccionada")],
     ["1 – 6", t("Abiertas · Mías · Para revisar · Borradores · Fusionadas · Cerradas")],
@@ -602,7 +526,9 @@ function openCheatsheet() {
 }
 
 document.addEventListener("keydown", (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+  // ⌘P es el atajo oficial (⌘K se mantiene por costumbre). preventDefault también evita
+  // que ⌘P abra el diálogo de impresión de Chromium.
+  if ((event.metaKey || event.ctrlKey) && ["p", "k"].includes(event.key.toLowerCase())) {
     event.preventDefault();
     openPalette();
     return;

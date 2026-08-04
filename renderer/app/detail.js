@@ -94,19 +94,7 @@ function renderDetail() {
   $("#act-ai").addEventListener("click", () => generateAiReview(pr));
   $("#act-approve")?.addEventListener("click", () => confirmApprove(pr));
   $("#act-unapprove")?.addEventListener("click", () => confirmUnapprove(pr));
-  $("#act-draft-toggle")?.addEventListener("click", async () => {
-    const btn = $("#act-draft-toggle");
-    btn.disabled = true;
-    try {
-      const result = await window.monstro.setPrDraft(pr.id, !pr.isDraft);
-      toast(result.isDraft ? t("#{n} convertida a borrador", { n: pr.number }) : t("#{n} lista para review 🚀", { n: pr.number }), "ok");
-      await refresh();
-      openDetail(pr.number, state.detailTab);
-    } catch (err) {
-      toast(t("No se pudo cambiar el estado: {e}", { e: String(err.message || err) }), "err");
-      btn.disabled = false;
-    }
-  });
+  $("#act-draft-toggle")?.addEventListener("click", () => toggleDraftState(pr));
   $("#copy-branch").addEventListener("click", () => copyText(pr.headRefName));
   $("#copy-checkout").addEventListener("click", () => copyText(`gh pr checkout ${pr.number}`));
   $("#copy-url").addEventListener("click", () => copyText(pr.url));
