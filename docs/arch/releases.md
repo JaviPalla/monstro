@@ -20,7 +20,9 @@ A top-level view (like history/milestones) that **generates release branches** `
 
 The selectable **projects are pulled live from the group** via `groupProjects()` (reusing the milestone-summary project data + icons; non-archived), **not** a hardcoded list (the old hardcoded 8 went stale/missing projects).
 
-Config `releases` = `{sourceBranch (default "development"), branchPrefix (default "rb/"), defaultProjectIds[] (the script's 8, by **numeric id** — names drifted, ids are stable), selectedProjects[]|null (last user selection, by path — remembered across sessions), ouicare:{projectPath, webConfigPath, appDateKey}}`.
+Config `releases` = `{sourceBranch (default "development"), branchPrefix (default "rb/"), defaultProjectIds[] (the script's 8, by **numeric id** — names drifted, ids are stable), selectedProjects[]|null (last user selection, by path — remembered across sessions), visibleProjects[]|null (whitelist of what the pickers **offer**), ouicare:{projectPath, webConfigPath, appDateKey}}`.
+
+**`visibleProjects` (offered) vs `selectedProjects` (ticked)**: the group has ~34 projects and a release touches ~8, so `visibleProjects` (paths, `null` = the whole group) filters the chip list in **both tabs** — they share `r.projects`, so the filter lives once in `loadReleases`. Edited in **Ajustes → "Proyectos de releases"** (GitLab-only card, chips lazy-loaded on `<details>` toggle because `groupProjects` avatar-proxying is slow); saving nulls `state.releases.defaults` so the view re-reads it. An empty list is stored as `null` (a picker offering nothing is useless). `r.projects` is re-derived from the cached project map on every `loadReleases` — if it were only filled once, widening the whitelist could never grow it back.
 
 UI: version input **prefilled with `MMYYYY` of the current month** (`suggestedReleaseVersion`, e.g. `062026`), live `rb/…` preview + `BRANCH_RE` validation; source-branch input (default `development`); **project picker = `.ms-proj-chip` chips** (same design as the summary's per-project filter — icon + name, `.off`/struck = deselected), click toggles, "Todos/Ninguno" button.
 

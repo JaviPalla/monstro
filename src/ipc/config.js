@@ -142,6 +142,12 @@ function register(ctx) {
       } else if (r.selectedProjects === null) {
         next.selectedProjects = null;
       }
+      // Lista blanca de proyectos ofrecidos en los selectores (null = todos los del grupo).
+      if (Array.isArray(r.visibleProjects)) {
+        next.visibleProjects = r.visibleProjects.filter((p) => typeof p === "string" && projId.test(p));
+      } else if (r.visibleProjects === null) {
+        next.visibleProjects = null;
+      }
       if (r.ouicare && typeof r.ouicare === "object") {
         const o = { ...current.releases.ouicare };
         if (typeof r.ouicare.projectPath === "string" && r.ouicare.projectPath.trim()) o.projectPath = r.ouicare.projectPath.trim();

@@ -14,6 +14,8 @@ function releaseDefaults() {
     // Selección por defecto (ids) y última recordada (paths) para que la vista la siembre/restaure.
     defaultProjectIds: Array.isArray(cfg.releases?.defaultProjectIds) ? cfg.releases.defaultProjectIds.map(String) : [],
     selectedProjects: Array.isArray(cfg.releases?.selectedProjects) ? cfg.releases.selectedProjects : null,
+    // Lista blanca de proyectos ofrecidos en los selectores (null = todos los del grupo).
+    visibleProjects: Array.isArray(cfg.releases?.visibleProjects) ? cfg.releases.visibleProjects : null,
     ouicare: cfg.releases?.ouicare || null,
   };
 }

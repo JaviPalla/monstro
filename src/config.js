@@ -86,6 +86,10 @@ const DEFAULTS = {
     // Última selección del usuario (paths de proyecto), recordada entre sesiones. null = usar los
     // defaultProjectIds. La vista la reescribe cada vez que cambias la selección.
     selectedProjects: null,
+    // Lista blanca de proyectos (paths) que se OFRECEN en los selectores de Ramas y Publicar.
+    // null = todos los del grupo (comportamiento por defecto). Se edita en Ajustes → Proyectos de
+    // releases. Ojo: esto filtra qué chips aparecen; selectedProjects es cuáles van marcados.
+    visibleProjects: null,
     // Ouicare: el AppDate es una appSetting del Web.config (cache-buster del appcache) que hay que
     // bumpear en cada release. Se actualiza en la rama origen antes de crear la release branch.
     ouicare: {

@@ -22,11 +22,12 @@ async function loadReleases() {
     if (!r.defaults) r.defaults = await window.monstro.releasesDefaults();
     // Proyectos: del grupo en vivo (mismos datos + iconos que el filtro del resumen). No archivados.
     await ensureProjects();
-    if (!r.projects.length) {
-      r.projects = [...(state.milestones.projects?.values() || [])]
-        .filter((p) => !p.archived)
-        .sort((a, b) => a.name.localeCompare(b.name));
-    }
+    // Se deriva SIEMPRE del mapa cacheado (barato): si solo se rellenara la primera vez, cambiar la
+    // lista blanca en Ajustes no podría volver a ampliarla — filtraría sobre lo ya filtrado.
+    const visible = Array.isArray(r.defaults.visibleProjects) ? new Set(r.defaults.visibleProjects) : null;
+    r.projects = [...(state.milestones.projects?.values() || [])]
+      .filter((p) => !p.archived && (!visible || visible.has(p.path)))
+      .sort((a, b) => a.name.localeCompare(b.name));
     // Selección: la última recordada (paths, persistida en config) si la hay; si no, el set por
     // defecto (los 8 del script, por ID). Solo se siembra una vez por sesión (seeded), para no pisar
     // lo que el usuario vaya cambiando al navegar dentro de la sesión.

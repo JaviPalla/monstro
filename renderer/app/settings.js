@@ -114,6 +114,14 @@ function openSettings() {
           <button class="btn" id="save-mail">${t("Guardar")}</button>
         </div>
       </div>` : ""}
+      ${isGitlab() ? `<div class="settings-card">
+        <h4>${t("Proyectos de releases")} 🚀</h4>
+        <p class="muted">${t("Qué proyectos se ofrecen en los selectores de Ramas y Publicar. Sin ninguno marcado se ofrecen todos los del grupo.")}</p>
+        <details id="rel-projects-details">
+          <summary>${t("Elegir proyectos")}</summary>
+          <div id="rel-projects" class="ms-proj-filter"><span class="muted">${t("Cargando proyectos del grupo…")}</span></div>
+        </details>
+      </div>` : ""}
       <div class="settings-card">
         <h4>${t("Apartados del menú")} 🧭</h4>
         <p class="muted">${t("Activa u oculta secciones de la barra lateral. Tiene que quedar al menos una.")}</p>
@@ -244,6 +252,40 @@ function openSettings() {
       mail: { clientId: $("#mail-client-id").value, tenant: $("#mail-tenant").value, folder: $("#mail-folder").value },
     });
     toast(t("Bandeja de propuestas guardada"), "ok");
+  });
+  // Proyectos ofrecidos en Releases (Ramas y Publicar comparten lista). Carga perezosa al desplegar:
+  // groupProjects proxea los avatares del grupo y es lento, no vale la pena al abrir Ajustes.
+  const renderRelProjects = () => {
+    const el = $("#rel-projects");
+    const all = [...(state.milestones.projects?.values() || [])].filter((p) => !p.archived).sort((a, b) => a.name.localeCompare(b.name));
+    const visible = state.config.releases?.visibleProjects;
+    const isOn = (path) => !Array.isArray(visible) || visible.includes(path);
+    el.innerHTML = all
+      .map((p) => `<button class="ms-proj-chip ${isOn(p.path) ? "" : "off"}" data-rel-proj="${esc(p.path)}"
+        title="${isOn(p.path) ? t("Se ofrece · clic para ocultar") : t("Oculto · clic para ofrecer")}">
+        ${projectIconHtml(p.path)}<span class="ms-proj-name">${esc(p.name)}</span>
+      </button>`)
+      .join("");
+    const save = async (next) => {
+      // Lista vacía = "todos": un selector sin ningún proyecto no sirve para nada.
+      state.config = await window.monstro.setConfig({ releases: { visibleProjects: next && next.length ? next : null } });
+      state.releases.defaults = null; // la vista de Releases relee la lista al volver a entrar
+      renderRelProjects();
+    };
+    el.querySelectorAll("[data-rel-proj]").forEach((chip) =>
+      chip.addEventListener("click", () => {
+        const path = chip.dataset.relProj;
+        const current = Array.isArray(visible) ? visible : all.map((p) => p.path);
+        save(current.includes(path) ? current.filter((x) => x !== path) : [...current, path]);
+      }),
+    );
+  };
+  $("#rel-projects-details")?.addEventListener("toggle", async (event) => {
+    const box = event.target;
+    if (!box.open || box.dataset.loaded) return;
+    box.dataset.loaded = "1";
+    await ensureProjects();
+    renderRelProjects();
   });
   // Apartados del menú: edición en vivo (mínimo 1). Guarda y reaplica visibilidad sin recargar.
   const secSel = new Set(cfg.sections || availableSectionKeys());
