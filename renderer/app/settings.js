@@ -79,11 +79,24 @@ function openSettings() {
         <div id="repo-lines">
           ${cfg.repos.map((r) => `<div class="repo-line">${esc(r)} <button class="btn" data-del="${esc(r)}">${t("Quitar")}</button></div>`).join("")}
         </div>
+        <details id="repo-suggest-details">
+          <summary>${t("Buscar mis repositorios")}</summary>
+          <p class="muted">${t("Los mismos que te propone el onboarding al iniciar la aplicación. Marca o desmarca para añadirlos o quitarlos.")}</p>
+          <div id="repo-suggest" class="repo-picker"><div class="empty">${t("Buscando tus repositorios…")}</div></div>
+        </details>
         <div class="add-repo">
           <input type="text" id="new-repo" placeholder="${repoPlaceholder()}" />
           <button class="btn btn-accent" id="add-repo">${t("Añadir")}</button>
         </div>
       </div>
+      ${isGitlab() ? `<div class="settings-card">
+        <h4>${t("Proyectos de releases")} 🚀</h4>
+        <p class="muted">${t("Qué proyectos se ofrecen en los selectores de Ramas y Publicar. Sin ninguno marcado se ofrecen todos los del grupo.")}</p>
+        <details id="rel-projects-details">
+          <summary>${t("Elegir proyectos")}</summary>
+          <div id="rel-projects" class="ms-proj-filter"><span class="muted">${t("Cargando proyectos del grupo…")}</span></div>
+        </details>
+      </div>` : ""}
       <div class="settings-card">
         <h4>${t("Token de {name}", { name: providerName() })}</h4>
         <p class="muted">${t("Origen actual:")} <b>${esc(state.authSource || t("ninguno"))}</b>. ${t("Orden:")} <code>${isGitlab() ? "GITLAB_TOKEN" : "GITHUB_TOKEN"}</code> → <code>${isGitlab() ? "glab CLI" : "gh auth token"}</code> → ${t("token manual.")}</p>
@@ -113,14 +126,6 @@ function openSettings() {
           <input type="text" id="mail-folder" placeholder="${t("Carpeta (inbox)")}" value="${esc(cfg.mail?.folder || "")}" />
           <button class="btn" id="save-mail">${t("Guardar")}</button>
         </div>
-      </div>` : ""}
-      ${isGitlab() ? `<div class="settings-card">
-        <h4>${t("Proyectos de releases")} 🚀</h4>
-        <p class="muted">${t("Qué proyectos se ofrecen en los selectores de Ramas y Publicar. Sin ninguno marcado se ofrecen todos los del grupo.")}</p>
-        <details id="rel-projects-details">
-          <summary>${t("Elegir proyectos")}</summary>
-          <div id="rel-projects" class="ms-proj-filter"><span class="muted">${t("Cargando proyectos del grupo…")}</span></div>
-        </details>
       </div>` : ""}
       <div class="settings-card">
         <h4>${t("Apartados del menú")} 🧭</h4>
@@ -230,14 +235,18 @@ function openSettings() {
     toast(t("URL base guardada"), "ok");
     boot();
   });
-  root.querySelectorAll("[data-del]").forEach((btn) =>
-    btn.addEventListener("click", async () => {
-      state.config = await window.monstro.setConfig({ repos: cfg.repos.filter((r) => r !== btn.dataset.del) });
-      if (state.repo === btn.dataset.del) state.repo = state.config.repos[0] || null;
-      renderRepoSelect();
-      openSettings();
-    }),
-  );
+  // Se recablea también tras tocar el picker de sugerencias, que reescribe #repo-lines.
+  const wireRepoDelete = () => {
+    root.querySelectorAll("[data-del]").forEach((btn) =>
+      btn.addEventListener("click", async () => {
+        state.config = await window.monstro.setConfig({ repos: state.config.repos.filter((r) => r !== btn.dataset.del) });
+        if (state.repo === btn.dataset.del) state.repo = state.config.repos[0] || null;
+        renderRepoSelect();
+        openSettings();
+      }),
+    );
+  };
+  wireRepoDelete();
   $("#save-token").addEventListener("click", async () => {
     state.config = await window.monstro.setConfig({ token: $("#manual-token").value });
     toast(t("Token guardado"), "ok");
@@ -252,6 +261,49 @@ function openSettings() {
       mail: { clientId: $("#mail-client-id").value, tenant: $("#mail-tenant").value, folder: $("#mail-folder").value },
     });
     toast(t("Bandeja de propuestas guardada"), "ok");
+  });
+  // Repos sugeridos por el token — el mismo picker del onboarding, para no teclear paths a mano.
+  // Perezoso (viewerRepos pega a la API) y con la lista viva en state.config: cada clic guarda.
+  const renderRepoSuggestions = (suggestions) => {
+    const el = $("#repo-suggest");
+    const names = [...new Set([...suggestions.map((s) => s.nameWithOwner), ...state.config.repos])];
+    if (!names.length) {
+      el.innerHTML = `<div class="empty">${t("No encontré repos accesibles con tu token — añade uno a mano abajo.")}</div>`;
+      return;
+    }
+    const isPrivate = new Map(suggestions.map((s) => [s.nameWithOwner, s.isPrivate]));
+    const chosen = new Set(state.config.repos);
+    el.innerHTML = names
+      .map(
+        (name) => `<button class="repo-option ${chosen.has(name) ? "selected" : ""}" data-suggest="${esc(name)}">
+          <span class="repo-check">${chosen.has(name) ? "✓" : ""}</span>
+          <span class="repo-name">${esc(name)}</span>
+          ${isPrivate.get(name) ? `<span class="chip chip-draft">${t("privado")}</span>` : ""}
+        </button>`,
+      )
+      .join("");
+    el.querySelectorAll("[data-suggest]").forEach((btn) =>
+      btn.addEventListener("click", async () => {
+        const name = btn.dataset.suggest;
+        const next = chosen.has(name) ? state.config.repos.filter((x) => x !== name) : [...state.config.repos, name];
+        state.config = await window.monstro.setConfig({ repos: next });
+        // El repo activo puede haberse quedado fuera: cae al primero que quede (o a ninguno).
+        if (!state.config.repos.includes(state.repo)) state.repo = state.config.repos[0] || null;
+        renderRepoSelect();
+        renderRepoSuggestions(suggestions);
+        $("#repo-lines").innerHTML = state.config.repos
+          .map((r) => `<div class="repo-line">${esc(r)} <button class="btn" data-del="${esc(r)}">${t("Quitar")}</button></div>`)
+          .join("");
+        wireRepoDelete();
+      }),
+    );
+  };
+  $("#repo-suggest-details")?.addEventListener("toggle", async (event) => {
+    const box = event.target;
+    if (!box.open || box.dataset.loaded) return;
+    box.dataset.loaded = "1";
+    const suggestions = await window.monstro.suggestRepos().catch(() => []);
+    renderRepoSuggestions(suggestions || []);
   });
   // Proyectos ofrecidos en Releases (Ramas y Publicar comparten lista). Carga perezosa al desplegar:
   // groupProjects proxea los avatares del grupo y es lento, no vale la pena al abrir Ajustes.

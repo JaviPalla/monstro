@@ -7,6 +7,29 @@ function calverBase(ref) {
   return `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// La rama que se teclea es la BASE (sin sufijo de país): la variante decide desde cuál se publica —
+// España = rb/x, México = rb/x-mx, Ambos = las dos. Mismo criterio que el selector de Ramas, y por
+// eso se acepta que pegues una rama que ya trae `-mx`: el sufijo lo pone siempre la variante.
+function pubBaseRef(ref) {
+  return (ref || "").replace(/-mx$/i, "");
+}
+function pubRefList() {
+  const p = state.releases.publish;
+  return releaseVariantSuffixes(p.variant).map((suffix) => `${pubBaseRef(p.ref)}${suffix}`);
+}
+// Tags que saldrán (uno por variante). El patch real lo calcula el backend por proyecto: aquí `.x`.
+function pubTagPreview() {
+  const base = calverBase(pubBaseRef(state.releases.publish.ref));
+  return pubRefList()
+    .map((ref) => `${base}.x${/-mx$/i.test(ref) ? "-mx" : ""}`)
+    .join(" · ");
+}
+// Clave del panel de estado: con las dos variantes el MISMO proyecto publica dos tags, así que la
+// clave no puede ser solo el id del proyecto o la segunda pisaría a la primera.
+function pubStatusKey(res) {
+  return `${res.id}@${res.tag}`;
+}
+
 // Icono de estado de pipeline (mismo mapeo SUCCESS/FAILURE/ERROR/PENDING que checksIcon del detalle).
 function pipelineDot(state) {
   const map = { SUCCESS: ["✓", "ok"], FAILURE: ["✗", "err"], ERROR: ["✗", "err"], PENDING: ["●", "pending"], EXPECTED: ["●", "pending"] };
@@ -48,10 +71,8 @@ function renderReleasePublish() {
     .join("");
   const selCount = projects.filter((proj) => r.selected.has(proj.path)).length;
   const allOn = selCount === projects.length && projects.length > 0;
-  const refValid = Boolean(p.ref) && BRANCH_RE.test(p.ref);
-  const base = calverBase(p.ref);
-  // Variante México: la rama rb/…-mx publica un tag con sufijo -mx (contador propio, lo resuelve el backend).
-  const mxSuffix = /-mx$/i.test(p.ref) ? "-mx" : "";
+  const refs = pubRefList();
+  const refValid = Boolean(pubBaseRef(p.ref)) && refs.every((ref) => BRANCH_RE.test(ref));
   const canRun = refValid && selCount > 0 && !p.running;
 
   const msOptions = [`<option value="">${t("Sin milestone")}</option>`]
@@ -67,8 +88,10 @@ function renderReleasePublish() {
     const cls = fail ? (ok ? "warn" : "err") : "ok";
     const rowsHtml = p.results.results
       .map((res) => {
-        if (!res.ok) return `<div class="rel-pub-card err" title="${esc(res.error || "")}"><span class="rel-pub-ico">✕</span> <b>${esc(res.name)}</b>: ${esc(res.error || t("error"))}</div>`;
-        const st = p.status.get(res.id);
+        // Un fallo no trae tag: con las dos variantes el mismo proyecto saldría dos veces igual, así
+        // que la rama de origen es lo único que las distingue.
+        if (!res.ok) return `<div class="rel-pub-card err" title="${esc(res.error || "")}"><span class="rel-pub-ico">✕</span> <b>${esc(res.name)}</b> <code class="rel-pub-tag">${esc(res.ref || p.results.base)}</code>: ${esc(res.error || t("error"))}</div>`;
+        const st = p.status.get(pubStatusKey(res));
         const pipe = st?.pipeline ? pipelineDot(st.pipeline.state) : `<span class="rel-pipe muted" title="${t("Sin pipeline aún")}">·</span>`;
         const envs = (st?.environments || [])
           .map((e) => `<span class="rel-env ${e.state === "available" ? "up" : ""}">${esc(e.name)}</span>`)
@@ -83,7 +106,7 @@ function renderReleasePublish() {
       })
       .join("");
     resultsHtml = `
-      <div class="rel-summary ${cls}">Release <code>${esc(p.results.base)}.x${/-mx$/i.test(p.results.ref) ? "-mx" : ""}</code> ${t("desde")} <code>${esc(p.results.ref)}</code> · ${ok === 1 ? t("{n} publicada", { n: ok }) : t("{n} publicadas", { n: ok })}${fail ? ` · ${t("{n} con error", { n: fail })}` : ""}</div>
+      <div class="rel-summary ${cls}">Release <code>${esc(p.results.base)}.x</code> ${t("desde")} <code>${esc((p.results.refs || [p.results.ref]).join(" · "))}</code> · ${ok === 1 ? t("{n} publicada", { n: ok }) : t("{n} publicadas", { n: ok })}${fail ? ` · ${t("{n} con error", { n: fail })}` : ""}</div>
       <div class="rel-pub-cards">${rowsHtml}</div>
       ${ok ? `<div class="rel-pub-cta"><button class="btn ghost" id="rel-pub-goto-pipelines">${t("Ver pipelines de despliegue")} →</button></div>` : ""}`;
   }
@@ -104,9 +127,17 @@ function renderReleasePublish() {
           <span class="rel-label">${t("Milestone (opcional)")}</span>
           <select id="rel-pub-milestone" class="modal-input" ${p.running || p.milestonesLoading ? "disabled" : ""}>${msOptions}</select>
         </label>
+        <div class="rel-field rel-variant" role="group" aria-label="${t("Variante")}">
+          <span class="rel-label">${t("Variante")}</span>
+          <div class="rel-variant-btns">
+            <button class="btn ${p.variant === "es" ? "btn-primary" : "ghost"}" data-pub-variant="es" ${p.running ? "disabled" : ""}>${t("España")}</button>
+            <button class="btn ${p.variant === "mx" ? "btn-primary" : "ghost"}" data-pub-variant="mx" ${p.running ? "disabled" : ""}>${t("México")}</button>
+            <button class="btn ${p.variant === "both" ? "btn-primary" : "ghost"}" data-pub-variant="both" ${p.running ? "disabled" : ""}>${t("Ambas")}</button>
+          </div>
+        </div>
         <div class="rel-preview-box">
-          <span class="rel-label">${t("Tag a crear")}</span>
-          <code class="rel-branch-preview ${refValid ? "" : "invalid"}" id="rel-pub-preview">${esc(base)}.x${esc(mxSuffix)}</code>
+          <span class="rel-label">${refs.length > 1 ? t("Tags a crear") : t("Tag a crear")}</span>
+          <code class="rel-branch-preview ${refValid ? "" : "invalid"}" id="rel-pub-preview">${esc(pubTagPreview())}</code>
         </div>
       </div>
 
@@ -132,9 +163,9 @@ function renderReleasePublish() {
   const preview = $("#rel-pub-preview");
   const pubBtn = $("#rel-publish");
   const sync = () => {
-    const valid = Boolean(p.ref) && BRANCH_RE.test(p.ref);
+    const valid = Boolean(pubBaseRef(p.ref)) && pubRefList().every((ref) => BRANCH_RE.test(ref));
     const sel = projects.filter((proj) => r.selected.has(proj.path)).length;
-    preview.textContent = `${calverBase(p.ref)}.x${/-mx$/i.test(p.ref) ? "-mx" : ""}`;
+    preview.textContent = pubTagPreview();
     preview.classList.toggle("invalid", !valid);
     $("#rel-pub-count").textContent = `${sel}/${projects.length}`;
     pubBtn.disabled = !(valid && sel > 0 && !p.running);
@@ -143,6 +174,13 @@ function renderReleasePublish() {
     p.ref = refInput.value.trim();
     sync();
   });
+  // Variante (España / México / Ambas): re-render porque cambia el preview de tags y el modal.
+  list.querySelectorAll(".rel-variant-btns [data-pub-variant]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      p.variant = btn.dataset.pubVariant;
+      renderReleasePublish();
+    }),
+  );
   $("#rel-pub-milestone")?.addEventListener("change", (event) => {
     p.milestone = event.target.value;
   });
@@ -181,18 +219,18 @@ function renderReleasePublish() {
 function confirmAndPublishReleases() {
   const r = state.releases;
   const p = r.publish;
-  if (!(p.ref && BRANCH_RE.test(p.ref))) return;
+  const refs = pubRefList();
+  if (!(pubBaseRef(p.ref) && refs.every((ref) => BRANCH_RE.test(ref)))) return;
   const targets = r.projects.filter((proj) => r.selected.has(proj.path));
   if (!targets.length) return;
-  const base = calverBase(p.ref);
-  const mxSuffix = /-mx$/i.test(p.ref) ? "-mx" : "";
+  const base = calverBase(pubBaseRef(p.ref));
   const msNote = p.milestone ? `<div class="rel-confirm-note">🏷️ ${t("Milestone")}: <b>${esc(p.milestone)}</b></div>` : "";
   const root = $("#modal-root");
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>${t("Publicar")} <code>${esc(base)}.x${esc(mxSuffix)}</code> ${targets.length === 1 ? t("en {n} proyecto", { n: targets.length }) : t("en {n} proyectos", { n: targets.length })}</h3>
-        <p class="muted">${t("Tag + release desde")} <code>${esc(p.ref)}</code>. ${t("El patch (<code>.0</code>, <code>.1</code>…) se calcula por proyecto. No atómico: si alguno falla, el resto sí se publica.")}</p>
+        <h3>${t("Publicar")} <code>${esc(pubTagPreview())}</code> ${targets.length === 1 ? t("en {n} proyecto", { n: targets.length }) : t("en {n} proyectos", { n: targets.length })}</h3>
+        <p class="muted">${t("Tag + release desde")} <code>${esc(refs.join(" · "))}</code>. ${t("El patch (<code>.0</code>, <code>.1</code>…) se calcula por proyecto. No atómico: si alguno falla, el resto sí se publica.")}</p>
         <ul class="rel-confirm-list">${targets.map((proj) => `<li>${esc(proj.name)} <span class="muted">${esc(proj.path)}</span></li>`).join("")}</ul>
         ${msNote ? `<div class="rel-confirm-notes">${msNote}</div>` : ""}
         <div class="modal-actions">
@@ -225,14 +263,23 @@ async function runReleasePublish() {
   renderReleasePublish();
   try {
     const projects = r.projects.filter((proj) => r.selected.has(proj.path)).map((proj) => ({ id: proj.path, name: proj.name }));
-    p.results = await window.monstro.createReleases({
-      projects,
-      ref: p.ref,
-      base: calverBase(p.ref),
-      milestones: p.milestone ? [p.milestone] : [],
-      description: p.description,
-      name: "{tag}",
-    });
+    const base = calverBase(pubBaseRef(p.ref));
+    const refs = pubRefList();
+    // Una llamada por variante (el backend publica desde UN ref). Secuencial y no atómico como el
+    // resto: si la rama -mx no existe en un proyecto, sus errores salen en la lista y España sigue.
+    const results = [];
+    for (const ref of refs) {
+      const batch = await window.monstro.createReleases({
+        projects,
+        ref,
+        base,
+        milestones: p.milestone ? [p.milestone] : [],
+        description: p.description,
+        name: "{tag}",
+      });
+      results.push(...batch.results.map((res) => ({ ...res, ref })));
+    }
+    p.results = { base, refs, milestones: p.milestone ? [p.milestone] : [], results };
     const ok = p.results.results.filter((x) => x.ok).length;
     const fail = p.results.results.length - ok;
     toast(fail ? t("{ok} publicada(s), {fail} con error", { ok, fail }) : t("{ok} release(s) publicada(s)", { ok }), fail ? "warn" : "ok");
@@ -261,10 +308,11 @@ function startReleaseStatusPoll() {
   const tick = async () => {
     ticks++;
     for (const res of ok) {
-      const before = p.status.get(res.id)?.pipeline?.state || null;
+      const key = pubStatusKey(res);
+      const before = p.status.get(key)?.pipeline?.state || null;
       const st = await window.monstro.releaseStatus(res.id, res.tag).catch(() => null);
       if (!st) continue;
-      p.status.set(res.id, st);
+      p.status.set(key, st);
       const now = st.pipeline?.state || null;
       if (["FAILURE", "ERROR"].includes(now) && !["FAILURE", "ERROR"].includes(before)) {
         toast(`${t("Pipeline en rojo")} · ${res.name} ${res.tag}`, "err");
@@ -274,7 +322,7 @@ function startReleaseStatusPoll() {
     if (state.view === "releases" && r.tab === "publish") renderReleasePublish();
     // Para cuando todas las pipelines llegan a estado terminal, o tras ~5 min (evita sondear sin fin
     // si un proyecto no tiene CI en tags y su pipeline nunca aparece).
-    const allDone = ok.every((res) => TERMINAL.includes(p.status.get(res.id)?.pipeline?.state));
+    const allDone = ok.every((res) => TERMINAL.includes(p.status.get(pubStatusKey(res))?.pipeline?.state));
     if (allDone || ticks >= 20) stop();
   };
   stop();
