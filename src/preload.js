@@ -65,7 +65,15 @@ contextBridge.exposeInMainWorld("monstro", {
   submitReview: (repo, number, review) => ipcRenderer.invoke("pr:submitReview", { repo, number, review }),
   dismissReview: (repo, number, reviewId, message) =>
     ipcRenderer.invoke("pr:dismissReview", { repo, number, reviewId, message }),
-  aiReview: (title, body, files) => ipcRenderer.invoke("ai:review", { title, body, files }),
+  aiReview: (repo, pr, files) =>
+    ipcRenderer.invoke("ai:review", {
+      repo,
+      title: pr.title,
+      body: pr.body || "",
+      sourceBranch: pr.headRefName,
+      targetBranch: pr.baseRefName,
+      files,
+    }),
   aiStatus: () => ipcRenderer.invoke("ai:status"),
   aiPing: () => ipcRenderer.invoke("ai:ping"),
   draftsList: (key) => ipcRenderer.invoke("drafts:list", { key }),

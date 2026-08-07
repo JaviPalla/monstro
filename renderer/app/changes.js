@@ -147,6 +147,8 @@ function openInlineComposer(tr) {
         <div class="muted" style="margin-bottom:6px">📝 ${t("Borrador en")} <code>${esc(path)}</code> ${t("línea")} ${esc(line)} (${side === "LEFT" ? t("versión anterior") : t("versión nueva")}) — ${t("no se publica hasta que tú lo digas")}</div>
         <textarea rows="3" placeholder="${t("Tu comentario…")}"></textarea>
         <div class="composer-actions">
+          ${severityPicker({})}
+          <span style="flex:1"></span>
           <button class="btn cancel">${t("Cancelar")}</button>
           <button class="btn btn-accent send">📝 ${t("Guardar borrador")}</button>
         </div>
@@ -158,7 +160,7 @@ function openInlineComposer(tr) {
   row.querySelector(".send").addEventListener("click", async () => {
     const body = row.querySelector("textarea").value.trim();
     if (!body) return;
-    await addDraft({ kind: "inline", path, side, line: Number(line), body });
+    await addDraft({ kind: "inline", path, side, line: Number(line), body, severity: row.querySelector(".sev-select").value });
     renderDetail();
   });
 }

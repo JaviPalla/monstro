@@ -20,9 +20,13 @@ async function openDetail(number, tab = "conv", repoOverride = null) {
     state.conversation = conversation;
     state.drafts = drafts;
     // seed visual para capturas de selftest: no se persiste
-    if (IS_SELFTEST && new URLSearchParams(location.search).get("seed_draft") === "1" && !state.drafts.length) {
-      state.drafts.push({ id: "seed", kind: "general", body: "Esto es un borrador local: no está en GitHub.", createdAt: new Date().toISOString() });
-      state.drafts.push({ id: "seed-ai", kind: "general", ai: true, aiModel: "claude-opus-4-8", aiEffort: "high", body: "AI draft seeded for screenshots.", createdAt: new Date().toISOString() });
+    if (IS_SELFTEST && (new URLSearchParams(location.search).get("seed_draft") === "1" || SELFTEST_ROUTE.startsWith("review")) && !state.drafts.length) {
+      const seed = (over) => ({ createdAt: new Date().toISOString(), kind: "general", ...over });
+      state.drafts.push(seed({ id: "seed", body: "Esto es un borrador local: no está en GitHub." }));
+      state.drafts.push(seed({ id: "seed-ai-1", ai: true, aiModel: "claude-opus-4-8", aiEffort: "high", severity: "blocker", kind: "inline", path: "src/pedidos.js", side: "RIGHT", line: 42, body: "Si el pedido no tiene cliente, esto revienta.\n\n1. El cliente se da de baja → 2. su pedido se queda sin dueño → 3. alguien abre la lista de pedidos → 4. pantalla en blanco.\n\nComprueba el cliente antes de leer su nombre." }));
+      state.drafts.push(seed({ id: "seed-ai-2", ai: true, aiModel: "claude-opus-4-8", aiEffort: "high", severity: "important", kind: "inline", path: "src/pedidos.js", side: "RIGHT", line: 88, body: "Guardas dentro del bucle: si falla el tercer pedido, los dos primeros ya se han guardado y no hay vuelta atrás. Guarda una sola vez al final." }));
+      state.drafts.push(seed({ id: "seed-ai-3", ai: true, aiModel: "claude-opus-4-8", aiEffort: "high", severity: "minor", kind: "inline", path: "src/util.js", side: "RIGHT", line: 12, body: "El nombre dice que solo trae los activos, pero también devuelve los borrados. Renómbralo o filtra." }));
+      state.drafts.push(seed({ id: "seed-ai-4", ai: true, aiModel: "claude-opus-4-8", aiEffort: "high", severity: "nit", body: "Bien resuelto el cálculo del total: el redondeo ya no se pierde.\n\nBloqueante: el pedido sin cliente (línea 42).\n\nPruebas: la lógica nueva no tiene ninguna que corra sola en CI." }));
     }
   } catch (err) {
     detailContent.innerHTML = `<div class="detail-inner"><div class="error-box">${esc(String(err.message || err))}</div></div>`;
@@ -30,6 +34,10 @@ async function openDetail(number, tab = "conv", repoOverride = null) {
     return;
   }
   renderDetail();
+  if (IS_SELFTEST && SELFTEST_ROUTE.startsWith("review")) {
+    if (SELFTEST_ROUTE === "review-edit") state.editingDraftId = "seed-ai-1";
+    openDraftsViewer();
+  }
 }
 
 function renderDetail() {
@@ -58,7 +66,7 @@ function renderDetail() {
         ${state.aiGenerating === pr.number
           ? `<button class="btn btn-ai" id="act-ai" disabled><span class="spinner"></span> ${t("Generando review…")}</button>`
           : `<button class="btn btn-ai" id="act-ai" ${pr.state === "OPEN" ? "" : "disabled"}
-                title="${t("Genera comentarios de review (en inglés) como borradores: nada se publica hasta que tú lo digas")}">🤖 ${t("Review con IA")}</button>`}
+                title="${t("Revisa la MR y deja los comentarios como borradores para que los repases: nada se publica hasta que tú lo digas")}">🤖 ${t("Review con IA")}</button>`}
         ${myApprovedReview(pr) && pr.state === "OPEN"
           ? `<button class="btn" id="act-unapprove"
                 title="${t("Descarta tu review aprobada (GitHub lo registra en la PR con el motivo)")}">↩︎ ${t("Quitar aprobación")}</button>`

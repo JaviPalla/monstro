@@ -139,9 +139,10 @@ function renderList() {
     row.addEventListener("click", () => openDetail(Number(row.dataset.number), "conv", row.dataset.repo)),
   );
 
-  if (IS_SELFTEST && !state.selftestOpenedDetail && prs.length && (SELFTEST_ROUTE === "list" || SELFTEST_ROUTE === "changes")) {
+  if (IS_SELFTEST && !state.selftestOpenedDetail && prs.length && (["list", "changes"].includes(SELFTEST_ROUTE) || SELFTEST_ROUTE.startsWith("review"))) {
     state.selftestOpenedDetail = true;
-    openDetail(prs[0].number, SELFTEST_ROUTE === "changes" ? "changes" : "conv");
+    // El repo va explícito: con "All repos" state.repo es "__all__" y el detalle daría 404.
+    openDetail(prs[0].number, SELFTEST_ROUTE === "list" ? "conv" : "changes", prs[0].repository?.nameWithOwner);
   }
 }
 

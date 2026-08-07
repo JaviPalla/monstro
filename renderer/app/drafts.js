@@ -1,5 +1,38 @@
 "use strict";
 
+/* ============ prioridad: burbujas de color ============ */
+// El emoji va SIEMPRE al principio del comentario publicado (GitLab no renderiza nuestro CSS),
+// la píldora de color es lo que se ve dentro de Monstro.
+const SEVERITIES = {
+  blocker: { dot: "🔴", label: () => t("Bloqueante") },
+  important: { dot: "🟠", label: () => t("Importante") },
+  minor: { dot: "🟡", label: () => t("Mejorable") },
+  nit: { dot: "🟢", label: () => t("Menor") },
+};
+const DEFAULT_SEVERITY = "minor";
+
+function severityOf(draft) {
+  return SEVERITIES[draft?.severity] ? draft.severity : DEFAULT_SEVERITY;
+}
+
+function severityBubble(draft) {
+  const key = severityOf(draft);
+  return `<span class="sev sev-${key}" title="${t("Prioridad")}">${SEVERITIES[key].dot} ${SEVERITIES[key].label()}</span>`;
+}
+
+function severityPicker(draft) {
+  const current = severityOf(draft);
+  return `<select class="sev-select">${Object.entries(SEVERITIES)
+    .map(([key, s]) => `<option value="${key}" ${key === current ? "selected" : ""}>${s.dot} ${s.label()}</option>`)
+    .join("")}</select>`;
+}
+
+/** Cuerpo tal y como se publica: con la burbuja delante para que la prioridad se vea en GitLab. */
+function publishBody(draft) {
+  const { dot, label } = SEVERITIES[severityOf(draft)];
+  return `${dot} **${label()}** — ${draft.body}`;
+}
+
 function draftsKey() {
   return `${detailRepo()}#${state.selected}`;
 }
@@ -31,6 +64,8 @@ function draftCard(draft) {
         <div class="draft-head">✏️ ${t("EDITANDO")} <span class="muted">· ${where}</span></div>
         <textarea class="draft-editor" rows="5">${esc(draft.body)}</textarea>
         <div class="composer-actions">
+          ${severityPicker(draft)}
+          <span style="flex:1"></span>
           <button class="btn draft-edit-cancel">${t("Cancelar")}</button>
           <button class="btn btn-accent draft-edit-save">${t("Guardar")}</button>
         </div>
@@ -41,7 +76,7 @@ function draftCard(draft) {
     : "";
   return `
     <div class="draft-card ${draft.ai ? "ai" : ""}" data-draft="${draft.id}">
-      <div class="draft-head">${draft.ai ? `🤖 ${t("BORRADOR (IA)")}` : `📝 ${t("BORRADOR")}`} <span class="muted">· ${where}${aiMeta}</span>
+      <div class="draft-head">${severityBubble(draft)} ${draft.ai ? `🤖 ${t("BORRADOR (IA)")}` : `📝 ${t("BORRADOR")}`} <span class="muted">· ${where}${aiMeta}</span>
         <button class="draft-edit" title="${t("Editar borrador")}">✏️</button>
         <button class="draft-pub" title="${t("Publicar solo este borrador en GitHub")}">↗ ${t("Publicar")}</button>
         <button class="draft-del" title="${t("Eliminar borrador")}">🗑</button>
@@ -56,13 +91,14 @@ async function generateAiReview(pr) {
   state.aiGenerating = pr.number;
   renderDetail(); // pinta el botón en loading; persiste aunque cambies de pestaña
   toast(t("Generando review con IA… esto puede tardar un par de minutos"), "");
-  const repoKey = `${detailRepo()}#${pr.number}`;
+  const repoName = detailRepo();
+  const repoKey = `${repoName}#${pr.number}`;
   try {
     const files = state.selected === pr.number && state.files
       ? state.files
-      : await window.monstro.prFiles(repoKey.split("#")[0], pr.number);
+      : await window.monstro.prFiles(repoName, pr.number);
     if (state.selected === pr.number) state.files = files;
-    const { review, backend, model, effort } = await window.monstro.aiReview(pr.title, pr.body || "", files);
+    const { review, backend, model, effort, deep } = await window.monstro.aiReview(repoName, pr, files);
 
     const anchors = new Set();
     for (const file of files) {
@@ -83,6 +119,7 @@ async function generateAiReview(pr) {
           ai: true,
           aiModel: model,
           aiEffort: effort || null,
+          severity: comment.severity,
           path: comment.path,
           side: comment.side,
           line: comment.line,
@@ -96,8 +133,8 @@ async function generateAiReview(pr) {
     if (review.summary) summaryParts.push(review.summary);
     if (orphaned.length) {
       summaryParts.push(
-        "Comments that could not be anchored to a diff line:\n" +
-          orphaned.map((c) => `- **${c.path}:${c.line}** — ${c.body}`).join("\n"),
+        `${t("Comentarios que no se pudieron anclar a una línea del diff:")}\n` +
+          orphaned.map((c) => `- **${c.path}:${c.line}** — ${SEVERITIES[c.severity]?.dot || ""} ${c.body}`).join("\n"),
       );
     }
     if (summaryParts.length) {
@@ -108,6 +145,8 @@ async function generateAiReview(pr) {
         ai: true,
         aiModel: model,
         aiEffort: effort || null,
+        // El resumen no es un hallazgo: la burbuja más baja para que no compita con los bloqueantes.
+        severity: "nit",
         body: summaryParts.join("\n\n---\n\n"),
       });
     }
@@ -117,13 +156,16 @@ async function generateAiReview(pr) {
       state.drafts.push(...newDrafts);
       await saveDrafts();
       state.detailTab = "changes";
+      // Lo primero que ves es lo que se publicaría, para revisarlo y retocarlo antes de nada.
+      openDraftsViewer();
     } else {
       const existing = await window.monstro.draftsList(repoKey);
       await window.monstro.draftsSave(repoKey, [...existing, ...newDrafts]);
       state.draftKeys = new Set(await window.monstro.draftsKeys());
       renderList();
     }
-    toast(`${t("IA")} (${backend} · ${model}${effort ? ` · ${effort}` : ""}): ${t("{n} comentario(s) en línea + resumen, en borradores de #{num}", { n: newDrafts.length - (summaryParts.length ? 1 : 0), num: pr.number })}`, "ok");
+    const how = deep ? t("revisado contra el código en local") : t("solo con el diff");
+    toast(`${t("IA")} (${backend} · ${model}${effort ? ` · ${effort}` : ""} · ${how}): ${t("{n} comentario(s) en línea + resumen, en borradores de #{num}", { n: newDrafts.length - (summaryParts.length ? 1 : 0), num: pr.number })}`, "ok");
   } catch (err) {
     toast(t("Review con IA falló: {err}", { err: String(err.message || err) }), "err");
   } finally {
@@ -167,6 +209,7 @@ function wireDraftCards(container) {
       const draft = state.drafts.find((d) => d.id === id);
       if (draft && body) {
         draft.body = body;
+        draft.severity = card.querySelector(".sev-select").value;
         await saveDrafts();
         toast(t("Borrador actualizado"), "ok");
       }
@@ -184,7 +227,7 @@ function confirmPublishSingle(draft) {
       <div class="modal">
         <h3>↗ ${t("Publicar este borrador")}</h3>
         <p class="muted">${esc(where)} — ${t("se publica como comentario (sin veredicto). El resto de borradores no se tocan.")}</p>
-        <div class="draft-card ${draft.ai ? "ai" : ""}" style="max-height:180px;overflow-y:auto"><div class="draft-body">${esc(draft.body)}</div></div>
+        <div class="draft-card ${draft.ai ? "ai" : ""}" style="max-height:180px;overflow-y:auto"><div class="draft-body">${esc(publishBody(draft))}</div></div>
         <div class="modal-actions">
           <button class="btn" id="modal-cancel">${t("Cancelar")}</button>
           <button class="btn btn-primary" id="modal-confirm">${t("Publicar en GitHub")}</button>
@@ -202,8 +245,8 @@ function confirmPublishSingle(draft) {
       await window.monstro.submitReview(detailRepo(), state.selected, {
         commitId: state.conversation.headRefOid,
         event: "COMMENT",
-        body: draft.kind === "general" ? draft.body : undefined,
-        comments: draft.kind === "inline" ? [draft] : [],
+        body: draft.kind === "general" ? publishBody(draft) : undefined,
+        comments: draft.kind === "inline" ? [{ ...draft, body: publishBody(draft) }] : [],
       });
       await removeDraft(draft.id);
       toast(t("Borrador publicado ✓"), "ok");
@@ -242,10 +285,16 @@ function wireDraftsBar() {
 }
 
 /* ============ navegación y visor de borradores ============ */
+// Orden de lectura y de navegación ↑↓: primero lo grave, luego por fichero y línea. El general
+// (el resumen) va al final.
+const SEVERITY_RANK = { blocker: 0, important: 1, minor: 2, nit: 3 };
+
 function orderedDrafts() {
   const fileOrder = new Map((state.files || []).map((f, i) => [f.filename, i]));
   return [...state.drafts].sort((a, b) => {
     if (a.kind !== b.kind) return a.kind === "inline" ? -1 : 1;
+    const bySeverity = SEVERITY_RANK[severityOf(a)] - SEVERITY_RANK[severityOf(b)];
+    if (bySeverity) return bySeverity;
     if (a.kind === "inline") {
       const byFile = (fileOrder.get(a.path) ?? 999) - (fileOrder.get(b.path) ?? 999);
       if (byFile) return byFile;
@@ -293,21 +342,37 @@ function openDraftsViewer() {
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal modal-wide">
-        <h3>📝 ${t("Borradores de #{num} ({count})", { num: state.selected, count: drafts.length })}</h3>
+        <h3>📝 ${t("Se publicarían {count} comentarios en #{num}", { num: state.selected, count: drafts.length })}</h3>
+        <p class="muted">${t("Revísalos y edítalos a tu gusto. Nada sale de tu Mac hasta que pulses Publicar.")}</p>
         <div class="drafts-viewer">
-          ${drafts.map((d) => `
+          ${drafts.map((d) => {
+            const where = `${severityBubble(d)} ${d.ai ? "🤖" : "📝"} ${d.kind === "inline"
+              ? `<code>${esc(d.path)}</code>:${d.line} <span class="muted">(${d.side === "LEFT" ? t("anterior") : t("nueva")})</span>`
+              : `<span class="muted">${t("comentario general")}</span>`}`;
+            if (state.editingDraftId === d.id) {
+              return `
+                <div class="viewer-row editing" data-id="${d.id}">
+                  <div class="viewer-where">${where}</div>
+                  <textarea class="draft-editor viewer-editor" rows="8">${esc(d.body)}</textarea>
+                  <div class="viewer-actions">
+                    ${severityPicker(d)}
+                    <button class="btn btn-accent viewer-save" data-id="${d.id}">${t("Guardar")}</button>
+                    <button class="btn viewer-cancel">${t("Cancelar")}</button>
+                  </div>
+                </div>`;
+            }
+            return `
             <div class="viewer-row" data-id="${d.id}">
-              <div class="viewer-where">${d.ai ? "🤖" : "📝"} ${d.kind === "inline"
-                ? `<code>${esc(d.path)}</code>:${d.line} <span class="muted">(${d.side === "LEFT" ? t("anterior") : t("nueva")})</span>`
-                : `<span class="muted">${t("comentario general")}</span>`}</div>
-              <div class="viewer-body">${esc(d.body.length > 220 ? `${d.body.slice(0, 220)}…` : d.body)}</div>
+              <div class="viewer-where">${where}</div>
+              <div class="viewer-body">${esc(d.body)}</div>
               <div class="viewer-actions">
                 <button class="btn viewer-go" data-id="${d.id}">${t("Ir ↗")}</button>
                 <button class="btn viewer-edit" data-id="${d.id}" title="${t("Editar borrador")}">✏️</button>
                 <button class="btn viewer-pub" data-id="${d.id}" title="${t("Publicar solo este borrador")}">${t("Publicar")}</button>
                 <button class="btn viewer-del" data-id="${d.id}">🗑</button>
               </div>
-            </div>`).join("")}
+            </div>`;
+          }).join("")}
         </div>
         <div class="modal-actions">
           <button class="btn" id="modal-cancel">${t("Cerrar")}</button>
@@ -316,7 +381,10 @@ function openDraftsViewer() {
         </div>
       </div>
     </div>`;
-  const close = () => (root.innerHTML = "");
+  const close = () => {
+    state.editingDraftId = null;
+    root.innerHTML = "";
+  };
   $("#modal-cancel").addEventListener("click", close);
   $("#modal-backdrop").addEventListener("click", (event) => {
     if (event.target.id === "modal-backdrop") close();
@@ -345,13 +413,32 @@ function openDraftsViewer() {
       if (draft) confirmPublishSingle(draft);
     }),
   );
+  // Editar sin salir del visor: lo que ves es lo que se publicaría, así que se retoca aquí mismo.
   root.querySelectorAll(".viewer-edit").forEach((btn) =>
     btn.addEventListener("click", () => {
-      close();
       state.editingDraftId = btn.dataset.id;
-      scrollToDraft(btn.dataset.id);
+      openDraftsViewer();
+      root.querySelector(".viewer-editor")?.focus();
     }),
   );
+  root.querySelector(".viewer-cancel")?.addEventListener("click", () => {
+    state.editingDraftId = null;
+    openDraftsViewer();
+  });
+  root.querySelector(".viewer-save")?.addEventListener("click", async (event) => {
+    const row = event.target.closest(".viewer-row");
+    const draft = state.drafts.find((d) => d.id === row.dataset.id);
+    const body = row.querySelector(".viewer-editor").value.trim();
+    if (draft && body) {
+      draft.body = body;
+      draft.severity = row.querySelector(".sev-select").value;
+      await saveDrafts();
+      toast(t("Borrador actualizado"), "ok");
+    }
+    state.editingDraftId = null;
+    openDraftsViewer();
+    renderDetail();
+  });
   root.querySelectorAll(".viewer-del").forEach((btn) =>
     btn.addEventListener("click", async () => {
       await removeDraft(btn.dataset.id);
@@ -403,8 +490,8 @@ async function publishDrafts(event) {
     await window.monstro.submitReview(detailRepo(), pr.number, {
       commitId: state.conversation.headRefOid,
       event,
-      body: general.map((d) => d.body).join("\n\n---\n\n") || undefined,
-      comments: inline,
+      body: general.map(publishBody).join("\n\n---\n\n") || undefined,
+      comments: inline.map((d) => ({ ...d, body: publishBody(d) })),
     });
     state.drafts = [];
     await saveDrafts();

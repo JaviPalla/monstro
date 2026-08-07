@@ -56,6 +56,8 @@ function resolveAi(override) {
 
 const MAX_DIFF_CHARS = 70_000;
 const CLI_TIMEOUT_MS = 12 * 60 * 1000;
+// La review "profunda" abre ficheros y sigue llamadores: tarda bastante más que un one-shot.
+const REVIEW_TIMEOUT_MS = 25 * 60 * 1000;
 // Sin MCP servers ni persistencia de sesión: arranque más rápido y sin tocar
 // el historial de Claude Code del usuario. La review es un one-shot sin tools.
 const CLI_ARGS = [
@@ -66,24 +68,38 @@ const CLI_ARGS = [
   "--no-session-persistence",
 ];
 
+// Herramientas de la review profunda: leer el repo del usuario, nada más.
+const READ_TOOLS = ["Read", "Grep", "Glob"];
+// COMPROBADO: --disallowedTools NO basta. El CLI arranca con cwd en el repo del usuario y hereda
+// su .claude/settings(.local).json, que suele traer permisos ya concedidos — en la prueba, el
+// agente creó un fichero pese al --disallowedTools. El veto que sí gana es `permissions.deny` en
+// un --settings propio. Bash entra en la lista: con Read/Grep/Glob ya sigue llamadores, y sin
+// shell no hay forma de escribir en el repo de rebote.
+const DENIED_TOOLS = ["Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "WebFetch", "WebSearch", "Task"];
+const READ_ONLY_SETTINGS = JSON.stringify({ permissions: { deny: DENIED_TOOLS } });
+
+// Prioridad de cada comentario → burbuja de color en la UI y en el comentario publicado.
+const SEVERITIES = ["blocker", "important", "minor", "nit"];
+
 const REVIEW_SCHEMA = {
   type: "object",
   properties: {
     summary: {
       type: "string",
-      description: "Concise overall review summary in English (markdown allowed).",
+      description: "Resumen de la revisión en español (markdown), empezando por lo que está bien hecho.",
     },
     comments: {
       type: "array",
       items: {
         type: "object",
         properties: {
-          path: { type: "string", description: "File path exactly as it appears in the diff." },
-          line: { type: "integer", description: "Line number the comment anchors to." },
+          path: { type: "string", description: "Ruta del fichero exactamente como aparece en el diff." },
+          line: { type: "integer", description: "Línea a la que se ancla el comentario." },
           side: { type: "string", enum: ["LEFT", "RIGHT"] },
-          body: { type: "string", description: "The review comment, in English." },
+          severity: { type: "string", enum: SEVERITIES, description: "Prioridad del hallazgo." },
+          body: { type: "string", description: "El comentario, en español, conciso y sin jerga." },
         },
-        required: ["path", "line", "side", "body"],
+        required: ["path", "line", "side", "severity", "body"],
         additionalProperties: false,
       },
     },
@@ -92,24 +108,49 @@ const REVIEW_SCHEMA = {
   additionalProperties: false,
 };
 
-function buildPrompt({ title, body, diffText, truncated }) {
-  return `You are a senior software engineer reviewing a colleague's pull request. Review the diff below and produce focused, actionable review comments.
+// Estrategia calcada de la skill `mr-review-gitlab`: verificar antes de afirmar, priorizar lo que
+// más rinde, y escribir para que lo entienda el autor sin descifrar jerga.
+function buildReviewPrompt({ title, body, diffText, truncated, deep, sourceBranch, targetBranch }) {
+  const verify = deep
+    ? `TIENES EL REPOSITORIO CLONADO EN TU DIRECTORIO DE TRABAJO (rama base: ${targetBranch || "?"}, rama de la MR: ${sourceBranch || "?"}). Úsalo: abre los ficheros implicados, busca los llamadores con grep, sigue las llamadas y lee las implementaciones. Tienes acceso de SOLO LECTURA (no puedes modificar nada, ni falta). El código en disco puede no estar en la rama de la MR: el diff de abajo manda, el repo sirve para entender el contexto de alrededor.`
+    : `NO tienes el repositorio en local: solo ves el diff. Por eso, si un hallazgo depende de código que no está en el diff, NO lo afirmes — o lo dejas fuera, o lo escribes como pregunta ("¿los llamadores de X garantizan Y?").`;
 
-Rules:
-- Write everything in English (comments and summary).
-- Focus on real issues: correctness bugs, edge cases, race conditions, security, performance, misleading names, dead code. Avoid style nits and empty praise.
-- At most 8 inline comments — only the ones worth a human's attention. If the change looks good, return few or zero comments and say so in the summary.
-- Each inline comment anchors to a line VISIBLE IN THE DIFF: use side "RIGHT" with the new-file line number for added/context lines, or side "LEFT" with the old-file line number for deleted lines. Use the exact file path shown in the diff.
-- Be concrete: say what is wrong and what you would do instead.
-${truncated ? "- Note: the diff was truncated for length; mention that in the summary.\n" : ""}
-Respond with ONLY a JSON object matching this shape (no prose, no code fences):
-{"summary": string, "comments": [{"path": string, "line": integer, "side": "LEFT"|"RIGHT", "body": string}]}
+  return `Eres un ingeniero senior revisando la merge request de un compañero. Vas a dejar comentarios EN BORRADOR anclados a líneas concretas del diff.
 
-# Pull request
-Title: ${title}
+# Cómo revisar
 
-Description:
-${body || "(no description)"}
+**Lee el diff entero antes de opinar.** No revises fichero a fichero de forma aislada: entiende el cambio completo.
+
+**Regla dura: cero hallazgos sin comprobar.** Un comentario falso quema la credibilidad de toda la revisión. ${verify}
+
+Lo que más rinde, por orden:
+1. **Sigue a los llamadores de los métodos nuevos o con firma cambiada.** Si el método nuevo exige una precondición, comprueba UNO POR UNO que todos los llamadores la cumplen. Aquí salen los bloqueantes de verdad.
+2. **Desconfía de los nombres.** Un \`GetAllDependantX\` puede devolver también al padre. Mira la implementación, no la firma.
+3. **Cambios de comportamiento que no se ven en el diff.** Si el código ahora hace algo nuevo (escribe otra fila, cascadea un borrado), pregúntate: ¿los datos que YA hay en producción cumplen lo que este código da por hecho?
+4. **La misma comprobación repetida en varios sitios.** Si N llamadores comprueban lo mismo con N criterios distintos, uno estará mal o lo estará pronto. Propón meterla dentro.
+5. **Operaciones a medias.** Un guardado por elemento dentro de un bucle deja estados inconsistentes si falla a mitad. Peor si antes del bucle ya se llamó a un tercero (un cobro, una baja externa).
+6. **Pruebas.** ¿La lógica nueva tiene alguna prueba que se ejecute sola en CI? Un test que no hace nada sin cierta variable de entorno no es cobertura.
+
+# Cómo escribir los comentarios
+
+- **En ESPAÑOL, conciso y al grano.** Frases cortas. Nada de párrafos.
+- **Sin jerga.** Prohibido "viola el principio de responsabilidad única", "acoplamiento", "idempotencia", "code smell". Di QUÉ SE ROMPE y A QUIÉN, en palabras llanas: "si el usuario borra su cuenta, sus pedidos se quedan sin dueño y la pantalla de pedidos revienta".
+- **Todo hallazgo grave lleva el escenario paso a paso**: "1. el hijo cumple 18 → 2. pierde el código → 3. entra a la app → 4. se cierra la cuenta del padre".
+- **Propón el arreglo**, con el fragmento de código si aplica. No solo la queja.
+- **"severity"**: "blocker" (rompe algo, no puede entrar así) · "important" (fallo real en un caso concreto) · "minor" (mejorable, no urgente) · "nit" (detalle menor).
+- **No infles la revisión**: entre 3 y 10 comentarios. Si el cambio está bien, devuelve pocos o ninguno y dilo en el resumen. Nada de elogios genéricos ni comentarios de estilo.
+- **Cada comentario ancla a una línea VISIBLE EN EL DIFF**: side "RIGHT" con el número de línea del fichero nuevo para líneas añadidas o de contexto; side "LEFT" con el número del fichero antiguo para líneas borradas. Usa la ruta exacta que aparece en el diff.
+- **El "summary"** empieza por lo que está BIEN hecho y sé específico (los elogios genéricos no valen nada), sigue con lo bloqueante y termina con el estado de las pruebas.
+${truncated ? "- Nota: el diff se truncó por longitud; dilo en el resumen.\n" : ""}
+Responde SOLO con un objeto JSON con esta forma (sin prosa ni cercos):
+{"summary": string, "comments": [{"path": string, "line": integer, "side": "LEFT"|"RIGHT", "severity": "blocker"|"important"|"minor"|"nit", "body": string}]}
+
+# Merge request
+Título: ${title}
+${sourceBranch ? `Rama: ${sourceBranch} → ${targetBranch}` : ""}
+
+Descripción:
+${body || "(sin descripción)"}
 
 # Diff
 ${diffText}`;
@@ -170,19 +211,31 @@ function claudeCliPath() {
   }
 }
 
-function generateViaCli(prompt, cliPath, model, effort) {
+function generateViaCli(prompt, cliPath, model, effort, opts = {}) {
+  const { cwd = undefined, timeoutMs = CLI_TIMEOUT_MS, readOnlyRepo = false } = opts;
   const args = [...CLI_ARGS, "--model", model];
   if (effort) args.push("--effort", effort);
+  // Modo "review profunda": el agente puede LEER el repo del usuario, jamás escribir. El veto real
+  // es `permissions.deny` vía --settings (ver DENIED_TOOLS); allowedTools solo pre-aprueba las
+  // lecturas para que no pidan permiso, y --permission-mode default evita heredar un
+  // bypassPermissions de los ajustes del repo.
+  if (readOnlyRepo) {
+    args.push(
+      "--allowedTools", READ_TOOLS.join(","),
+      "--permission-mode", "default",
+      "--settings", READ_ONLY_SETTINGS,
+    );
+  }
   return new Promise((resolve, reject) => {
     // shell:true en Windows: el CLI suele ser claude.cmd y Node ya no lanza .cmd sin shell.
-    const child = spawn(cliPath, args, { stdio: ["pipe", "pipe", "pipe"], windowsHide: true, shell: process.platform === "win32" });
+    const child = spawn(cliPath, args, { cwd, stdio: ["pipe", "pipe", "pipe"], windowsHide: true, shell: process.platform === "win32" });
     let stdout = "";
     let stderr = "";
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill("SIGTERM");
-    }, CLI_TIMEOUT_MS);
+    }, timeoutMs);
 
     child.stdout.on("data", (d) => (stdout += d));
     child.stderr.on("data", (d) => (stderr += d));
@@ -195,7 +248,7 @@ function generateViaCli(prompt, cliPath, model, effort) {
       if (timedOut) {
         return reject(
           new Error(
-            `La review tardó más de ${CLI_TIMEOUT_MS / 60000} min y se canceló (PR muy grande). ` +
+            `La review tardó más de ${timeoutMs / 60000} min y se canceló (PR muy grande). ` +
               "Reintenta, o exporta ANTHROPIC_API_KEY para usar la API directa (más rápida).",
           ),
         );
@@ -245,20 +298,44 @@ async function runStructured(prompt, schema, override) {
 
 /* ---------- API pública ---------- */
 
-async function generateReview({ title, body, files }) {
+// Review de una MR con la estrategia de la skill `mr-review-gitlab`. Si el repo está clonado en
+// local (`repoDir`) y hay CLI, la review es PROFUNDA: el agente abre los ficheros y sigue a los
+// llamadores para verificar cada hallazgo antes de escribirlo. Si no, cae al one-shot con el diff
+// (mismo prompt, pero avisado de que no puede comprobar nada fuera del diff).
+async function generateReview({ title, body, files, repoDir, sourceBranch, targetBranch }) {
   const { diffText, truncated } = buildDiffText(files);
-  if (!diffText) throw new Error("La PR no tiene diff revisable (¿binarios?)");
-  const prompt = buildPrompt({ title, body, diffText, truncated });
-  const { data, backend, model, effort } = await runStructured(prompt, REVIEW_SCHEMA);
-  return { review: normalize(data), backend, model, effort };
+  if (!diffText) throw new Error("La MR no tiene diff revisable (¿binarios?)");
+  const cliPath = repoDir ? claudeCliPath() : null;
+  const deep = Boolean(cliPath);
+  const prompt = buildReviewPrompt({ title, body, diffText, truncated, deep, sourceBranch, targetBranch });
+  if (!deep) {
+    const { data, backend, model, effort } = await runStructured(prompt, REVIEW_SCHEMA);
+    return { review: normalize(data), backend, model, effort, deep: false };
+  }
+  const { model, effort } = aiSettings();
+  const data = await generateViaCli(prompt, cliPath, model, effort, {
+    cwd: repoDir,
+    readOnlyRepo: true,
+    timeoutMs: REVIEW_TIMEOUT_MS,
+  });
+  return { review: normalize(data), backend: "claude-cli", model, effort, deep: true };
 }
+
+const SEVERITY_RANK = { blocker: 0, important: 1, minor: 2, nit: 3 };
 
 function normalize(review) {
   return {
     summary: typeof review.summary === "string" ? review.summary : "",
     comments: (Array.isArray(review.comments) ? review.comments : [])
       .filter((c) => c && typeof c.path === "string" && Number.isInteger(c.line) && typeof c.body === "string")
-      .map((c) => ({ path: c.path, line: c.line, side: c.side === "LEFT" ? "LEFT" : "RIGHT", body: c.body }))
+      .map((c) => ({
+        path: c.path,
+        line: c.line,
+        side: c.side === "LEFT" ? "LEFT" : "RIGHT",
+        severity: SEVERITIES.includes(c.severity) ? c.severity : "minor",
+        body: c.body,
+      }))
+      .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])
       .slice(0, 12),
   };
 }

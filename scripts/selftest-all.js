@@ -15,7 +15,7 @@ const path = require("path");
 // En Windows el binario de electron es electron.cmd (.bin) y spawnSync no lo lanza sin extensión.
 const ELECTRON = path.join(__dirname, "..", "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
 const SHOT = path.join(os.tmpdir(), "monstro-selftest.png");
-const ROUTES = ["list", "changes", "history"];
+const ROUTES = ["list", "changes", "review", "history"];
 
 let failed = 0;
 for (const route of ROUTES) {

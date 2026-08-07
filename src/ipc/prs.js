@@ -5,10 +5,25 @@
 
 const { ipcMain } = require("electron");
 const ai = require("../ai");
+const config = require("../config");
 const drafts = require("../drafts");
+const local = require("../local");
 const provider = require("../provider");
 
 const gh = () => provider.current();
+
+// Clon local del repo de la MR, si lo hay bajo el rootDir configurado. Con él la review es
+// profunda (el agente lee el código de verdad); sin él, cae al one-shot con solo el diff.
+async function localRepoDir(repoFullName) {
+  const root = config.load().local.rootDir;
+  if (!root || !repoFullName) return null;
+  try {
+    const repos = await local.scanRepos(root);
+    return repos.find((r) => r.gitlabPath === repoFullName)?.dir || null;
+  } catch {
+    return null;
+  }
+}
 
 function register() {
   ipcMain.handle("prs:list", async (_event, { repo, states }) => gh().listPRs(repo, states));
@@ -40,7 +55,9 @@ function register() {
     gh().dismissReview(repo, number, reviewId, String(message || "")),
   );
 
-  ipcMain.handle("ai:review", async (_event, { title, body, files }) => ai.generateReview({ title, body, files }));
+  ipcMain.handle("ai:review", async (_event, { repo, title, body, sourceBranch, targetBranch, files }) =>
+    ai.generateReview({ title, body, files, sourceBranch, targetBranch, repoDir: await localRepoDir(repo) }),
+  );
   ipcMain.handle("ai:status", () => ai.backendStatus());
   ipcMain.handle("ai:ping", async () => ai.ping());
 
