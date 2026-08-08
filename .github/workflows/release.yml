@@ -115,7 +115,29 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
+      # fetch-depth 0: hace falta el historial Y los tags para saber qué entró desde la versión
+      # anterior. Va aquí (y no en auto-release.yml pasándolo como input) para que la descripción
+      # salga igual venga de donde venga: auto-release, push de un tag o disparo manual.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Redactar novedades
+        shell: bash
+        run: |
+          set -euo pipefail
+          # El tag anterior a ESTE (no el último a secas: al republicar un tag viejo, `git describe`
+          # a secas devolvería el propio tag y el rango saldría vacío).
+          PREV="$(git describe --tags --abbrev=0 --match 'v*' "${TAG}^" 2>/dev/null || true)"
+          echo "Novedades de ${PREV:-el principio} a ${TAG}"
+          # Sin tag anterior (primera release) el rango es todo el historial.
+          git log ${PREV:+$PREV..}"${TAG}" --format='%s%n%b%x00' | node scripts/release-notes.js > release-notes.md
+          cat release-notes.md
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -129,4 +151,8 @@ jobs:
           name: Monstro ${{ inputs.tag || github.ref_name }}
           files: artifacts/**/*
           fail_on_unmatched_files: true
+          # body_path y NO body: el markdown lleva saltos de línea y comillas, y meterlo por
+          # `${{ }}` en el YAML lo rompe en cuanto un commit trae un carácter raro.
+          # generate_release_notes añade DEBAJO el "Full Changelog" y la lista de PRs de GitHub.
+          body_path: release-notes.md
           generate_release_notes: true

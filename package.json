@@ -9,7 +9,7 @@
     "doctor": "node scripts/doctor.js",
     "test": "node scripts/selftest-all.js",
     "test:unit": "npm run test:nodeps && node scripts/test-summary-block.js",
-    "test:nodeps": "node scripts/test-health-verdict.js && node scripts/test-next-version.js && node scripts/test-sections-sync.js && node scripts/test-ipc-handlers.js && node src/version.js && node src/updater.js",
+    "test:nodeps": "node scripts/test-health-verdict.js && node scripts/test-next-version.js && node scripts/test-release-notes.js && node scripts/test-sections-sync.js && node scripts/test-ipc-handlers.js && node src/version.js && node src/updater.js",
     "selftest": "electron . --selftest",
     "icon": "electron scripts/make-icon.js",
     "dist": "electron-builder",
