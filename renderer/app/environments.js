@@ -152,12 +152,29 @@ function healthDotHtml(path, env) {
   return `<span class="env-health ${esc(h.status)}" title="${esc(`${env.externalUrl} — ${detail}`)}">${HEALTH_ICO[h.status] || "○"}</span>`;
 }
 
+// Entornos espejo (config `environments.mirrors`): un entorno que no despliega nada por su cuenta
+// porque lo que corre ahí es el despliegue de otro (mismo artefacto, distinto bucket/dominio). Se
+// copia SOLO el despliegue, y solo si el destino no tiene uno propio: en cuanto alguien le añada su
+// job de deploy, `env.deployment` deja de ser nulo y el espejo se desactiva sin tocar nada.
+function mirrored(env, envs, sourceName) {
+  if (!sourceName || env.deployment) return env;
+  const source = envs.find((x) => x.name === sourceName);
+  if (!source?.deployment) return env;
+  return { ...env, deployment: source.deployment, mirrorOf: sourceName };
+}
+
 function envCellHtml(path, env, staleDays) {
   const v = deployVerdict(env.deployment, staleDays);
   const d = env.deployment;
   const ref = d?.ref ? `<code class="env-ref">${esc(d.ref)}</code>` : `<span class="env-ref muted">—</span>`;
   const when = d?.createdAt ? timeAgo(d.createdAt) : "";
-  const tip = [v.label, d?.ref ? `${t("ref")}: ${d.ref}` : "", d?.user ? `${t("por")} ${d.user}` : "", d?.sha || ""]
+  const tip = [
+    v.label,
+    env.mirrorOf ? t("mismo despliegue que {env}", { env: env.mirrorOf }) : "",
+    d?.ref ? `${t("ref")}: ${d.ref}` : "",
+    d?.user ? `${t("por")} ${d.user}` : "",
+    d?.sha || "",
+  ]
     .filter(Boolean)
     .join(" · ");
   const url = d?.pipelineUrl || env.externalUrl || env.webUrl || "";
@@ -166,7 +183,11 @@ function envCellHtml(path, env, staleDays) {
   return `<td class="env-cell">
     <button class="env-box ${v.cls}" ${url ? `data-url="${esc(url)}"` : "disabled"} title="${esc(tip)}">
       <span class="env-box-top"><span class="env-ico">${v.ico}</span>${ref}</span>
-      <span class="env-box-bot"><span class="env-when">${esc(when)}</span>${healthDotHtml(path, env)}</span>
+      <span class="env-box-bot">
+        <span class="env-when">${esc(when)}</span>
+        ${env.mirrorOf ? `<span class="env-mirror">↔ ${esc(env.mirrorOf)}</span>` : ""}
+        ${healthDotHtml(path, env)}
+      </span>
     </button>
   </td>`;
 }
@@ -209,6 +230,7 @@ function renderEnvironments() {
   const rowsHtml = projects
     .map((p) => {
       const envs = e.data.get(p.path);
+      const mirrors = state.config?.environments?.mirrors?.[p.path] || {};
       const cells = !envs
         ? `<td class="env-cell" colspan="${Math.max(1, cols.length)}"><span class="env-loading">${t("Cargando…")}</span></td>`
         : envs.error
@@ -216,7 +238,8 @@ function renderEnvironments() {
           : cols
               .map((name) => {
                 const env = envs.find((x) => x.name === name);
-                return env ? envCellHtml(p.path, env, staleDays) : `<td class="env-cell empty"></td>`;
+                if (!env) return `<td class="env-cell empty"></td>`;
+                return envCellHtml(p.path, mirrored(env, envs, mirrors[name]), staleDays);
               })
               .join("");
       return `<tr>

@@ -129,6 +129,17 @@ const DEFAULTS = {
     },
     // Días sin desplegar tras los que un entorno se marca como rancio (ámbar) aunque el deploy fuera OK.
     staleDays: 45,
+    // Entornos que NO tienen despliegue propio porque comparten el de otro (proyecto → destino → origen).
+    // Caso real: el dashboard tiene un único job `build` y los cuatro deploys consumen ESE artefacto
+    // (sin `--build-arg COUNTRY`, al revés que la API), así que el "test de MX" es literalmente el
+    // mismo bundle que sirve staging ES; nunca hubo un job que declarase `staging-mx`, y su celda
+    // salía vacía para siempre. Espejar es más honesto que dejar el hueco: el dato existe, solo que
+    // vive en otra columna. Solo aplica si el destino EXISTE y no tiene despliegue propio — el día
+    // que alguien le añada su job, el espejo se apaga solo. Se hereda el despliegue, NO el
+    // external_url: la sonda de salud debe ir contra la URL real del país, no duplicar la de al lado.
+    mirrors: {
+      "OpenSaludGroup/dashboard": { "staging-mx": "staging" },
+    },
   },
   // Trabajo local → GitLab (OPE-19): publicar trabajo de ramas/worktrees locales como Issues/Epics + MRs.
   local: {

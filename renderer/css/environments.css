@@ -60,6 +60,12 @@
 }
 .env-ref.muted { background: none; color: var(--text-muted); }
 .env-when { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+/* Marca de entorno espejo: la celda muestra el despliegue de otra columna, y eso hay que decirlo.
+   Sin la marca, dos celdas con el mismo tag se leen como dos despliegues distintos que casualmente
+   coinciden — justo lo contrario de lo que pasa. Va apagada: informa del origen, no compite con el ref. */
+.env-mirror {
+  font-size: 10px; color: var(--text-muted); white-space: nowrap; opacity: 0.85;
+}
 
 /* Punto de salud. `unknown` es ámbar a propósito: 200 con HTML NO es prueba de que la app esté
    sana (una SPA sirve index.html en cualquier ruta), así que no se pinta verde. */

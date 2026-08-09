@@ -29,9 +29,21 @@ Check: `node scripts/test-health-verdict.js`.
 
 **GitLab `/-/health`, `/-/readiness`, `/-/liveness` are USELESS here** — they monitor the GitLab instance itself (and need an IP allowlist), not the apps deployed through it.
 
+## Entornos espejo (`mirrors`)
+
+Un entorno puede existir en GitLab y **no desplegar nunca nada**, porque lo que corre ahí es el despliegue de otro. Caso real: `OpenSaludGroup/dashboard` → `staging-mx`. El proyecto tiene **un solo job `build`** y los cuatro deploys consumen ESE artefacto (sin `--build-arg COUNTRY`, al revés que `openhealthcareapi`), así que el test de MX es literalmente el mismo bundle que sirve `staging`. Nunca hubo un job que declarase `staging-mx` (`deploy:test` filtra por `^rb\/\d{6}$`, cuyo `$` excluye las ramas `rb/XXXXXX-mx`), y el entorno —creado a mano el 2025-03-06— acumulaba **cero deployments en cualquier estado**.
+
+`environments.mirrors` (proyecto → destino → origen) copia el despliegue del origen a la celda del destino. Tres límites deliberados:
+
+- Solo si el destino **existe y no tiene despliegue propio**. El día que alguien le añada su job de deploy, `env.deployment` deja de ser nulo y **el espejo se apaga solo** — no hay que acordarse de quitar la config.
+- Se hereda el **despliegue, no el `external_url`**: la sonda de salud debe ir contra la URL real del país, no duplicar la del vecino.
+- La celda se marca `↔ <origen>` y lo dice en el tooltip. Sin la marca, dos celdas con el mismo tag se leen como dos despliegues distintos que casualmente coinciden, que es justo lo contrario de lo que pasa.
+
+`mirrors` **no se edita desde la UI**: es una afirmación sobre la infraestructura (“estos dos entornos son el mismo despliegue”), no una preferencia. Vive en `DEFAULTS` de `src/config.js`, igual que `healthPaths`.
+
 ## Config & seeding
 
-Config `environments` = `{selectedProjects[]|null, healthPaths{}, healthExpect{}, staleDays}`. `healthPaths`/`healthExpect` are keyed by project path and read **from config in main, never from the renderer** (the renderer only sends the url + project).
+Config `environments` = `{selectedProjects[]|null, healthPaths{}, healthExpect{}, staleDays, mirrors{}}`. `healthPaths`/`healthExpect` are keyed by project path and read **from config in main, never from the renderer** (the renderer only sends the url + project).
 
 Seeding: saved `selectedProjects` else `releases.defaultProjectIds` — deliberately **not** `releases.selectedProjects` (that is "whatever was published last", often a single project). The project picker is a native `<details>` (the group has ~40 projects and the full chip bar buried the matrix).
 

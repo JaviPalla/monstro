@@ -796,6 +796,7 @@ Object.assign(I18N_EN, {
   "caído": "down",
   "ref": "ref",
   "por": "by",
+  "mismo despliegue que {env}": "same deployment as {env}",
   "Busca PRs, repos o acciones…  (Esc para cerrar)": "Search PRs, repos or actions…  (Esc to close)",
   "Sin resultados": "No results",
   "Paleta de comandos (PRs, repos, acciones)": "Command palette (PRs, repos, actions)",
