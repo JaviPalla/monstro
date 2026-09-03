@@ -179,13 +179,28 @@ async function addWorktree(dir, { branch, slug, sourceBranch }) {
   return { worktree: wtPath, branch, base };
 }
 
+// Worktree efímero, detached, en la punta de `sourceBranch` en origin. La review profunda tiene que
+// leer EL CÓDIGO DE ESA RAMA: el clon del usuario está en la rama que él dejara, con sus cambios sin
+// commitear, y el agente (sin Bash, solo Read/Grep/Glob) no tiene forma de saltar a otra rama.
+// Fetch aparte de git() porque 10s no bastan para un repo grande.
+async function reviewWorktree(dir, sourceBranch) {
+  if (!BRANCH_RE.test(sourceBranch || "")) throw new Error(`Nombre de rama no válido: ${sourceBranch}`);
+  const wtPath = path.join(dir, ".worktrees", "__review");
+  // Si quedó colgado de una review anterior que petó, se recrea limpio.
+  try { await git(dir, ["worktree", "remove", "--force", wtPath]); } catch { /* no existía */ }
+  await pexec("git", ["fetch", "--quiet", "origin", sourceBranch], { cwd: dir, timeout: 180000 });
+  fs.mkdirSync(path.join(dir, ".worktrees"), { recursive: true });
+  await git(dir, ["worktree", "add", "--detach", wtPath, "FETCH_HEAD"]);
+  return wtPath;
+}
+
 // Quita un worktree (para "limpiar stale" tras fusionar la MR). --force porque puede tener cambios.
 async function removeWorktree(dir, wtPath) {
   await git(dir, ["worktree", "remove", "--force", wtPath]);
   return { ok: true };
 }
 
-module.exports = { scanRepos, repoInfo, remotePath, parseWorktrees, parseBranches, pushBranch, branchDiff, createLocalBranch, commitAll, workingDiff, isDirty, addWorktree, removeWorktree };
+module.exports = { scanRepos, repoInfo, remotePath, parseWorktrees, parseBranches, pushBranch, branchDiff, createLocalBranch, commitAll, workingDiff, isDirty, addWorktree, removeWorktree, reviewWorktree };
 
 // Auto-verificación: `node src/local.js [dir]` (dir por defecto = el padre de este repo).
 if (require.main === module) {

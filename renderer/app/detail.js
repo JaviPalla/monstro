@@ -35,6 +35,17 @@ async function openDetail(number, tab = "conv", repoOverride = null) {
   }
   renderDetail();
   if (IS_SELFTEST && SELFTEST_ROUTE.startsWith("review")) {
+    if (SELFTEST_ROUTE === "review-model") return void openAiReviewModal(state.detailPR);
+    if (SELFTEST_ROUTE === "review-progress") {
+      state.aiGenerating = state.detailPR.number;
+      state.aiRunLabel = `claude-opus-4-8 · ${t("esfuerzo {level}", { level: "high" })}`;
+      state.aiSteps = [
+        "Leyendo src/pedidos.js", 'Buscando "GuardarPedido"', "Leyendo src/pedidos/repo.js",
+        "Leyendo src/clientes/servicio.js", 'Buscando "ClienteId"', "Listando tests/pedidos/*",
+        "Leyendo tests/pedidos/guardar.test.js", "Leyendo src/util.js",
+      ];
+      return void renderAiProgressModal(state.detailPR);
+    }
     if (SELFTEST_ROUTE === "review-edit") state.editingDraftId = "seed-ai-1";
     openDraftsViewer();
   }
@@ -64,7 +75,7 @@ function renderDetail() {
         <button class="btn btn-primary" id="act-merge" ${canMerge(pr) ? "" : "disabled"}
                 title="${esc(blockReason || t("Merge con merge commit"))}">⇅ ${t("Merge (merge commit)")}</button>
         ${state.aiGenerating === pr.number
-          ? `<button class="btn btn-ai" id="act-ai" disabled><span class="spinner"></span> ${t("Generando review…")}</button>`
+          ? `<button class="btn btn-ai" id="act-ai" title="${t("Ver por dónde va la review")}"><span class="spinner"></span> <span id="act-ai-step">${esc(state.aiStep || t("Generando review…"))}</span></button>`
           : `<button class="btn btn-ai" id="act-ai" ${pr.state === "OPEN" ? "" : "disabled"}
                 title="${t("Revisa la MR y deja los comentarios como borradores para que los repases: nada se publica hasta que tú lo digas")}">🤖 ${t("Review con IA")}</button>`}
         ${myApprovedReview(pr) && pr.state === "OPEN"
@@ -99,7 +110,7 @@ function renderDetail() {
   $("#detail-close").addEventListener("click", closeDetail);
   $("#act-update").addEventListener("click", () => updateBranch(pr));
   $("#act-merge").addEventListener("click", () => confirmMerge(pr));
-  $("#act-ai").addEventListener("click", () => generateAiReview(pr));
+  $("#act-ai").addEventListener("click", () => openAiReviewModal(pr));
   $("#act-approve")?.addEventListener("click", () => confirmApprove(pr));
   $("#act-unapprove")?.addEventListener("click", () => confirmUnapprove(pr));
   $("#act-draft-toggle")?.addEventListener("click", () => toggleDraftState(pr));

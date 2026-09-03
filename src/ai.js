@@ -62,7 +62,6 @@ const REVIEW_TIMEOUT_MS = 25 * 60 * 1000;
 // el historial de Claude Code del usuario. La review es un one-shot sin tools.
 const CLI_ARGS = [
   "-p",
-  "--output-format", "json",
   "--strict-mcp-config",
   "--mcp-config", '{"mcpServers":{}}',
   "--no-session-persistence",
@@ -86,7 +85,8 @@ const REVIEW_SCHEMA = {
   properties: {
     summary: {
       type: "string",
-      description: "Resumen de la revisión en español (markdown), empezando por lo que está bien hecho.",
+      description: "Resumen de la revisión en español (markdown), empezando por lo que está bien hecho. Máximo 8 líneas.",
+      maxLength: 1200,
     },
     comments: {
       type: "array",
@@ -97,7 +97,7 @@ const REVIEW_SCHEMA = {
           line: { type: "integer", description: "Línea a la que se ancla el comentario." },
           side: { type: "string", enum: ["LEFT", "RIGHT"] },
           severity: { type: "string", enum: SEVERITIES, description: "Prioridad del hallazgo." },
-          body: { type: "string", description: "El comentario, en español, conciso y sin jerga." },
+          body: { type: "string", description: "El comentario, en español, sin jerga. Tope: 3 frases (5 si es blocker con escenario).", maxLength: 600 },
         },
         required: ["path", "line", "side", "severity", "body"],
         additionalProperties: false,
@@ -110,10 +110,12 @@ const REVIEW_SCHEMA = {
 
 // Estrategia calcada de la skill `mr-review-gitlab`: verificar antes de afirmar, priorizar lo que
 // más rinde, y escribir para que lo entienda el autor sin descifrar jerga.
-function buildReviewPrompt({ title, body, diffText, truncated, deep, sourceBranch, targetBranch }) {
-  const verify = deep
-    ? `TIENES EL REPOSITORIO CLONADO EN TU DIRECTORIO DE TRABAJO (rama base: ${targetBranch || "?"}, rama de la MR: ${sourceBranch || "?"}). Úsalo: abre los ficheros implicados, busca los llamadores con grep, sigue las llamadas y lee las implementaciones. Tienes acceso de SOLO LECTURA (no puedes modificar nada, ni falta). El código en disco puede no estar en la rama de la MR: el diff de abajo manda, el repo sirve para entender el contexto de alrededor.`
-    : `NO tienes el repositorio en local: solo ves el diff. Por eso, si un hallazgo depende de código que no está en el diff, NO lo afirmes — o lo dejas fuera, o lo escribes como pregunta ("¿los llamadores de X garantizan Y?").`;
+function buildReviewPrompt({ title, body, diffText, truncated, deep, exact, sourceBranch, targetBranch }) {
+  const verify = !deep
+    ? `NO tienes el repositorio en local: solo ves el diff. Por eso, si un hallazgo depende de código que no está en el diff, NO lo afirmes — o lo dejas fuera, o lo escribes como pregunta ("¿los llamadores de X garantizan Y?").`
+    : exact
+      ? `TU DIRECTORIO DE TRABAJO ES EL REPOSITORIO EN LA RAMA EXACTA DE LA MR (${sourceBranch || "?"}, sobre ${targetBranch || "?"}): lo que leas en disco es lo que se va a fusionar. Ábrelo SIN LÍMITE — lee ficheros enteros aunque no los toque el diff, busca con grep TODOS los llamadores, sigue las cadenas de llamadas hasta el final, mira los tests que ya existen. Verificar es el trabajo, no un extra: si comprobar un hallazgo exige abrir veinte ficheros que nadie ha tocado, ábrelos. Acceso de SOLO LECTURA (no puedes modificar nada, ni falta).`
+      : `TIENES UN CLON DEL REPOSITORIO EN TU DIRECTORIO DE TRABAJO, PERO NO ESTÁ EN LA RAMA DE LA MR (rama base: ${targetBranch || "?"}, rama de la MR: ${sourceBranch || "?"}) y puede tener cambios sin guardar. Léelo sin límite para entender el contexto (llamadores, implementaciones de lo que no cambia), pero cuando el disco y el diff se contradigan MANDA EL DIFF. Acceso de SOLO LECTURA.`;
 
   return `Eres un ingeniero senior revisando la merge request de un compañero. Vas a dejar comentarios EN BORRADOR anclados a líneas concretas del diff.
 
@@ -133,14 +135,14 @@ Lo que más rinde, por orden:
 
 # Cómo escribir los comentarios
 
-- **En ESPAÑOL, conciso y al grano.** Frases cortas. Nada de párrafos.
+- **En ESPAÑOL y CORTO. Tope duro: 3 frases por comentario** (5 si es "blocker" y lleva el escenario). Nada de párrafos. Si no te cabe, estás explicando de más: di qué se rompe y corta.
 - **Sin jerga.** Prohibido "viola el principio de responsabilidad única", "acoplamiento", "idempotencia", "code smell". Di QUÉ SE ROMPE y A QUIÉN, en palabras llanas: "si el usuario borra su cuenta, sus pedidos se quedan sin dueño y la pantalla de pedidos revienta".
 - **Todo hallazgo grave lleva el escenario paso a paso**: "1. el hijo cumple 18 → 2. pierde el código → 3. entra a la app → 4. se cierra la cuenta del padre".
 - **Propón el arreglo**, con el fragmento de código si aplica. No solo la queja.
 - **"severity"**: "blocker" (rompe algo, no puede entrar así) · "important" (fallo real en un caso concreto) · "minor" (mejorable, no urgente) · "nit" (detalle menor).
 - **No infles la revisión**: entre 3 y 10 comentarios. Si el cambio está bien, devuelve pocos o ninguno y dilo en el resumen. Nada de elogios genéricos ni comentarios de estilo.
 - **Cada comentario ancla a una línea VISIBLE EN EL DIFF**: side "RIGHT" con el número de línea del fichero nuevo para líneas añadidas o de contexto; side "LEFT" con el número del fichero antiguo para líneas borradas. Usa la ruta exacta que aparece en el diff.
-- **El "summary"** empieza por lo que está BIEN hecho y sé específico (los elogios genéricos no valen nada), sigue con lo bloqueante y termina con el estado de las pruebas.
+- **El "summary"** empieza por lo que está BIEN hecho y sé específico (los elogios genéricos no valen nada), sigue con lo bloqueante y termina con el estado de las pruebas. Máximo 8 líneas.
 ${truncated ? "- Nota: el diff se truncó por longitud; dilo en el resumen.\n" : ""}
 Responde SOLO con un objeto JSON con esta forma (sin prosa ni cercos):
 {"summary": string, "comments": [{"path": string, "line": integer, "side": "LEFT"|"RIGHT", "severity": "blocker"|"important"|"minor"|"nit", "body": string}]}
@@ -211,9 +213,24 @@ function claudeCliPath() {
   }
 }
 
+// La review profunda tarda minutos y hasta ahora era una caja negra. Con stream-json sacamos qué
+// herramienta acaba de invocar el agente; el renderer lo traduce y lo pinta (por eso no lleva texto).
+function progressStep(evt) {
+  if (evt.type !== "assistant") return null;
+  for (const block of evt.message?.content || []) {
+    if (block.type !== "tool_use") continue;
+    const input = block.input || {};
+    const target = String(input.file_path || input.pattern || input.path || "");
+    return { tool: block.name, target: target.split("/").slice(-2).join("/").slice(0, 60) };
+  }
+  return null;
+}
+
 function generateViaCli(prompt, cliPath, model, effort, opts = {}) {
-  const { cwd = undefined, timeoutMs = CLI_TIMEOUT_MS, readOnlyRepo = false } = opts;
+  const { cwd = undefined, timeoutMs = CLI_TIMEOUT_MS, readOnlyRepo = false, onProgress = null } = opts;
   const args = [...CLI_ARGS, "--model", model];
+  // Con progreso hace falta el stream (NDJSON); sin él, un único JSON al cerrar.
+  args.push(...(onProgress ? ["--output-format", "stream-json", "--verbose"] : ["--output-format", "json"]));
   if (effort) args.push("--effort", effort);
   // Modo "review profunda": el agente puede LEER el repo del usuario, jamás escribir. El veto real
   // es `permissions.deny` vía --settings (ver DENIED_TOOLS); allowedTools solo pre-aprueba las
@@ -231,13 +248,31 @@ function generateViaCli(prompt, cliPath, model, effort, opts = {}) {
     const child = spawn(cliPath, args, { cwd, stdio: ["pipe", "pipe", "pipe"], windowsHide: true, shell: process.platform === "win32" });
     let stdout = "";
     let stderr = "";
+    let buf = "";
+    let streamed = null; // evento `result` del stream, cuando vamos en modo progreso
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill("SIGTERM");
     }, timeoutMs);
 
-    child.stdout.on("data", (d) => (stdout += d));
+    child.stdout.on("data", (d) => {
+      if (!onProgress) return void (stdout += d);
+      buf += d;
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line) continue;
+        let evt;
+        try { evt = JSON.parse(line); } catch { continue; }
+        if (evt.type === "result") streamed = evt;
+        else {
+          const step = progressStep(evt);
+          if (step) onProgress(step);
+        }
+      }
+    });
     child.stderr.on("data", (d) => (stderr += d));
     child.on("error", (err) => {
       clearTimeout(timer);
@@ -255,7 +290,8 @@ function generateViaCli(prompt, cliPath, model, effort, opts = {}) {
       }
       if (code !== 0) return reject(new Error(`claude CLI exited ${code}: ${stderr.slice(0, 300)}`));
       try {
-        const envelope = JSON.parse(stdout);
+        const envelope = onProgress ? streamed : JSON.parse(stdout);
+        if (!envelope) return reject(new Error("El CLI terminó sin devolver un resultado"));
         if (envelope.is_error) return reject(new Error(`claude CLI error: ${String(envelope.result).slice(0, 300)}`));
         resolve(extractJson(envelope.result));
       } catch (err) {
@@ -302,21 +338,23 @@ async function runStructured(prompt, schema, override) {
 // local (`repoDir`) y hay CLI, la review es PROFUNDA: el agente abre los ficheros y sigue a los
 // llamadores para verificar cada hallazgo antes de escribirlo. Si no, cae al one-shot con el diff
 // (mismo prompt, pero avisado de que no puede comprobar nada fuera del diff).
-async function generateReview({ title, body, files, repoDir, sourceBranch, targetBranch }) {
+async function generateReview({ title, body, files, repoDir, exact, sourceBranch, targetBranch, onProgress, override }) {
   const { diffText, truncated } = buildDiffText(files);
   if (!diffText) throw new Error("La MR no tiene diff revisable (¿binarios?)");
   const cliPath = repoDir ? claudeCliPath() : null;
   const deep = Boolean(cliPath);
-  const prompt = buildReviewPrompt({ title, body, diffText, truncated, deep, sourceBranch, targetBranch });
+  const prompt = buildReviewPrompt({ title, body, diffText, truncated, deep, exact, sourceBranch, targetBranch });
   if (!deep) {
-    const { data, backend, model, effort } = await runStructured(prompt, REVIEW_SCHEMA);
+    const { data, backend, model, effort } = await runStructured(prompt, REVIEW_SCHEMA, override);
     return { review: normalize(data), backend, model, effort, deep: false };
   }
-  const { model, effort } = aiSettings();
+  // Modelo/esfuerzo elegidos en el modal de la review; si no vienen, los de Ajustes.
+  const { model, effort } = resolveAi(override);
   const data = await generateViaCli(prompt, cliPath, model, effort, {
     cwd: repoDir,
     readOnlyRepo: true,
     timeoutMs: REVIEW_TIMEOUT_MS,
+    onProgress: typeof onProgress === "function" ? onProgress : null,
   });
   return { review: normalize(data), backend: "claude-cli", model, effort, deep: true };
 }
@@ -837,3 +875,15 @@ function isAiEffort(level) {
 }
 
 module.exports = { generateReview, summarizeMilestone, proposeTask, proposeEpic, proposeFromEmail, proposePlan, planAgents, backendStatus, ping, isAiModel, isAiEffort };
+
+// Auto-verificación: `node src/ai.js`. Solo lo que puede romperse en silencio — si el shape del
+// stream-json cambia, el botón de la review se queda mudo y no lo notaría nadie.
+if (require.main === module) {
+  const assert = require("assert");
+  const toolEvent = (name, input) => ({ type: "assistant", message: { content: [{ type: "tool_use", name, input }] } });
+  assert.deepStrictEqual(progressStep(toolEvent("Read", { file_path: "/a/b/src/pedidos.js" })), { tool: "Read", target: "src/pedidos.js" });
+  assert.deepStrictEqual(progressStep(toolEvent("Grep", { pattern: "GetAllDependant" })), { tool: "Grep", target: "GetAllDependant" });
+  assert.strictEqual(progressStep({ type: "result", result: "{}" }), null, "el resultado final no es un paso de progreso");
+  assert.strictEqual(progressStep({ type: "assistant", message: { content: [{ type: "text", text: "mirando" }] } }), null);
+  console.log("ai.js: progressStep ok");
+}

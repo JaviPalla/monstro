@@ -80,6 +80,9 @@ const state = {
   cursor: -1, // selección con teclado (j/k) en la lista
   draftKeys: new Set(), // "owner/repo#n" con borradores guardados → badge 📝 en la lista
   aiGenerating: null, // nº de PR con review IA en curso → el botón persiste en loading entre pestañas
+  aiStep: "", // qué está mirando el agente ahora mismo ("Leyendo src/foo.js"), en el botón
+  aiSteps: [], // historial de pasos de la review en curso, para el modal de progreso
+  aiRunLabel: "", // "modelo · esfuerzo" de la review en curso, en la cabecera del modal
   draftNavIndex: -1, // navegación ↑↓ entre borradores
   editingDraftId: null, // borrador en edición → su tarjeta se pinta como editor
 };

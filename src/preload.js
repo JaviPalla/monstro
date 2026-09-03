@@ -65,7 +65,7 @@ contextBridge.exposeInMainWorld("monstro", {
   submitReview: (repo, number, review) => ipcRenderer.invoke("pr:submitReview", { repo, number, review }),
   dismissReview: (repo, number, reviewId, message) =>
     ipcRenderer.invoke("pr:dismissReview", { repo, number, reviewId, message }),
-  aiReview: (repo, pr, files) =>
+  aiReview: (repo, pr, files, override) =>
     ipcRenderer.invoke("ai:review", {
       repo,
       title: pr.title,
@@ -73,6 +73,8 @@ contextBridge.exposeInMainWorld("monstro", {
       sourceBranch: pr.headRefName,
       targetBranch: pr.baseRefName,
       files,
+      model: override?.model || null,
+      effort: override?.effort || null,
     }),
   aiStatus: () => ipcRenderer.invoke("ai:status"),
   aiPing: () => ipcRenderer.invoke("ai:ping"),
@@ -114,6 +116,12 @@ contextBridge.exposeInMainWorld("monstro", {
     const listener = (_e, percent) => cb(percent);
     ipcRenderer.on("update:progress", listener);
     return () => ipcRenderer.removeListener("update:progress", listener);
+  },
+  // Paso actual de la review con IA ({tool, target}) mientras el agente lee el repo. De-suscriptor.
+  onReviewProgress: (cb) => {
+    const listener = (_e, step) => cb(step);
+    ipcRenderer.on("ai:review-progress", listener);
+    return () => ipcRenderer.removeListener("ai:review-progress", listener);
   },
   notify: (title, body) => ipcRenderer.invoke("notify", { title, body }),
   dockBadge: (text) => ipcRenderer.invoke("dock:badge", text),

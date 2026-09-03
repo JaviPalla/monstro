@@ -34,7 +34,8 @@ function paletteEntriesCurrentPR() {
 
   if (open) add(t("Update branch (rebase)"), t("actualiza la rama con la base"), () => updateBranch(pr));
   if (canMerge(pr)) add(t("Merge (merge commit)"), t("pide confirmación"), () => confirmMerge(pr));
-  if (open && !state.aiGenerating) add(t("Review con IA"), t("genera borradores, no publica"), () => generateAiReview(pr));
+  if (open && !state.aiGenerating) add(t("Review con IA"), t("elige modelo; genera borradores, no publica"), () => openAiReviewModal(pr));
+  if (state.aiGenerating === pr.number) add(t("Ver por dónde va la review"), t("qué está mirando el agente ahora mismo"), () => openAiReviewModal(pr));
   if (myApprovedReview(pr) && open) add(t("Quitar aprobación"), t("descarta tu review aprobada"), () => confirmUnapprove(pr));
   else if (open && !mine) add(t("Aprobar"), t("review de aprobación sin comentarios"), () => confirmApprove(pr));
   if (open && mine) {
