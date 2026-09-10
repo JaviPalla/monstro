@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="css/theme-glass.css" />
   <link rel="stylesheet" href="css/environments.css" />
   <link rel="stylesheet" href="css/proposals.css" />
+  <link rel="stylesheet" href="css/sessions.css" />
 </head>
 <body>
   <div id="splash">
@@ -62,6 +63,7 @@
 
   <div id="layout">
     <nav id="sidebar">
+      <button class="bucket" id="sessions-btn" title="Agents"><svg class="ico ico-agents" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/></svg>Agents <span class="count" id="sessions-count"></span></button>
       <select id="repo-select" title="Repositorio" data-i18n-title="Repositorio"></select>
       <div class="nav-section" id="nav-prs-section" data-i18n="Pull requests"><svg class="ico sec-prs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></svg>Pull requests</div>
       <button class="bucket active" data-bucket="open" data-i18n="Abiertas"><svg class="ico ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg>Abiertas <span class="count" id="count-open"></span></button>
@@ -93,6 +95,8 @@
       <div class="nav-section" id="nav-propuestas-section" data-i18n="Propuestas"><svg class="ico sec-propuestas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Propuestas</div>
       <button class="bucket" id="bucket-propuestas" data-i18n="Bandeja"><svg class="ico ico-propuestas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>Bandeja</button>
     </nav>
+
+    <aside id="sessions-pane" class="hidden"></aside>
 
     <main id="list-pane">
       <div id="pr-list"></div>
@@ -136,6 +140,7 @@
   <script src="app/releases-pipelines.js"></script>
   <script src="app/environments.js"></script>
   <script src="app/proposals.js"></script>
+  <script src="app/sessions.js"></script>
   <script src="app/palette.js"></script>
   <script src="app/boot.js"></script>
 </body>

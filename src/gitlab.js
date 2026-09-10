@@ -25,6 +25,7 @@ module.exports = {
   viewerRepos: all.viewerRepos,
   listPRs: all.listPRs,
   searchPRs: all.searchPRs,
+  mrForBranch: all.mrForBranch,
   prDetail: all.prDetail,
   mergePR: all.mergePR,
   updateBranchRebase: all.updateBranchRebase,

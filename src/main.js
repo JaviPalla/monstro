@@ -155,6 +155,7 @@ function wireIpc() {
   require("./ipc/env").register(ctx);
   require("./ipc/mail").register(ctx);
   require("./ipc/system").register(ctx);
+  require("./ipc/sessions").register(ctx);
 }
 
 function wireSelftest() {

@@ -147,6 +147,15 @@ async function searchPRs(repoFullNames, states) {
   return lists.flat().sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
 }
 
+// MR más reciente (cualquier estado) cuya rama origen es `branch`, o null. La usa el panel de sesiones.
+async function mrForBranch(repoFullName, branch) {
+  const [mr] = await api(
+    "GET",
+    `/projects/${proj(repoFullName)}/merge_requests?source_branch=${encodeURIComponent(branch)}&order_by=updated_at&per_page=1`,
+  );
+  return mr ? { iid: mr.iid, url: mr.web_url, state: mapState(mr.state) } : null;
+}
+
 async function prDetail(repoFullName, number) {
   const mr = await api("GET", `/projects/${proj(repoFullName)}/merge_requests/${number}`);
   const approvals = await api(
@@ -240,7 +249,12 @@ async function prFiles(repoFullName, number) {
 
 async function prConversation(repoFullName, number) {
   const mr = await api("GET", `/projects/${proj(repoFullName)}/merge_requests/${number}`);
-  const discussions = await apiAll(`/projects/${proj(repoFullName)}/merge_requests/${number}/discussions`);
+  const [discussions, draftNotes] = await Promise.all([
+    apiAll(`/projects/${proj(repoFullName)}/merge_requests/${number}/discussions`),
+    // Borradores de review (draft notes, p. ej. los de la skill mr-review-gitlab): solo los ve el dueño
+    // del token hasta publicarlos. Si la instancia no los soporta, sin ellos.
+    apiAll(`/projects/${proj(repoFullName)}/merge_requests/${number}/draft_notes`).catch(() => []),
+  ]);
   const comments = [];
   const reviewThreads = [];
   for (const d of discussions) {
@@ -275,10 +289,33 @@ async function prConversation(repoFullName, number) {
       }
     }
   }
+  // isPendingDraft: el renderer los pinta aparte y sin responder/resolver. Sin fichero (position_type
+  // "text", el resumen de la review) = comentario general.
+  for (const dn of draftNotes) {
+    const comment = { databaseId: null, author: null, bodyHTML: mdToSafeHtml(dn.note), createdAt: null, isPendingDraft: true };
+    const pos = dn.position;
+    if (!pos?.new_path && !pos?.old_path) {
+      comments.push(comment);
+      continue;
+    }
+    reviewThreads.push({
+      id: null,
+      isPendingDraft: true,
+      viewerCanResolve: false,
+      viewerCanUnresolve: false,
+      path: pos.new_path || pos.old_path,
+      line: pos.new_line ?? pos.old_line,
+      startLine: pos.line_range?.start?.new_line ?? null,
+      isResolved: false,
+      isOutdated: false,
+      comments: { nodes: [comment] },
+    });
+  }
   return {
     headRefOid: mr.diff_refs?.head_sha || mr.sha,
     comments: { totalCount: comments.length, nodes: comments },
     reviewThreads: { nodes: reviewThreads },
+    pendingDrafts: draftNotes.length,
   };
 }
 
@@ -486,6 +523,7 @@ module.exports = {
   mapState,
   mergePR,
   mrCommits,
+  mrForBranch,
   prConversation,
   prDetail,
   prFiles,

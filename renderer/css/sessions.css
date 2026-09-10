@@ -1,0 +1,193 @@
+/* panel de sesiones de Claude Code a la izquierda (renderer/app/sessions.js), diseño "Actividad" */
+#sessions-pane {
+  width: 340px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 10px 10px 24px;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+}
+#sessions-pane.hidden { display: none; }
+
+/* Entrada "Agents", arriba del todo del menú: abre/cierra el panel. Contador = sesiones que te esperan. */
+#sessions-btn { position: relative; margin-bottom: 6px; }
+#sessions-btn .ico { color: var(--accent); }
+#sessions-btn.open { background: var(--branch-bg); color: var(--branch-text); }
+#sessions-count:not(:empty) {
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  background: var(--yellow);
+  color: #fff;
+}
+
+/* Menú plegado a iconos mientras el panel está abierto: sigue accesible, con el nombre como tooltip. */
+body.nav-collapsed #sidebar { width: 52px; padding: 12px 6px; }
+body.nav-collapsed #sidebar > #repo-select { display: none; }
+body.nav-collapsed #sidebar .nav-section { justify-content: center; padding: 10px 0 4px; font-size: 0; }
+body.nav-collapsed #sidebar .bucket { justify-content: center; padding: 8px 0; font-size: 0; }
+body.nav-collapsed #sidebar .bucket .ico { width: 16px; height: 16px; }
+body.nav-collapsed #sidebar .bucket .count { display: none; }
+body.nav-collapsed #sessions-btn .count:not(:empty) { display: block; position: absolute; top: 1px; right: 3px; padding: 0 4px; font-size: 9px; line-height: 14px; }
+
+.ss-head { display: flex; align-items: center; gap: 8px; margin: 2px 2px 4px; }
+.ss-sub { font-size: 12px; color: var(--text-muted); }
+.ss-close { margin-left: auto; font-size: 13px; }
+.ss-empty { padding: 18px 4px; font-size: 12px; text-align: center; color: var(--text-muted); }
+
+.ss-sec {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 4px 6px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+button.ss-sec { cursor: pointer; }
+.ss-sec .ss-dot { box-shadow: none; }
+.ss-sec-waiting { color: var(--yellow); }
+.ss-sec-working { color: var(--green); }
+.ss-chevron { width: 10px; font-size: 10px; }
+
+.ss-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: var(--text-muted); }
+.waiting .ss-dot, .ss-sec-waiting .ss-dot { background: var(--yellow); }
+.working .ss-dot, .ss-sec-working .ss-dot { background: var(--green); }
+.done .ss-dot, .ss-sec-idle .ss-dot { background: var(--accent); }
+.ss-card.waiting .ss-top .ss-dot { box-shadow: 0 0 0 3px var(--yellow-bg); }
+.ss-card.working .ss-top .ss-dot { box-shadow: 0 0 0 3px var(--green-bg); }
+
+.ss-card {
+  margin-bottom: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+}
+.ss-card.waiting { border-color: color-mix(in srgb, var(--yellow) 40%, transparent); }
+.ss-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.ss-go { width: 100%; padding: 0; border: none; font: inherit; color: inherit; text-align: left; background: none; cursor: pointer; }
+.ss-go:hover .ss-title { color: var(--accent); }
+.ss-title { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-time { flex-shrink: 0; font-size: 11px; color: var(--text-muted); }
+.ss-meta { margin: 2px 0 7px 15px; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-ellip { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* El recorte va en el span: con line-clamp sobre la caja, su padding deja asomar la cuarta línea. */
+.ss-clamp { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.ss-quote {
+  margin-bottom: 7px;
+  padding: 7px 9px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.ss-activity {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 7px 15px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.ss-spin {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border: 2px solid var(--green-bg);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: ss-spin 0.9s linear infinite;
+}
+@keyframes ss-spin { to { transform: rotate(360deg); } }
+
+.ss-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.ss-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+button.ss-badge { cursor: pointer; }
+.ss-badge button { padding: 0; border: none; font: inherit; color: inherit; background: none; cursor: pointer; }
+.ss-badge .ss-x { display: none; margin-left: 3px; opacity: 0.7; }
+.ss-badge:hover .ss-x { display: inline; }
+.ss-mr, .ss-pr { background: var(--purple-bg); color: var(--purple); }
+.ss-issue { background: var(--green-bg); color: var(--green); }
+.ss-epic { background: var(--orange-bg); color: var(--orange); }
+.ss-more { background: var(--gray-bg); color: var(--text-muted); }
+.ss-badge.manual { border-color: currentColor; }
+.ss-badge.done { opacity: 0.55; }
+
+.ss-actions { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.ss-go-btn {
+  padding: 3px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  cursor: pointer;
+}
+.ss-go-btn:hover { filter: brightness(1.08); }
+.ss-more-link { display: block; margin: -2px 4px 4px; padding: 0; border: none; font: inherit; font-size: 12px; color: var(--accent); background: none; cursor: pointer; }
+.ss-tag-form { margin-top: 7px; }
+.ss-tag-form input {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.ss-done { padding: 2px 4px; font-size: 12.5px; color: var(--text-muted); }
+.ss-done-top { display: flex; align-items: center; gap: 7px; height: 26px; }
+.ss-done-top .ss-ellip { flex: 1; }
+.ss-done-links { margin: 0 0 4px 15px; }
+.ss-done .mini-btn { display: none; }
+.ss-done:hover .mini-btn { display: inline-block; }
+.ss-done:hover .ss-time { display: none; }
+
+/* Liquid Glass: el mismo cristal que el menú lateral (css/theme-glass.css) */
+body[data-ui-theme="liquid-glass"] #sessions-pane {
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+body[data-ui-theme="liquid-glass"] .ss-card { background: rgba(255, 255, 255, 0.62); }
+@media (prefers-color-scheme: dark) {
+  body[data-ui-theme="liquid-glass"] #sessions-pane {
+    border-right-color: rgba(255, 255, 255, 0.08);
+    background: rgba(12, 16, 36, 0.6);
+  }
+  body[data-ui-theme="liquid-glass"] .ss-card { background: rgba(25, 32, 58, 0.55); }
+  body[data-ui-theme="liquid-glass"] .ss-quote { background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.07); }
+}

@@ -540,6 +540,11 @@ async function prNodeId(repoFullName, number) {
   return data.repository.pullRequest.id;
 }
 
+// En GitHub la PR de una sesión ya llega por el `pr-link` del transcript (ver src/sessions.js).
+async function mrForBranch() {
+  return null;
+}
+
 module.exports = {
   resolveToken,
   invalidateTokenCache,
@@ -547,6 +552,7 @@ module.exports = {
   viewerRepos,
   listPRs,
   searchPRs,
+  mrForBranch,
   prDetail,
   mergePR,
   updateBranchRebase,

@@ -243,7 +243,8 @@
 .composer.inline { margin: 8px 4px; }
 
 /* ---------- diff ---------- */
-#detail-pane.wide { width: calc(100% - 190px); max-width: none; }
+/* flex y no calc(100% - 190px): el menú puede estar plegado y el panel de sesiones abierto a su lado. */
+#detail-pane.wide { flex: 1; width: auto; min-width: 0; max-width: none; }
 #detail-pane.wide ~ * #list-pane, #layout:has(#detail-pane.wide) #list-pane { display: none; }
 .diff-summary { margin: 4px 0 10px; }
 .changes-layout { display: flex; gap: 14px; align-items: flex-start; }
@@ -389,4 +390,8 @@
 .thread-resolve.resolve-ok:hover:not(:disabled) { background: var(--green-bg); }
 .thread-reply textarea { flex: 1; font: inherit; font-size: 12px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; resize: vertical; }
 .orphan-threads { padding: 4px 14px 10px; }
+/* Borradores de review en GitLab (draft notes): pendientes de publicar, solo los ves tú. */
+.thread.pending-draft { border-left-color: var(--yellow); background: var(--yellow-bg); }
+.comment.pending-draft { border-style: dashed; border-color: var(--yellow); }
+.gl-drafts-bar { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--yellow); border-radius: 10px; background: var(--yellow-bg); font-weight: 600; }
 
