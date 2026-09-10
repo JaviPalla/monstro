@@ -258,6 +258,43 @@ async function workItemChildren(gids) {
   return out;
 }
 
+// Nota (comentario) en una issue. addIssueComment (prs.js) es de MRs: /merge_requests/:iid/notes.
+
+async function addIssueNote(projectPath, iid, body) {
+  return api("POST", `/projects/${proj(projectPath)}/issues/${iid}/notes`, { body });
+}
+
+// MRs de una tarea o de una Epic a partir de su proyecto + iid, para lanzar agentes sobre ellas (panel
+// Agents). De una Epic, también las de sus hijas por jerarquía Y las de sus enlazadas: "Crear tarea" de
+// Monstro enlaza las tareas con /links en vez de colgarlas como hijas. Devuelve [{mrUrl, title, state,
+// taskUrl}] sin repetir y abiertas primero; taskUrl es la tarea por la que se llegó a la MR.
+
+async function taskMergeRequests(projectPath, iid) {
+  const issue = await api("GET", `/projects/${proj(projectPath)}/issues/${iid}`);
+  const gidOf = (id) => `gid://gitlab/WorkItem/${id}`;
+  const tasks = [{ gid: gidOf(issue.id), webUrl: issue.web_url }];
+  if (isEpicUrl(issue.web_url)) {
+    const [children, links] = await Promise.all([
+      workItemChildren([tasks[0].gid]).then((map) => map.get(tasks[0].gid) || []),
+      api("GET", `/projects/${proj(projectPath)}/issues/${iid}/links`).catch(() => []),
+    ]);
+    for (const c of children) tasks.push({ gid: c.gid, webUrl: c.webUrl });
+    for (const l of Array.isArray(links) ? links : []) tasks.push({ gid: gidOf(l.id), webUrl: l.web_url });
+  }
+  const unique = [...new Map(tasks.map((t) => [t.gid, t])).values()];
+  const mrs = await developmentMRs(unique.map((t) => t.gid), { withRelated: true });
+  const seen = new Set();
+  const out = [];
+  for (const t of unique) {
+    for (const mr of mrs.get(t.gid) || []) {
+      if (seen.has(mr.webUrl)) continue;
+      seen.add(mr.webUrl);
+      out.push({ mrUrl: mr.webUrl, title: mr.title, state: mr.state, taskUrl: t.webUrl });
+    }
+  }
+  return out.sort((a, b) => (MR_RANK[a.state] ?? 9) - (MR_RANK[b.state] ?? 9));
+}
+
 // Descarga un avatar (privado, requiere token) y lo devuelve como data-URI para que el renderer
 // pueda pintarlo (las imágenes /uploads/-/system de una instancia privada dan 401 sin auth).
 
@@ -537,6 +574,7 @@ module.exports = {
   MR_RANK,
   SUMMARY_END,
   SUMMARY_START,
+  addIssueNote,
   closingMRs,
   collapseMilestoneEpics,
   createEpic,
@@ -563,6 +601,7 @@ module.exports = {
   relatedMRsOne,
   saveMilestoneSummary,
   searchGroupIssues,
+  taskMergeRequests,
   updateIssue,
   workItemChildren,
   workItemParents,

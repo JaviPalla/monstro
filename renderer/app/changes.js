@@ -45,7 +45,20 @@ function renderChangesTab() {
     })
     .join("");
 
+  // Borradores de review que esperan en GitLab (p. ej. los de la skill mr-review-gitlab).
+  const pendingTotal = state.conversation?.pendingDrafts || 0;
+  const pendingInline = (state.conversation?.reviewThreads?.nodes || []).some((th) => th.isPendingDraft);
+  const prUrl = state.detailPR.url || "";
+  const pendingBar = pendingTotal
+    ? `<div class="gl-drafts-bar">📝 ${t("{n} comentarios de review pendientes de publicar en GitLab", { n: pendingTotal })}
+        <span style="flex:1"></span>
+        ${pendingInline ? `<button class="btn" id="gl-drafts-first">${t("Ir al primero")}</button>` : ""}
+        ${prUrl ? `<button class="btn" data-ext="${esc(prUrl)}">${t("Publicar en GitLab")} ↗</button>` : ""}
+      </div>`
+    : "";
+
   $("#tab-body").innerHTML = `
+    ${pendingBar}
     <div class="changes-layout">
       <nav class="file-nav">
         <div class="file-nav-h">${t("Ficheros")} (${files.length}) ·
@@ -132,6 +145,20 @@ function renderChangesTab() {
   );
   wireExternalLinks();
   wireDraftCards($("#tab-body"));
+  const firstPending = () => {
+    const el = $("#tab-body").querySelector(".thread.pending-draft");
+    if (!el) return;
+    const file = el.closest("details");
+    if (file) file.open = true;
+    // A mano sobre el panel (su scroller): scrollIntoView también desplaza la ventana y se come la topbar.
+    detailPane.scrollTop += el.getBoundingClientRect().top - detailPane.getBoundingClientRect().top - 80;
+  };
+  $("#gl-drafts-first")?.addEventListener("click", firstPending);
+  // Abierta desde una sesión de review del panel de sesiones: directo al primer borrador pendiente.
+  if (state.focusPendingDrafts) {
+    state.focusPendingDrafts = false;
+    firstPending();
+  }
   notifySelftestOnce();
 }
 

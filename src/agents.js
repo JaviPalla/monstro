@@ -314,24 +314,28 @@ function stopRun(runId, projectDir) {
 
 function removeRun(runId) { RUNS = load().filter((r) => r.id !== runId); persist(); return RUNS; }
 
-// Abre el worktree en el editor adecuado: Rider para .NET (*.sln/*.csproj), VSCode para Vue/Node.
-function openEditor(projectDir, worktree) {
-  const dir = worktree || projectDir;
-  let stack = "node";
+// Stack de una carpeta, que decide el editor: .NET (*.sln/*.csproj) → Rider, Vue/Node → VSCode.
+function editorStack(dir) {
   try {
     const files = fs.readdirSync(dir);
-    if (files.some((f) => f.endsWith(".sln") || f.endsWith(".csproj"))) stack = "dotnet";
-    else {
-      const pkg = path.join(dir, "package.json");
-      if (fs.existsSync(pkg)) { const j = JSON.parse(fs.readFileSync(pkg, "utf8")); if ((j.dependencies && j.dependencies.vue) || (j.devDependencies && j.devDependencies.vue)) stack = "vue"; }
-    }
+    if (files.some((f) => f.endsWith(".sln") || f.endsWith(".csproj"))) return "dotnet";
+    const pkg = path.join(dir, "package.json");
+    if (fs.existsSync(pkg)) { const j = JSON.parse(fs.readFileSync(pkg, "utf8")); if ((j.dependencies && j.dependencies.vue) || (j.devDependencies && j.devDependencies.vue)) return "vue"; }
   } catch { /* sin pistas → VSCode por defecto */ }
-  const cmd = stack === "dotnet" ? ["open", ["-a", "Rider", dir]] : ["code", [dir]];
-  try { spawn(cmd[0], cmd[1], { detached: true, stdio: "ignore" }).unref(); } catch (err) { return { ok: false, stack, error: String(err.message || err) }; }
+  return "node";
+}
+
+// Abre el worktree en su editor. `open -a` y no el CLI `code`: lanzada desde Finder la app no hereda
+// el PATH del shell (/usr/local/bin), y un spawn sin binario tumba el proceso main.
+function openEditor(projectDir, worktree) {
+  const dir = worktree || projectDir;
+  const stack = editorStack(dir);
+  const app = stack === "dotnet" ? "Rider" : "Visual Studio Code";
+  try { spawn("open", ["-a", app, dir], { detached: true, stdio: "ignore" }).unref(); } catch (err) { return { ok: false, stack, error: String(err.message || err) }; }
   return { ok: true, stack };
 }
 
-module.exports = { init, startRun, listRuns, getRun, updateProject, cleanupWorktree, resumeRun, stopRun, removeRun, openEditor, slugify, toolLabel, summarizeEvent };
+module.exports = { init, startRun, listRuns, getRun, updateProject, cleanupWorktree, resumeRun, stopRun, removeRun, openEditor, editorStack, slugify, toolLabel, summarizeEvent };
 
 /* ---------- auto-verificación de las funciones puras ---------- */
 if (require.main === module && process.argv[2] === "--self-check") {

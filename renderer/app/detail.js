@@ -129,22 +129,36 @@ function renderDetail() {
   else renderChangesTab();
 }
 
-function closeDetail() {
+// Oculta el detalle sin salir de Agents: así vuelve la ficha de una sesión al tablero.
+function hideDetail() {
   state.selected = null;
   state.detailPR = null;
   detailPane.classList.add("hidden");
   detailPane.classList.remove("wide");
   renderList();
+  renderSessions(); // si era la ficha de una sesión, su tarjeta deja de estar marcada
+}
+
+// Todas las vistas pasan por aquí al entrar, así que también saca del tablero de Agents: a pantalla
+// completa las taparía.
+function closeDetail() {
+  hideDetail();
+  if (sessionsOpen()) toggleSessionsPane(false);
 }
 
 /* ============ tab conversación ============ */
 function commentBlock(comment) {
-  return `
-    <div class="comment">
-      <div class="comment-head">
-        <img src="${esc(comment.author?.avatarUrl || "")}" alt="" />
+  // Borrador de review en GitLab (draft note): nadie más lo ve todavía y la API no trae autor ni fecha.
+  const head = comment.isPendingDraft
+    ? `<b>📝 ${t("Borrador en GitLab")}</b>
+        <span class="muted">${t("sin publicar")}</span>`
+    : `<img src="${esc(comment.author?.avatarUrl || "")}" alt="" />
         <b>${esc(comment.author?.login || "?")}</b>
-        <span class="muted">${timeAgo(comment.createdAt)}</span>
+        <span class="muted">${timeAgo(comment.createdAt)}</span>`;
+  return `
+    <div class="comment ${comment.isPendingDraft ? "pending-draft" : ""}">
+      <div class="comment-head">
+        ${head}
       </div>
       <div class="comment-body pr-body">${comment.bodyHTML || ""}</div>
     </div>`;
@@ -230,6 +244,8 @@ function threadsByAnchor() {
 
 function threadBlock(thread) {
   const comments = thread.comments?.nodes || [];
+  // Un borrador de GitLab aún no es un hilo: ni se responde ni se resuelve hasta publicarlo.
+  if (thread.isPendingDraft) return `<div class="thread pending-draft">${comments.map(commentBlock).join("")}</div>`;
   const first = comments[0];
   const resolveBtn = !thread.id
     ? ""

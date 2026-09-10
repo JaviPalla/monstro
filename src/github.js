@@ -305,6 +305,9 @@ async function addIssueComment(repoFullName, number, body) {
   return rest("POST", `/repos/${repoFullName}/issues/${number}/comments`, { body });
 }
 
+// En GitHub los comentarios de issues y de PRs son el mismo endpoint (en GitLab no: ver addIssueNote).
+const addIssueNote = addIssueComment;
+
 async function addInlineComment(repoFullName, number, { body, commitId, path, side, line }) {
   return rest("POST", `/repos/${repoFullName}/pulls/${number}/comments`, {
     body,
@@ -401,6 +404,10 @@ async function milestoneEpicChildren() {
 
 async function issueMRs() {
   throw new Error("La vista de Milestones solo está disponible en GitLab.");
+}
+
+async function taskMergeRequests() {
+  throw new Error("El lanzador de agentes solo está disponible en GitLab.");
 }
 
 async function projectIssues() {
@@ -540,6 +547,11 @@ async function prNodeId(repoFullName, number) {
   return data.repository.pullRequest.id;
 }
 
+// En GitHub la PR de una sesión ya llega por el `pr-link` del transcript (ver src/sessions.js).
+async function mrForBranch() {
+  return null;
+}
+
 module.exports = {
   resolveToken,
   invalidateTokenCache,
@@ -547,6 +559,7 @@ module.exports = {
   viewerRepos,
   listPRs,
   searchPRs,
+  mrForBranch,
   prDetail,
   mergePR,
   updateBranchRebase,
@@ -555,6 +568,7 @@ module.exports = {
   prFiles,
   prConversation,
   addIssueComment,
+  addIssueNote,
   addInlineComment,
   replyToThread,
   setThreadResolved,
@@ -571,6 +585,7 @@ module.exports = {
   milestoneIssues,
   milestoneEpicChildren,
   issueMRs,
+  taskMergeRequests,
   projectIssues,
   groupLabels,
   groupProjects,

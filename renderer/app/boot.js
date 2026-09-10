@@ -152,6 +152,7 @@ async function boot() {
   await refresh();
   hideSplash();
   schedulePoll();
+  initSessions();
   // Aviso de versión nueva al arrancar. Click en el toast → actualiza (ver startUpdate).
   if (!IS_SELFTEST && state.config.checkUpdates) {
     window.monstro.checkUpdates().then((r) => {
@@ -194,6 +195,10 @@ async function boot() {
   if (IS_SELFTEST && SELFTEST_ROUTE === "local-vincular") runLocalLinkSelftest();
   if (IS_SELFTEST && (SELFTEST_ROUTE === "local-historico" || SELFTEST_ROUTE === "local-historico-detail")) runLocalHistorySelftest();
   if (IS_SELFTEST && SELFTEST_ROUTE === "local-list") runLocalListSelftest();
+  if (IS_SELFTEST && SELFTEST_ROUTE === "sessions") runSessionsSelftest();
+  if (IS_SELFTEST && SELFTEST_ROUTE === "sessions-mr") runSessionsMrSelftest();
+  if (IS_SELFTEST && SELFTEST_ROUTE === "sessions-view") runSessionsViewSelftest();
+  if (IS_SELFTEST && SELFTEST_ROUTE === "sessions-launch") runSessionsLaunchSelftest();
   if (IS_SELFTEST && (SELFTEST_ROUTE === "local-empezar" || SELFTEST_ROUTE === "local-plan")) runLocalStartSelftest();
   if (IS_SELFTEST && SELFTEST_ROUTE === "local-agents") runLocalAgentsSelftest();
 }
@@ -536,7 +541,7 @@ document.addEventListener("keydown", (event) => {
   const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
   if (typing) return;
   if (event.key === "?") return openCheatsheet();
-  if (event.key === "Escape") return closeDetail();
+  if (event.key === "Escape") return viewingId() ? hideDetail() : closeDetail(); // de la ficha, al tablero
   if (event.key === "r") return refresh();
   if (event.key === "j") return moveCursor(1);
   if (event.key === "k") return moveCursor(-1);
