@@ -42,7 +42,10 @@ const ENTRYPOINT_RE = /"entrypoint":"([\w-]+)"/;
 // sistema (away_summary…) en sesiones paradas y todas parecerían de "ahora".
 const TS_RE = /"timestamp":"([^"]+)"/;
 const FILE_RE = /"file_path":"(\/[^"]+)"/g;
-const META_RE = /^\{"type":"(ai-title|custom-title|agent-name|last-prompt|pr-link)"/;
+const META_RE = /^\{"type":"(ai-title|custom-title|agent-name|last-prompt|pr-link|cost-state)"/;
+const PROMPT_MAX = 500;
+// Lo que el CLI / el IDE meten alrededor de tu mensaje: no es lo que escribiste.
+const CLI_TAG_RE = /<(system-reminder|ide_[a-z_]+|local-command-[a-z]+|command-message|bash-std(?:out|err)|task-notification)>[\s\S]*?<\/\1>/g;
 
 function linkFrom(host, project, type, iid) {
   let kind = "issue";
@@ -68,12 +71,53 @@ const freshAcc = () => ({
   offset: 0, seq: 0, lastAt: 0, entrypoint: null, aiTitle: null, customTitle: null, agentName: null, lastPrompt: null,
   firstCwd: null, lastCwd: null, dirs: new Map(), branches: new Map(), links: new Map(),
   lastAssistant: null, lastAssistantSeq: 0, lastUserSeq: 0, turn: null, turnSeq: -1, review: false,
+  // Para la ficha: tus peticiones, ficheros editados (ruta → líneas +/−), recap del CLI, tiempo de Claude y coste.
+  prompts: [], files: new Map(), awaySummary: null, workMs: 0, costUSD: null,
 });
 
 function addLink(acc, link, fromPrLink) {
   if (!link) return;
   const prev = acc.links.get(link.key);
   acc.links.set(link.key, { ...link, count: (prev?.count || 0) + 1, fromPrLink: fromPrLink || !!prev?.fromPrLink });
+}
+
+const lineCount = (text) => (text ? String(text).replace(/\n$/, "").split("\n").length : 0);
+
+// Lo que escribiste tú, sin lo que el CLI / el IDE añaden alrededor. Un slash command queda "/comando args".
+function promptText(content) {
+  let raw = content;
+  if (Array.isArray(content)) raw = content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
+  if (typeof raw !== "string" || raw.startsWith("[Request interrupted")) return null;
+  const command = /<command-name>([^<]+)<\/command-name>/.exec(raw);
+  if (command) return clip(`${command[1]} ${/<command-args>([\s\S]*?)<\/command-args>/.exec(raw)?.[1] || ""}`, PROMPT_MAX);
+  return clip(raw.replace(CLI_TAG_RE, " ").replace(/<bash-input>([\s\S]*?)<\/bash-input>/, "! $1"), PROMPT_MAX);
+}
+
+function addPrompt(acc, line, at) {
+  let entry;
+  try { entry = JSON.parse(line); } catch { return; }
+  const text = !entry.isCompactSummary && promptText(entry.message?.content);
+  if (!text) return;
+  acc.prompts.push({ at: at || null, text });
+  // Review lanzada por slash command (así la lanza el panel Agents): no deja llamada a la tool Skill.
+  if (/^\/mr-review-gitlab\b/.test(text)) acc.review = true;
+}
+
+// Cambio APLICADO de un Edit/Write: el CLI deja su diff en toolUseResult.structuredPatch (un Edit que falla no
+// lo trae). Un Write que crea el fichero viene sin hunks: todo su contenido es nuevo.
+function addPatch(acc, line) {
+  let result;
+  try { result = JSON.parse(line).toolUseResult; } catch { return; }
+  if (typeof result?.filePath !== "string") return;
+  const lines = (Array.isArray(result.structuredPatch) ? result.structuredPatch : []).flatMap((h) => h.lines || []);
+  let added = !lines.length && result.type === "create" ? lineCount(result.content) : 0;
+  let removed = 0;
+  for (const l of lines) {
+    if (l[0] === "+") added++;
+    else if (l[0] === "-") removed++;
+  }
+  const prev = acc.files.get(result.filePath) || { added: 0, removed: 0 };
+  acc.files.set(result.filePath, { added: prev.added + added, removed: prev.removed + removed });
 }
 
 function scanLine(acc, line) {
@@ -87,6 +131,7 @@ function scanLine(acc, line) {
     if (entry.agentName) acc.agentName = entry.agentName;
     if (entry.lastPrompt) acc.lastPrompt = entry.lastPrompt;
     if (entry.prUrl) addLink(acc, parseLink(entry.prUrl), true);
+    if (typeof entry.totalCostUSD === "number") acc.costUSD = entry.totalCostUSD;
     return;
   }
   acc.entrypoint ??= ENTRYPOINT_RE.exec(line)?.[1] || null;
@@ -99,6 +144,14 @@ function scanLine(acc, line) {
     acc.lastAssistantSeq = acc.seq;
   } else if (line.includes('"type":"user"')) {
     acc.lastUserSeq = acc.seq;
+    // Mismo truco que con cwd: dentro de un texto estas claves van escapadas, así que solo casan las reales.
+    if (line.includes('"structuredPatch":')) addPatch(acc, line);
+    else if (!line.includes('"tool_use_id"') && !line.includes('"isMeta":true')) addPrompt(acc, line, ts);
+  } else if (line.includes('"subtype":"away_summary"')) {
+    // Recap que escribe el CLI (la extensión de VS Code no) al volver a una sesión tras un rato fuera.
+    try { acc.awaySummary = { text: JSON.parse(line).content, at: ts || null }; } catch { /* línea corrupta */ }
+  } else if (line.includes('"subtype":"turn_duration"')) {
+    acc.workMs += Number(/"durationMs":(\d+)/.exec(line)?.[1] || 0);
   }
   // Sesión de la skill de review de MRs (su llamada a la tool Skill; mencionarla en un texto va escapado).
   if (!acc.review && line.includes('"skill":"mr-review-gitlab"')) acc.review = true;
@@ -291,6 +344,17 @@ async function sessionRepos(acc, dirs) {
   return [...byRepo.values()].reverse().map((r) => ({ ...r, stack: editorStack(r.dir) }));
 }
 
+// Ficheros editados, relativos a su repo (con ~ si no están en ninguno), ordenados como un `git diff --stat`.
+async function sessionFiles(acc) {
+  const out = [];
+  for (const [file, lines] of acc.files) {
+    const repo = await repoOf(path.dirname(file));
+    const rel = repo ? path.relative(repo.root, file) : file.startsWith(HOME) ? `~${file.slice(HOME.length)}` : file;
+    out.push({ repo: repo?.name || null, rel, ...lines });
+  }
+  return out.sort((a, b) => `${a.repo}/${a.rel}`.localeCompare(`${b.repo}/${b.rel}`));
+}
+
 async function sessionLinks(id, acc, repos, { host, groups, branchMr, tags }) {
   const inScope = (project) => groups.has(project.split("/")[0]);
   // Solo links del proveedor configurado y de sus grupos: fuera quedan URLs de docs o de otros hosts.
@@ -403,6 +467,11 @@ async function buildSession({ id, live, transcript }, opts) {
     review: acc.review,
     repos,
     links: await sessionLinks(id, acc, repos, opts),
+    summary: acc.awaySummary,
+    prompts: acc.prompts,
+    files: await sessionFiles(acc),
+    workMs: acc.workMs,
+    costUSD: acc.costUSD,
   };
 }
 
@@ -424,6 +493,21 @@ async function list({ host, groups, branchMr }) {
   const tags = loadTags();
   const out = await Promise.all(rows.map((r) => buildSession(r, { host, groups, branchMr, tags, cutoff })));
   return out.filter(Boolean).sort((a, b) => (b.live - a.live) || (b.updatedAt - a.updatedAt));
+}
+
+/* ---------- lanzador del panel Agents: lo que Monstro teclea en una pestaña nueva de Ghostty ---------- */
+
+// Comillas simples de shell: la línea lleva texto del usuario (el prompt) y no debe poder cerrarlas.
+const shellQuote = (text) => `'${String(text).replace(/'/g, "'\\''")}'`;
+
+function claudeCommand({ name, worktree, prompt }) {
+  return `claude${worktree ? ` -w ${shellQuote(worktree)}` : ""} -n ${shellQuote(name)} ${shellQuote(prompt)}`;
+}
+
+// Nombre del worktree de "Implementar tarea": las primeras palabras del prompt y un sufijo para no chocar.
+function launchSlug(prompt, now = Date.now()) {
+  const words = String(prompt).toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").match(/[a-z0-9]+/g) || [];
+  return [...words.slice(0, 4), now.toString(36).slice(-5)].join("-");
 }
 
 /* ---------- badges a mano: userData/session-tags.json {[sessionId]: {add:[url], hide:[key]}} ---------- */
@@ -470,4 +554,4 @@ function untag(sessionId, key) {
   fs.writeFileSync(tagsPath(), JSON.stringify(tags, null, 2));
 }
 
-module.exports = { list, tag, untag, parseLink, scanTranscript, hostFromChain, lastTurn, sessionActivity };
+module.exports = { list, tag, untag, parseLink, scanTranscript, hostFromChain, lastTurn, sessionActivity, repoOf, shellQuote, claudeCommand, launchSlug };

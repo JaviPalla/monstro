@@ -51,6 +51,8 @@ module.exports = {
   milestoneEpicChildren: all.milestoneEpicChildren,
   projectIssues: all.projectIssues,
   issueMRs: all.issueMRs,
+  taskMergeRequests: all.taskMergeRequests,
+  addIssueNote: all.addIssueNote,
   groupLabels: all.groupLabels,
   groupProjects: all.groupProjects,
   updateIssue: all.updateIssue,

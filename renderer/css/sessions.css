@@ -9,6 +9,35 @@
 }
 #sessions-pane.hidden { display: none; }
 
+/* Tablero: Agents abierto sin nada en el detalle → los agentes a pantalla completa, cada sección en rejilla.
+   Al abrir una ficha (o una MR) el panel vuelve a ser la columna de 340 px. Sale del DOM, sin estado en JS. */
+#layout:has(#detail-pane.hidden) #sessions-pane { flex: 1; width: auto; padding: 14px 18px 30px; border-right: none; }
+#layout:has(#detail-pane.hidden):has(#sessions-pane:not(.hidden)) #list-pane { display: none; }
+#layout:has(#detail-pane.hidden) .ss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; }
+#layout:has(#detail-pane.hidden) .ss-grid .ss-card { margin-bottom: 0; }
+
+/* "¿Qué quieres hacer?" encima del tablero; en la columna (ficha abierta) no cabe y se esconde. */
+.ss-launch { display: none; }
+#layout:has(#detail-pane.hidden) .ss-launch { display: block; margin: 6px 0 18px; padding: 18px 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-raised); }
+.ss-launch h2 { margin: 0 0 12px; font-size: 20px; }
+.ss-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.ss-option { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; font: inherit; text-align: left; color: var(--text); background: var(--bg); cursor: pointer; }
+.ss-option:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+.ss-option.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.ss-option b { font-size: 14px; }
+.ss-option span { font-size: 12px; color: var(--text-muted); }
+.ss-launch-form { display: flex; gap: 8px; margin-top: 14px; }
+.ss-launch-form input, .ss-launch-form textarea { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 13px; color: var(--text); background: var(--bg); }
+.ss-implement { flex-direction: column; }
+.ss-implement textarea { min-height: 84px; resize: vertical; }
+.ss-launch-row { display: flex; align-items: center; gap: 10px; }
+.ss-launch-row .ss-ellip { flex: 1; font-size: 12px; }
+.ss-targets { margin: 12px 0; padding: 0; list-style: none; }
+.ss-targets li { display: flex; align-items: baseline; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.ss-targets li .ss-ellip { flex: 1; }
+.ss-targets li.missing { opacity: 0.55; }
+.ss-go-btn:disabled { opacity: 0.5; cursor: default; }
+
 /* Entrada "Agents", arriba del todo del menú: abre/cierra el panel. Contador = sesiones que te esperan. */
 #sessions-btn { position: relative; margin-bottom: 6px; }
 #sessions-btn .ico { color: var(--accent); }
@@ -75,8 +104,11 @@ button.ss-sec { cursor: pointer; }
 }
 .ss-card.waiting { border-color: color-mix(in srgb, var(--yellow) 40%, transparent); }
 .ss-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.ss-go { width: 100%; padding: 0; border: none; font: inherit; color: inherit; text-align: left; background: none; cursor: pointer; }
-.ss-go:hover .ss-title { color: var(--accent); }
+/* Click en la tarjeta (fuera de sus botones) → su ficha; la de la ficha abierta queda marcada. */
+.ss-card, .ss-done { cursor: pointer; }
+.ss-card:hover .ss-title, .ss-done:hover .ss-ellip { color: var(--accent); }
+.ss-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.ss-done.selected { border-radius: 8px; color: var(--text); background: var(--bg-raised); }
 .ss-title { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ss-time { flex-shrink: 0; font-size: 11px; color: var(--text-muted); }
 .ss-meta { margin: 2px 0 7px 15px; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -165,6 +197,7 @@ button.ss-badge { cursor: pointer; }
   font-size: 12px;
   color: var(--text);
   background: var(--bg);
+  cursor: text;
 }
 
 .ss-done { padding: 2px 4px; font-size: 12.5px; color: var(--text-muted); }
@@ -174,6 +207,38 @@ button.ss-badge { cursor: pointer; }
 .ss-done .mini-btn { display: none; }
 .ss-done:hover .mini-btn { display: inline-block; }
 .ss-done:hover .ss-time { display: none; }
+
+/* Ficha de una sesión (sessionView), en el panel de detalle a lo ancho */
+.sv { max-width: 1180px; }
+.sv-title { display: flex; align-items: center; gap: 10px; padding-right: 30px; font-size: 21px; }
+.sv-title .ss-dot { width: 11px; height: 11px; }
+.sv .detail-sub > * + *::before { content: "·"; margin-right: 8px; }
+.sv-state { color: var(--text); }
+.sv.waiting .sv-state { color: var(--yellow); }
+.sv.working .sv-state { color: var(--green); }
+.sv-actions { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+.sv > .ss-badges { margin-bottom: 16px; }
+.sv h3 { margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-muted); }
+.sv h3 span { font-weight: 400; letter-spacing: 0; text-transform: none; }
+.sv-summary { margin-bottom: 12px; padding: 12px 16px; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--bg); }
+.sv-summary p { margin: 0; font-size: 15px; line-height: 1.55; }
+.sv .ss-quote { margin-bottom: 16px; padding: 10px 14px; font-size: 14px; }
+.sv .ss-clamp { display: block; } /* en la ficha el mensaje va entero (el main ya lo recorta) */
+.sv.waiting .ss-quote { border-color: color-mix(in srgb, var(--yellow) 45%, transparent); }
+.sv .ss-activity { margin: 0 0 16px; font-size: 12.5px; }
+.sv-stats { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; }
+.sv-stat { display: flex; flex-direction: column; gap: 2px; min-width: 100px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.sv-stat b { font-size: 22px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.sv-stat > span { font-size: 11.5px; color: var(--text-muted); }
+.sv-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px 28px; align-items: start; }
+.sv-prompts, .sv-files { margin: 0; padding: 0; list-style: none; }
+.sv-prompts li { display: flex; gap: 14px; padding: 9px 0; border-top: 1px solid var(--border); font-size: 13.5px; line-height: 1.5; }
+.sv-prompts time { flex-shrink: 0; width: 92px; padding-top: 1px; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.sv-prompts li span { min-width: 0; overflow-wrap: anywhere; }
+.sv-files li { display: flex; align-items: baseline; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; }
+.sv-path { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sv-path b { font-weight: 600; }
+.sv-path .muted { margin-left: 8px; }.sv-files .checks-success, .sv-files .checks-failure { flex-shrink: 0; font-variant-numeric: tabular-nums; }
 
 /* Liquid Glass: el mismo cristal que el menú lateral (css/theme-glass.css) */
 body[data-ui-theme="liquid-glass"] #sessions-pane {

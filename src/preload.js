@@ -48,6 +48,10 @@ contextBridge.exposeInMainWorld("monstro", {
   sessionsOpenEditor: (sessionId, dir) => ipcRenderer.invoke("sessions:openEditor", { sessionId, dir }),
   sessionsResume: (sessionId) => ipcRenderer.invoke("sessions:resume", { sessionId }),
   sessionsFocus: (sessionId) => ipcRenderer.invoke("sessions:focus", { sessionId }),
+  sessionsLaunchTargets: (url, action) => ipcRenderer.invoke("sessions:launchTargets", { url, action }),
+  sessionsLaunch: (url, action) => ipcRenderer.invoke("sessions:launch", { url, action }),
+  sessionsPickDir: () => ipcRenderer.invoke("sessions:pickDir"),
+  sessionsImplement: (prompt, dir) => ipcRenderer.invoke("sessions:implement", { prompt, dir }),
   // Eventos push de los agentes (timeline/estado/notificación). Devuelve un de-suscriptor.
   onAgentEvent: (channel, cb) => {
     const ok = ["agents:event", "agents:run", "agents:notify"];

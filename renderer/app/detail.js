@@ -129,12 +129,21 @@ function renderDetail() {
   else renderChangesTab();
 }
 
-function closeDetail() {
+// Oculta el detalle sin salir de Agents: así vuelve la ficha de una sesión al tablero.
+function hideDetail() {
   state.selected = null;
   state.detailPR = null;
   detailPane.classList.add("hidden");
   detailPane.classList.remove("wide");
   renderList();
+  renderSessions(); // si era la ficha de una sesión, su tarjeta deja de estar marcada
+}
+
+// Todas las vistas pasan por aquí al entrar, así que también saca del tablero de Agents: a pantalla
+// completa las taparía.
+function closeDetail() {
+  hideDetail();
+  if (sessionsOpen()) toggleSessionsPane(false);
 }
 
 /* ============ tab conversación ============ */

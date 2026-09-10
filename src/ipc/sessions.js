@@ -1,13 +1,16 @@
 "use strict";
 
-// Handlers IPC del panel de sesiones de Claude Code (src/sessions.js). Se registran desde wireIpc().
+// Handlers IPC del panel Agents: las sesiones de Claude Code (src/sessions.js) y el lanzador del tablero
+// (review de MR, pruebas, implementar tarea), que abre sesiones INTERACTIVAS en Ghostty. Se registran
+// desde wireIpc().
 
-const { ipcMain } = require("electron");
-const { execFile, spawn } = require("child_process");
+const { ipcMain, dialog } = require("electron");
+const { execFile } = require("child_process");
 const { promisify } = require("util");
 const fs = require("fs");
 const agents = require("../agents");
 const config = require("../config");
+const local = require("../local");
 const provider = require("../provider");
 const sessions = require("../sessions");
 
@@ -16,8 +19,8 @@ const MR_TTL_MS = 5 * 60 * 1000;
 const TTY_RE = /^ttys\d{1,4}$/;
 const ESC = String.fromCharCode(27);
 const BEL = String.fromCharCode(7);
+const QA_SKILL = "qa-checklist-gitlab"; // skill de usuario (~/.claude/skills), como mr-review-gitlab
 const mrCache = new Map(); // "proyecto|rama" → { at, link }
-const shellQuote = (text) => `'${String(text).replace(/'/g, "'\\''")}'`;
 const appleScriptArgs = (lines) => lines.flatMap((l) => ["-e", l]);
 
 // Ghostty (1.3+) no expone el TTY por AppleScript y el título de una sesión parada no cambia, así que
@@ -45,6 +48,27 @@ const GHOSTTY_FOCUS = [
   'return "none"',
   "end run",
 ];
+
+// Pestaña nueva de Ghostty en `dir` que TECLEA `command` en tu shell (initial input, no `command`: así
+// lleva tu PATH y tu glab, y la pestaña sigue viva al salir de claude). Los dos van por argv, nunca
+// interpolados en el AppleScript; lo de dentro del comando lo entrecomilla sessions.claudeCommand.
+const GHOSTTY_LAUNCH = [
+  "on run argv",
+  'tell application "Ghostty"',
+  "activate",
+  "set cfg to {initial working directory:(item 1 of argv), initial input:((item 2 of argv) & linefeed)}",
+  "if (count of windows) is 0 then",
+  "new window with configuration cfg",
+  "else",
+  "new tab in front window with configuration cfg",
+  "end if",
+  "end tell",
+  "end run",
+];
+
+function openInGhostty(dir, command) {
+  return pexec("osascript", [...appleScriptArgs(GHOSTTY_LAUNCH), dir, command], { timeout: 15000 });
+}
 
 // Título de pestaña vía OSC 2. Fuera caracteres de control: un ESC o BEL dentro cortaría la secuencia.
 function setTerminalTitle(tty, title) {
@@ -103,10 +127,54 @@ function linkScope(cfg) {
   return { host, groups: new Set((cfg.repos || []).map((r) => r.split("/")[0])) };
 }
 
-function register() {
+// Link de MR / tarea / epic → sus MRs, cada una con el clon local de su repo (la skill hace ahí su worktree)
+// y, si no se puede lanzar, por qué (`skip`). Review: solo sobre abiertas; pruebas: también sobre fusionadas
+// (lo entregado se prueba). Las descartadas se devuelven igual: "no hay MRs" y "están todas fusionadas" no
+// son lo mismo para quien pega el link.
+async function launchTargets(url, action) {
+  if (action !== "review" && action !== "tests") throw new Error("Acción desconocida.");
+  const link = sessions.parseLink(url);
+  if (!link || !["mr", "issue", "epic"].includes(link.kind)) throw new Error("Pega el link de una MR, una tarea o una epic de GitLab.");
+  const found = link.kind === "mr"
+    ? [{ mrUrl: link.url, title: null, state: "opened", taskUrl: null }]
+    : await provider.current().taskMergeRequests(link.project, link.iid);
+  const root = config.load().local.rootDir;
+  const clones = root ? await local.scanRepos(root).catch(() => []) : [];
+  return found.flatMap((m) => {
+    const mr = sessions.parseLink(m.mrUrl);
+    if (!mr) return [];
+    const dir = clones.find((c) => c.gitlabPath === mr.project)?.dir || null;
+    const launchable = m.state === "opened" || (action === "tests" && m.state === "merged");
+    return [{ ...m, project: mr.project, iid: mr.iid, dir, skip: launchable ? (dir ? null : "no-clone") : m.state }];
+  });
+}
+
+// Lo que teclea cada acción: la skill por slash command (el tablero la reconoce así como review).
+function agentFor(action, target) {
+  if (action === "review") return { name: `Review !${target.iid}`, prompt: `/mr-review-gitlab ${target.mrUrl}` };
+  return { name: `Pruebas !${target.iid}`, prompt: `/${QA_SKILL} ${target.mrUrl}${target.taskUrl ? ` ${target.taskUrl}` : ""}` };
+}
+
+// Claude crea la tarea, pero solo tras tu OK: nada sale a GitLab sin que lo confirmes.
+function implementPrompt(task, project, epicsProject) {
+  return [
+    task,
+    "",
+    "---",
+    `Lanzado desde Monstro en un worktree de ${project}. Antes de tocar código:`,
+    `1. Decide si esto es una epic (varios proyectos o varias entregas) o una tarea de ${project}.`,
+    "2. Propón tipo, título y descripción, y ESPERA a que te diga que sí.",
+    `3. Créala con glab (las epics van en ${epicsProject}; si es epic, crea dentro también la tarea de ${project}) y dame su URL.`,
+    "Después implementa aquí, en este worktree: parte de la rama base actualizada (git fetch) y pon el número de la tarea en la rama y en los commits. Pregúntame antes de hacer push o abrir la MR.",
+  ].join("\n");
+}
+
+function register(ctx) {
   // Última foto que vio el renderer: abrir editor, enfocar y reanudar solo actúan sobre sesiones y
   // carpetas de aquí, nunca sobre rutas que mande el renderer tal cual.
   let known = new Map();
+  // Carpetas elegidas con el diálogo en esta sesión: "Implementar tarea" solo lanza en una de ellas.
+  const pickedDirs = new Set();
   const startDirOf = (s) => {
     if (!s.startDir || !fs.existsSync(s.startDir)) throw new Error("La carpeta de la sesión ya no existe.");
     return s.startDir;
@@ -132,14 +200,42 @@ function register() {
     startDirOf(s);
     return focusSession(s);
   });
-  ipcMain.handle("sessions:resume", (_event, { sessionId }) => {
+  ipcMain.handle("sessions:resume", async (_event, { sessionId }) => {
     const s = known.get(sessionId);
     if (!s || s.live) throw new Error("Solo se pueden reanudar sesiones terminadas.");
-    // El comando va por argv, no interpolado en el AppleScript: no puede romper el script.
-    // ponytail: Terminal.app fijo; si se usa iTerm/Ghostty, hacerlo configurable.
-    const command = `cd ${shellQuote(startDirOf(s))} && claude --resume ${s.sessionId}`;
-    const script = ["on run argv", 'tell application "Terminal"', "activate", "do script (item 1 of argv)", "end tell", "end run"];
-    spawn("osascript", [...appleScriptArgs(script), command], { detached: true, stdio: "ignore" }).unref();
+    // En la carpeta donde ARRANCÓ: ahí busca `claude --resume` el transcript. El id es un UUID validado.
+    await openInGhostty(startDirOf(s), `claude --resume ${s.sessionId}`);
+    return { ok: true };
+  });
+
+  ipcMain.handle("sessions:launchTargets", (_event, { url, action }) => launchTargets(url, action));
+  ipcMain.handle("sessions:launch", async (_event, { url, action }) => {
+    // Se resuelve otra vez aquí: el renderer solo manda el link, nunca rutas.
+    const targets = (await launchTargets(url, action)).filter((t) => !t.skip);
+    if (!targets.length) throw new Error("Ninguna de esas MRs tiene un clon local donde lanzar el agente.");
+    for (const t of targets) await openInGhostty(t.dir, sessions.claudeCommand(agentFor(action, t)));
+    return { launched: targets.length };
+  });
+  ipcMain.handle("sessions:pickDir", async () => {
+    const res = await dialog.showOpenDialog(ctx.win, { properties: ["openDirectory"], title: "¿Dónde lanzo el agente?", defaultPath: config.load().local.rootDir || undefined });
+    const dir = !res.canceled && res.filePaths[0];
+    if (!dir) return null;
+    const repo = await sessions.repoOf(dir);
+    if (!repo) throw new Error("Esa carpeta no es un repo git: el agente trabaja en un worktree suyo.");
+    pickedDirs.add(dir);
+    return { dir, project: repo.project, name: repo.name };
+  });
+  ipcMain.handle("sessions:implement", async (_event, { prompt, dir }) => {
+    const task = String(prompt || "").trim();
+    if (!task) throw new Error("Escribe qué hay que hacer.");
+    if (!pickedDirs.has(dir)) throw new Error("Elige antes la carpeta donde lanzarlo.");
+    const repo = await sessions.repoOf(dir);
+    const group = config.load().milestones?.group || (repo?.project || "").split("/")[0];
+    await openInGhostty(dir, sessions.claudeCommand({
+      name: `Implementar: ${task.split(/\s+/).slice(0, 6).join(" ")}`,
+      worktree: sessions.launchSlug(task),
+      prompt: implementPrompt(task, repo?.project || repo?.name || dir, group ? `${group}/epics` : "el proyecto epics del grupo"),
+    }));
     return { ok: true };
   });
 }

@@ -25,7 +25,7 @@ function register(ctx) {
     // GitLab (no se pierde y todo el equipo lo ve). Best-effort: si falla, no aborta el lanzamiento.
     let planNote = null;
     if (taskProjectPath && Number.isInteger(taskIid)) {
-      try { const c = await gh().addIssueComment(taskProjectPath, taskIid, planMarkdown({ title, indications, objectives, requirements, tests, projects: merged })); planNote = c && (c.url || c.html_url || true); }
+      try { const c = await gh().addIssueNote(taskProjectPath, taskIid, planMarkdown({ title, indications, objectives, requirements, tests, projects: merged })); planNote = c && (c.url || c.html_url || true); }
       catch (err) { planNote = { error: String(err.message || err) }; }
     }
     return { ...(await agents.startRun({ title, url, isEpic, indications, objectives, requirements, tests, projects: merged })), planNote };
