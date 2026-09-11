@@ -32,12 +32,10 @@ function paletteEntriesCurrentPR() {
   const open = pr.state === "OPEN";
   const mine = pr.author?.login === state.me?.login;
 
-  if (open) add(t("Update branch (rebase)"), t("actualiza la rama con la base"), () => updateBranch(pr));
+  if (open) add(t("Abrir en Rider / VS Code"), t("worktree en la rama de la PR"), () => openPrInEditor(pr));
   if (canMerge(pr)) add(t("Merge (merge commit)"), t("pide confirmación"), () => confirmMerge(pr));
   if (open && !state.aiGenerating) add(t("Review con IA"), t("elige modelo; genera borradores, no publica"), () => openAiReviewModal(pr));
   if (state.aiGenerating === pr.number) add(t("Ver por dónde va la review"), t("qué está mirando el agente ahora mismo"), () => openAiReviewModal(pr));
-  if (myApprovedReview(pr) && open) add(t("Quitar aprobación"), t("descarta tu review aprobada"), () => confirmUnapprove(pr));
-  else if (open && !mine) add(t("Aprobar"), t("review de aprobación sin comentarios"), () => confirmApprove(pr));
   if (open && mine) {
     add(
       pr.isDraft ? t("Marcar lista para review") : t("Convertir a borrador"),
@@ -51,13 +49,14 @@ function paletteEntriesCurrentPR() {
     add(t("Publicar borradores"), t("{n} pendientes", { n: state.drafts.length }), () => openPublishModal());
     add(t("Ver borradores"), t("visor de borradores locales"), () => openDraftsViewer());
   }
+  const glPending = state.conversation?.pendingDrafts || 0;
+  if (glPending) add(t("Publicar en GitLab"), t("{n} pendientes", { n: glPending }), () => publishGitlabDrafts());
 
   const goTab = (tab) => () => { state.detailTab = tab; renderDetail(); };
   if (state.detailTab !== "conv") add(t("Ir a: Conversación"), t("pestaña del detalle"), goTab("conv"));
   if (state.detailTab !== "changes") add(t("Ir a: Cambios"), t("pestaña del detalle"), goTab("changes"));
 
   add(t("Copiar rama"), pr.headRefName, () => copyText(pr.headRefName));
-  add(t("Copiar comando de checkout"), `gh pr checkout ${pr.number}`, () => copyText(`gh pr checkout ${pr.number}`));
   add(t("Copiar URL"), pr.url || "", () => copyText(pr.url));
   if (pr.url) add(t("Abrir en el navegador"), providerName(), () => window.monstro.openExternal(pr.url));
   add(t("Cerrar el detalle"), "Esc", closeDetail);

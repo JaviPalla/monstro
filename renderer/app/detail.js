@@ -6,6 +6,8 @@ async function openDetail(number, tab = "conv", repoOverride = null) {
   state.detailTab = tab;
   state.files = null;
   state.conversation = null;
+  state.openFiles = null;
+  state.commentNav = null;
   renderList();
   detailPane.classList.remove("hidden");
   detailPane.classList.toggle("wide", tab === "changes");
@@ -54,6 +56,10 @@ async function openDetail(number, tab = "conv", repoOverride = null) {
 function renderDetail() {
   const pr = state.detailPR;
   if (!pr) return;
+  // Los ficheros que tenías desplegados (a mano o por un salto) se leen del DOM antes de repintarlo:
+  // el evento `toggle` es asíncrono y llegaría tarde si se repinta justo después de abrir uno.
+  const shownFiles = detailContent.querySelectorAll("details.diff-file");
+  if (shownFiles.length) state.openFiles = new Set([...shownFiles].filter((d) => d.open).map((d) => d.dataset.file));
   const blockReason = mergeBlockReason(pr);
   const threadCount = state.conversation?.reviewThreads?.nodes?.length ?? 0;
   detailPane.classList.toggle("wide", state.detailTab === "changes");
@@ -70,26 +76,20 @@ function renderDetail() {
       </div>
 
       <div class="actions">
-        <button class="btn btn-accent" id="act-update" ${pr.state !== "OPEN" ? "disabled" : ""}
-                title="${t("Actualiza la rama con la base usando rebase")}">⤴ ${t("Update branch (rebase)")}</button>
+        <button class="btn btn-accent" id="act-editor" ${pr.state === "OPEN" ? "" : "disabled"}
+                title="${t("Crea un worktree en la rama de la PR y lo abre en su editor: Rider si es .NET, VS Code si no")}">💻 ${t("Abrir en Rider / VS Code")}</button>
         <button class="btn btn-primary" id="act-merge" ${canMerge(pr) ? "" : "disabled"}
                 title="${esc(blockReason || t("Merge con merge commit"))}">⇅ ${t("Merge (merge commit)")}</button>
         ${state.aiGenerating === pr.number
           ? `<button class="btn btn-ai" id="act-ai" title="${t("Ver por dónde va la review")}"><span class="spinner"></span> <span id="act-ai-step">${esc(state.aiStep || t("Generando review…"))}</span></button>`
           : `<button class="btn btn-ai" id="act-ai" ${pr.state === "OPEN" ? "" : "disabled"}
                 title="${t("Revisa la MR y deja los comentarios como borradores para que los repases: nada se publica hasta que tú lo digas")}">🤖 ${t("Review con IA")}</button>`}
-        ${myApprovedReview(pr) && pr.state === "OPEN"
-          ? `<button class="btn" id="act-unapprove"
-                title="${t("Descarta tu review aprobada (GitHub lo registra en la PR con el motivo)")}">↩︎ ${t("Quitar aprobación")}</button>`
-          : `<button class="btn" id="act-approve" ${pr.state === "OPEN" && pr.author?.login !== state.me?.login ? "" : "disabled"}
-                title="${pr.author?.login === state.me?.login ? t("No puedes aprobar tu propia PR") : t("Aprobar sin comentarios (pide confirmación)")}">✅ ${t("Aprobar")}</button>`}
         ${pr.state === "OPEN" && pr.author?.login === state.me?.login
           ? `<button class="btn" id="act-draft-toggle" title="${pr.isDraft ? t("Marca la PR como lista: notifica a los reviewers") : t("Convierte la PR en borrador: deja de pedir reviews")}">${pr.isDraft ? `🚀 ${t("Marcar lista para review")}` : `↩︎ ${t("Convertir a borrador")}`}</button>`
           : ""}
       </div>
       <div class="copy-row">
         <button class="mini-btn" id="copy-branch" title="${t("Copiar nombre de la rama")}">📋 ${esc(pr.headRefName)}</button>
-        <button class="mini-btn" id="copy-checkout" title="${t("Copiar comando para traerte la PR en local")}">⬇ gh pr checkout ${pr.number}</button>
         <button class="mini-btn" id="copy-url" title="${t("Copiar URL de la PR")}">🔗 URL</button>
       </div>
       ${blockReason && pr.state === "OPEN" ? `<p class="muted">⚠️ ${esc(blockReason)}</p>` : ""}
@@ -108,14 +108,11 @@ function renderDetail() {
     </div>`;
 
   $("#detail-close").addEventListener("click", closeDetail);
-  $("#act-update").addEventListener("click", () => updateBranch(pr));
+  $("#act-editor").addEventListener("click", () => openPrInEditor(pr));
   $("#act-merge").addEventListener("click", () => confirmMerge(pr));
   $("#act-ai").addEventListener("click", () => openAiReviewModal(pr));
-  $("#act-approve")?.addEventListener("click", () => confirmApprove(pr));
-  $("#act-unapprove")?.addEventListener("click", () => confirmUnapprove(pr));
   $("#act-draft-toggle")?.addEventListener("click", () => toggleDraftState(pr));
   $("#copy-branch").addEventListener("click", () => copyText(pr.headRefName));
-  $("#copy-checkout").addEventListener("click", () => copyText(`gh pr checkout ${pr.number}`));
   $("#copy-url").addEventListener("click", () => copyText(pr.url));
   wireDraftsBar();
   detailContent.querySelectorAll(".tab").forEach((tabBtn) =>
@@ -148,10 +145,25 @@ function closeDetail() {
 
 /* ============ tab conversación ============ */
 function commentBlock(comment) {
+  if (comment.isPendingDraft && comment.draftNoteId === state.editingDraftNoteId) {
+    return `
+      <div class="comment pending-draft editing">
+        <div class="comment-head"><b>✏️ ${t("Editando borrador en GitLab")}</b></div>
+        <div class="pending-editor">
+          <textarea class="draft-editor" rows="5">${esc(comment.body || "")}</textarea>
+          <div class="composer-actions">
+            <button class="btn pending-edit-cancel">${t("Cancelar")}</button>
+            <button class="btn btn-accent pending-edit-save">${t("Guardar")}</button>
+          </div>
+        </div>
+      </div>`;
+  }
   // Borrador de review en GitLab (draft note): nadie más lo ve todavía y la API no trae autor ni fecha.
   const head = comment.isPendingDraft
     ? `<b>📝 ${t("Borrador en GitLab")}</b>
-        <span class="muted">${t("sin publicar")}</span>`
+        <span class="muted">${t("sin publicar")}</span>
+        ${comment.draftNoteId ? `<button class="draft-edit pending-edit" data-draft-note="${comment.draftNoteId}" title="${t("Editar borrador")}">✏️</button>
+          <button class="draft-del pending-del" data-draft-note="${comment.draftNoteId}" title="${t("Borrar borrador de GitLab")}">🗑</button>` : ""}`
     : `<img src="${esc(comment.author?.avatarUrl || "")}" alt="" />
         <b>${esc(comment.author?.login || "?")}</b>
         <span class="muted">${timeAgo(comment.createdAt)}</span>`;
@@ -162,6 +174,60 @@ function commentBlock(comment) {
       </div>
       <div class="comment-body pr-body">${comment.bodyHTML || ""}</div>
     </div>`;
+}
+
+// Repinta sin mover la pantalla: editar, guardar o responder un comentario te deja donde estabas.
+function renderDetailInPlace() {
+  const { scrollTop } = detailPane;
+  renderDetail();
+  detailPane.scrollTop = scrollTop;
+}
+
+// Borradores de GitLab (draft notes): se edita el texto en el servidor y siguen sin publicarse.
+function wirePendingDraftEdits(container) {
+  container.querySelectorAll(".pending-edit").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      state.editingDraftNoteId = Number(btn.dataset.draftNote);
+      renderDetailInPlace();
+      detailContent.querySelector(".pending-draft.editing .draft-editor")?.focus({ preventScroll: true });
+    }),
+  );
+  container.querySelectorAll(".pending-del").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      if (!confirm(t("¿Borrar este borrador de GitLab? No se puede deshacer."))) return;
+      btn.disabled = true;
+      try {
+        await window.monstro.deleteDraftNote(detailRepo(), state.detailPR.number, Number(btn.dataset.draftNote));
+        state.conversation = await window.monstro.prConversation(detailRepo(), state.detailPR.number);
+        toast(t("Borrador borrado de GitLab"), "ok");
+        renderDetailInPlace();
+      } catch (err) {
+        toast(t("No se pudo borrar el borrador: {err}", { err: String(err.message || err) }), "err");
+        btn.disabled = false;
+      }
+    }),
+  );
+  const card = container.querySelector(".pending-draft.editing");
+  if (!card) return;
+  card.querySelector(".pending-edit-cancel").addEventListener("click", () => {
+    state.editingDraftNoteId = null;
+    renderDetailInPlace();
+  });
+  card.querySelector(".pending-edit-save").addEventListener("click", async (event) => {
+    const body = card.querySelector(".draft-editor").value.trim();
+    if (!body) return;
+    event.target.disabled = true;
+    try {
+      await window.monstro.updateDraftNote(detailRepo(), state.detailPR.number, state.editingDraftNoteId, body);
+      state.conversation = await window.monstro.prConversation(detailRepo(), state.detailPR.number);
+      state.editingDraftNoteId = null;
+      toast(t("Borrador actualizado en GitLab (sigue sin publicar)"), "ok");
+      renderDetailInPlace();
+    } catch (err) {
+      toast(t("No se pudo guardar el borrador: {err}", { err: String(err.message || err) }), "err");
+      event.target.disabled = false;
+    }
+  });
 }
 
 function renderConversationTab() {
@@ -196,6 +262,7 @@ function renderConversationTab() {
   });
   wireExternalLinks();
   wireDraftCards($("#tab-body"));
+  wirePendingDraftEdits($("#tab-body"));
   $("#send-comment").addEventListener("click", async () => {
     const body = $("#new-comment").value.trim();
     if (!body) return;

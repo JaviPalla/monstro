@@ -192,19 +192,6 @@ async function mergePR(repoFullName, number, { deleteBranch, headRefName, isCros
   return { merged: result.merged === true, sha: result.sha, branchDeleted };
 }
 
-/** Update branch SIEMPRE con rebase (así se hacen los pull aquí). */
-async function updateBranchRebase(prNodeId) {
-  const data = await gql(
-    `mutation ($id: ID!) {
-       updatePullRequestBranch(input: { pullRequestId: $id, updateMethod: REBASE }) {
-         pullRequest { number mergeStateStatus }
-       }
-     }`,
-    { id: prNodeId },
-  );
-  return data.updatePullRequestBranch.pullRequest;
-}
-
 /* ---------- histórico (grafo de commits) ---------- */
 
 const HISTORY_COMMIT_FIELDS = `
@@ -352,9 +339,17 @@ async function submitReview(repoFullName, number, { commitId, event, body, comme
   return rest("POST", `/repos/${repoFullName}/pulls/${number}/reviews`, payload);
 }
 
-/** Descarta una review publicada (quitar tu aprobación). GitHub exige un mensaje. */
-async function dismissReview(repoFullName, number, reviewId, message) {
-  return rest("PUT", `/repos/${repoFullName}/pulls/${number}/reviews/${reviewId}/dismissals`, { message });
+// Los borradores de review en el servidor (draft notes) solo existen en GitLab.
+async function updateDraftNote() {
+  throw new Error("Editar borradores de review solo está disponible en GitLab.");
+}
+
+async function deleteDraftNote() {
+  throw new Error("Borrar borradores de review solo está disponible en GitLab.");
+}
+
+async function publishDraftNotes() {
+  throw new Error("Publicar borradores de review del servidor solo está disponible en GitLab.");
 }
 
 /* ---------- acciones sobre el grafo ---------- */
@@ -562,7 +557,6 @@ module.exports = {
   mrForBranch,
   prDetail,
   mergePR,
-  updateBranchRebase,
   defaultBranch,
   branchHistories,
   prFiles,
@@ -573,7 +567,9 @@ module.exports = {
   replyToThread,
   setThreadResolved,
   submitReview,
-  dismissReview,
+  updateDraftNote,
+  deleteDraftNote,
+  publishDraftNotes,
   createBranch,
   forceUpdateBranch,
   cherryPick,

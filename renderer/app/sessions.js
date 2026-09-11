@@ -6,7 +6,6 @@
 // (resumen, tus peticiones, ficheros y métricas) en el panel de detalle. Al abrirlo el menú se pliega a
 // iconos para dejar sitio. Abierto/cerrado se recuerda en localStorage (preferencia de este equipo, no config).
 // Poll cada 10 s con el panel abierto y cada minuto cerrado (solo para el contador del botón).
-const SESSIONS_STORE_KEY = "monstro:sessionsPane";
 const SESSIONS_TICK_MS = 10000;
 const SESSIONS_IDLE_TICKS = 6;
 const SESSIONS_MAX_LINKS = 6;
@@ -42,9 +41,6 @@ function toggleSessionsPane(open = !sessionsOpen()) {
   $("#sessions-btn").classList.toggle("open", open);
   document.body.classList.toggle("nav-collapsed", open);
   if (open) labelCollapsedNav();
-  if (!IS_SELFTEST) {
-    try { localStorage.setItem(SESSIONS_STORE_KEY, open ? "1" : "0"); } catch { /* sin storage: no se recuerda */ }
-  }
   if (open) {
     if (!detailPane.classList.contains("hidden")) hideDetail(); // el tablero va a pantalla completa
     loadSessions();
@@ -65,9 +61,9 @@ function loadSessions() {
   return sessionsUi.pending;
 }
 
+// La app arranca siempre en el tablero de Agents. El selftest no: sus rutas parten de la lista.
 function initSessions() {
-  let open = false;
-  try { open = !IS_SELFTEST && localStorage.getItem(SESSIONS_STORE_KEY) === "1"; } catch { /* idem */ }
+  const open = !IS_SELFTEST;
   toggleSessionsPane(open);
   if (!open) loadSessions();
   setInterval(() => {

@@ -4,6 +4,7 @@
 // Se registran desde wireIpc() en src/main.js.
 
 const { ipcMain } = require("electron");
+const agents = require("../agents");
 const ai = require("../ai");
 const config = require("../config");
 const drafts = require("../drafts");
@@ -32,7 +33,13 @@ function register(ctx) {
   ipcMain.handle("pr:merge", async (_event, { repo, number, deleteBranch, headRefName, isCrossRepository }) =>
     gh().mergePR(repo, number, { deleteBranch, headRefName, isCrossRepository }),
   );
-  ipcMain.handle("pr:updateBranch", async (_event, { nodeId }) => gh().updateBranchRebase(nodeId));
+  // Abre la rama de la MR en Rider / VS Code, en un worktree suyo: el clon del usuario no se toca.
+  ipcMain.handle("pr:openEditor", async (_event, { repo, branch }) => {
+    const dir = await localRepoDir(repo);
+    if (!dir) throw new Error(`No encuentro el clon de ${repo} en tu carpeta de repos locales (Trabajo local → 📁).`);
+    const worktree = await local.branchWorktree(dir, branch);
+    return { ...agents.openEditor(worktree), worktree };
+  });
 
   ipcMain.handle("pr:files", async (_event, { repo, number }) => gh().prFiles(repo, number));
   ipcMain.handle("pr:conversation", async (_event, { repo, number }) => gh().prConversation(repo, number));
@@ -51,9 +58,22 @@ function register(ctx) {
   ipcMain.handle("pr:submitReview", async (_event, { repo, number, review }) =>
     gh().submitReview(repo, number, review),
   );
-  ipcMain.handle("pr:dismissReview", async (_event, { repo, number, reviewId, message }) =>
-    gh().dismissReview(repo, number, reviewId, String(message || "")),
-  );
+  // Solo cambia el texto de un borrador de review de GitLab (draft note): sigue sin publicarse.
+  ipcMain.handle("pr:updateDraftNote", async (_event, { repo, number, draftNoteId, body }) => {
+    if (!Number.isInteger(Number(number)) || !Number.isInteger(Number(draftNoteId))) throw new Error("Borrador no válido");
+    if (!String(body || "").trim()) throw new Error("El borrador no puede quedar vacío");
+    return gh().updateDraftNote(repo, Number(number), Number(draftNoteId), String(body));
+  });
+  // Borra un borrador de review de GitLab. No hay deshacer: el renderer pide confirmación antes.
+  ipcMain.handle("pr:deleteDraftNote", async (_event, { repo, number, draftNoteId }) => {
+    if (!Number.isInteger(Number(number)) || !Number.isInteger(Number(draftNoteId))) throw new Error("Borrador no válido");
+    return gh().deleteDraftNote(repo, Number(number), Number(draftNoteId));
+  });
+  // Publica todos los borradores de review de GitLab de la MR. Solo tras clic + confirmación en el renderer.
+  ipcMain.handle("pr:publishDraftNotes", async (_event, { repo, number }) => {
+    if (!Number.isInteger(Number(number))) throw new Error("Número de MR no válido");
+    return gh().publishDraftNotes(repo, Number(number));
+  });
 
   // La review profunda corre en un worktree detached en la punta de la rama de la MR: así el agente
   // lee EL código que se va a fusionar, no lo que el usuario tenga en su clon. Si no se puede crear

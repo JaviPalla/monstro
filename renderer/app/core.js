@@ -85,6 +85,9 @@ const state = {
   aiRunLabel: "", // "modelo · esfuerzo" de la review en curso, en la cabecera del modal
   draftNavIndex: -1, // navegación ↑↓ entre borradores
   editingDraftId: null, // borrador en edición → su tarjeta se pinta como editor
+  editingDraftNoteId: null, // draft note de GitLab en edición (su id)
+  openFiles: null, // Set de ficheros desplegados en Cambios (null = los 6 primeros)
+  commentNav: null, // último salto de las flechas ↑↓ de Cambios: {index, scrollTop}
 };
 
 const $ = (sel) => document.querySelector(sel);

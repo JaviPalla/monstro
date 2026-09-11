@@ -48,14 +48,17 @@ function renderChangesTab() {
   // Borradores de review que esperan en GitLab (p. ej. los de la skill mr-review-gitlab).
   const pendingTotal = state.conversation?.pendingDrafts || 0;
   const pendingInline = (state.conversation?.reviewThreads?.nodes || []).some((th) => th.isPendingDraft);
-  const prUrl = state.detailPR.url || "";
   const pendingBar = pendingTotal
     ? `<div class="gl-drafts-bar">📝 ${t("{n} comentarios de review pendientes de publicar en GitLab", { n: pendingTotal })}
         <span style="flex:1"></span>
         ${pendingInline ? `<button class="btn" id="gl-drafts-first">${t("Ir al primero")}</button>` : ""}
-        ${prUrl ? `<button class="btn" data-ext="${esc(prUrl)}">${t("Publicar en GitLab")} ↗</button>` : ""}
+        <button class="btn btn-primary" id="gl-drafts-publish" title="${t("Publica todos tus borradores de esta MR en GitLab (pide confirmación)")}">${t("Publicar en GitLab")}</button>
       </div>`
     : "";
+
+  // Qué ficheros tienes desplegados sobrevive a los repintados (editar, guardar, responder…): si no,
+  // el comentario en el que estabas se queda dentro de un fichero plegado y pierdes el sitio.
+  state.openFiles ??= new Set(files.slice(0, 6).map((f) => f.filename));
 
   $("#tab-body").innerHTML = `
     ${pendingBar}
@@ -72,7 +75,7 @@ function renderChangesTab() {
         const orphanThreads = (orphans.get(file.filename) || []).map(threadBlock).join("");
         const comments = commentsPerFile.get(file.filename) || 0;
         return `
-        <details class="diff-file" id="diff-f${fi}" ${fi < 6 ? "open" : ""}>
+        <details class="diff-file" id="diff-f${fi}" data-file="${esc(file.filename)}" ${state.openFiles.has(file.filename) ? "open" : ""}>
           <summary>
             <span class="status-ico">${statusIcon[file.status] || "⚪"}</span>
             <span class="diff-path">${esc(file.previousFilename ? `${file.previousFilename} → ` : "")}${esc(file.filename)}</span>
@@ -87,6 +90,11 @@ function renderChangesTab() {
       })
       .join("")}
       </div>
+    </div>
+    <div class="comment-nav" id="comment-nav">
+      <button class="btn" id="cn-prev" title="${t("Comentario anterior")}">↑</button>
+      <span class="comment-nav-count" id="cn-count"></span>
+      <button class="btn" id="cn-next" title="${t("Comentario siguiente")}">↓</button>
     </div>`;
 
   // índice lateral: saltar al fichero (abriendo su diff)
@@ -120,7 +128,7 @@ function renderChangesTab() {
         await window.monstro.replyThread(detailRepo(), state.detailPR.number, Number(btn.dataset.reply), body);
         toast(t("Respuesta publicada"), "ok");
         state.conversation = await window.monstro.prConversation(detailRepo(), state.detailPR.number);
-        renderChangesTab();
+        renderDetailInPlace();
       } catch (err) {
         toast(t("No se pudo responder: {err}", { err: String(err.message || err) }), "err");
         btn.disabled = false;
@@ -136,7 +144,7 @@ function renderChangesTab() {
         await window.monstro.resolveThread(btn.dataset.resolveId, resolved);
         toast(resolved ? t("Conversación resuelta ✓") : t("Conversación reabierta"), "ok");
         state.conversation = await window.monstro.prConversation(detailRepo(), state.detailPR.number);
-        renderChangesTab();
+        renderDetailInPlace();
       } catch (err) {
         toast(t("No se pudo {action}: {err}", { action: resolved ? t("resolver") : t("reabrir"), err: String(err.message || err) }), "err");
         btn.disabled = false;
@@ -145,6 +153,16 @@ function renderChangesTab() {
   );
   wireExternalLinks();
   wireDraftCards($("#tab-body"));
+  wirePendingDraftEdits($("#tab-body"));
+  const navTotal = commentNavItems().length;
+  if (navTotal) {
+    const last = state.commentNav;
+    $("#cn-count").textContent = last && last.index < navTotal ? `${last.index + 1}/${navTotal}` : String(navTotal);
+    $("#cn-prev").addEventListener("click", () => jumpToComment(-1));
+    $("#cn-next").addEventListener("click", () => jumpToComment(1));
+  } else {
+    $("#comment-nav").remove();
+  }
   const firstPending = () => {
     const el = $("#tab-body").querySelector(".thread.pending-draft");
     if (!el) return;
@@ -154,12 +172,60 @@ function renderChangesTab() {
     detailPane.scrollTop += el.getBoundingClientRect().top - detailPane.getBoundingClientRect().top - 80;
   };
   $("#gl-drafts-first")?.addEventListener("click", firstPending);
+  $("#gl-drafts-publish")?.addEventListener("click", publishGitlabDrafts);
   // Abierta desde una sesión de review del panel de sesiones: directo al primer borrador pendiente.
   if (state.focusPendingDrafts) {
     state.focusPendingDrafts = false;
     firstPending();
   }
   notifySelftestOnce();
+}
+
+// Publica de golpe todos tus borradores de review de GitLab (bulk_publish), sin pasar por el
+// navegador. Es irreversible y lo ve todo el equipo: siempre tras un clic y una confirmación.
+async function publishGitlabDrafts() {
+  const n = state.conversation?.pendingDrafts || 0;
+  if (!n || !confirm(t("¿Publicar los {n} comentarios en GitLab? Dejan de ser borradores y los verá todo el equipo.", { n }))) return;
+  const btn = $("#gl-drafts-publish");
+  if (btn) btn.disabled = true;
+  try {
+    await window.monstro.publishDraftNotes(detailRepo(), state.detailPR.number);
+    state.conversation = await window.monstro.prConversation(detailRepo(), state.detailPR.number);
+    toast(t("{n} comentarios publicados en GitLab ✓", { n }), "ok");
+    renderDetailInPlace();
+  } catch (err) {
+    toast(t("No se pudieron publicar los comentarios: {err}", { err: String(err.message || err) }), "err");
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Todo lo comentado del diff, en orden de lectura: hilos, borradores de GitLab y borradores locales.
+function commentNavItems() {
+  return [...$("#tab-body").querySelectorAll(".changes-body .thread, .changes-body .draft-card")];
+}
+
+// Flechas ↑↓: salta al comentario anterior/siguiente desplegando su fichero. Si has movido la
+// pantalla desde el último salto sigue desde lo que estás viendo; si no, va al siguiente de la
+// lista (cerca del final la página ya no baja y la posición no serviría para avanzar).
+function jumpToComment(direction) {
+  const items = commentNavItems();
+  if (!items.length) return;
+  const viewTop = detailPane.getBoundingClientRect().top + 80; // bajo la cabecera, como "Ir al primero"
+  // Lo que está dentro de un fichero plegado no tiene caja: cuenta la de su cabecera.
+  const top = (el) => (el.closest("details:not([open])") || el).getBoundingClientRect().top - viewTop;
+  const last = state.commentNav;
+  let index = last && last.scrollTop === detailPane.scrollTop
+    ? last.index + direction
+    : direction > 0 ? items.findIndex((el) => top(el) > 1) : items.findLastIndex((el) => top(el) < -1);
+  if (index < 0 || index >= items.length) index = direction > 0 ? 0 : items.length - 1;
+  const el = items[index];
+  const file = el.closest("details");
+  if (file) file.open = true;
+  detailPane.scrollTop += el.getBoundingClientRect().top - viewTop;
+  el.classList.add("flash");
+  setTimeout(() => el.classList.remove("flash"), 1600);
+  state.commentNav = { index, scrollTop: detailPane.scrollTop };
+  $("#cn-count").textContent = `${index + 1}/${items.length}`;
 }
 
 function openInlineComposer(tr) {

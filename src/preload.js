@@ -64,7 +64,7 @@ contextBridge.exposeInMainWorld("monstro", {
   searchPRs: (repos, states) => ipcRenderer.invoke("prs:search", { repos, states }),
   prDetail: (repo, number) => ipcRenderer.invoke("pr:detail", { repo, number }),
   mergePR: (args) => ipcRenderer.invoke("pr:merge", args),
-  updateBranch: (nodeId) => ipcRenderer.invoke("pr:updateBranch", { nodeId }),
+  prOpenEditor: (repo, branch) => ipcRenderer.invoke("pr:openEditor", { repo, branch }),
   prFiles: (repo, number) => ipcRenderer.invoke("pr:files", { repo, number }),
   prConversation: (repo, number) => ipcRenderer.invoke("pr:conversation", { repo, number }),
   commentIssue: (repo, number, body) => ipcRenderer.invoke("pr:commentIssue", { repo, number, body }),
@@ -73,8 +73,10 @@ contextBridge.exposeInMainWorld("monstro", {
     ipcRenderer.invoke("pr:replyThread", { repo, number, commentDatabaseId, body }),
   resolveThread: (threadId, resolved) => ipcRenderer.invoke("pr:resolveThread", { threadId, resolved }),
   submitReview: (repo, number, review) => ipcRenderer.invoke("pr:submitReview", { repo, number, review }),
-  dismissReview: (repo, number, reviewId, message) =>
-    ipcRenderer.invoke("pr:dismissReview", { repo, number, reviewId, message }),
+  updateDraftNote: (repo, number, draftNoteId, body) =>
+    ipcRenderer.invoke("pr:updateDraftNote", { repo, number, draftNoteId, body }),
+  deleteDraftNote: (repo, number, draftNoteId) => ipcRenderer.invoke("pr:deleteDraftNote", { repo, number, draftNoteId }),
+  publishDraftNotes: (repo, number) => ipcRenderer.invoke("pr:publishDraftNotes", { repo, number }),
   aiReview: (repo, pr, files, override) =>
     ipcRenderer.invoke("ai:review", {
       repo,
