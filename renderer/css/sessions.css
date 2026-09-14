@@ -107,6 +107,14 @@ button.ss-sec { cursor: pointer; }
 .ss-done.selected { border-radius: 8px; color: var(--text); background: var(--bg-raised); }
 .ss-title { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ss-time { flex-shrink: 0; font-size: 11px; color: var(--text-muted); }
+/* Cerrar / Quitar sesión: X roja en círculo, junto al tiempo. */
+.ss-x {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 16px; height: 16px; padding: 0; border: 1.5px solid var(--red); border-radius: 50%;
+  font-size: 8px; line-height: 1; color: var(--red); background: transparent; cursor: pointer;
+}
+.ss-x:hover { color: #fff; background: var(--red); }
+.sv .detail-sub > .ss-x::before { content: none; }
 .ss-meta { margin: 2px 0 7px 15px; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ss-ellip { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 

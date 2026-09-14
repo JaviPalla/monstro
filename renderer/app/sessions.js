@@ -165,7 +165,7 @@ function linkBadges(s) {
 }
 
 function sessionHeader(s) {
-  return `<div class="ss-top" title="${esc(s.title)}"><span class="ss-dot"></span><span class="ss-title">${esc(s.title)}</span><span class="ss-time">${esc(timeAgo(s.updatedAt))}</span></div>`;
+  return `<div class="ss-top" title="${esc(s.title)}"><span class="ss-dot"></span><span class="ss-title">${esc(s.title)}</span><span class="ss-time">${esc(timeAgo(s.updatedAt))}</span>${closeButton(s)}</div>`;
 }
 
 // Iconos reales de las apps (sessions:appIcons, dataURL): se piden la primera vez que hacen falta y se
@@ -225,7 +225,6 @@ function sessionCard(s) {
       <div class="ss-actions">
         ${openButton(s)}
         <button class="mini-btn" data-ss="add" title="${esc(t("Asociar MR, issue o epic"))}">+</button>
-        ${closeButton(s)}
       </div>
       ${tagForm}
     </div>`;
@@ -235,8 +234,8 @@ function sessionCard(s) {
 // Terminada: solo la saca. Trabajando no se ofrece: se cortaría a medias.
 function closeButton(s) {
   if (s.state === "working") return "";
-  const [label, tip] = s.live ? [t("Cerrar"), t("Cerrar la sesión y quitarla del panel")] : [t("Quitar"), t("Quitar del panel")];
-  return `<button class="mini-btn" data-ss="close-session" title="${esc(tip)}">${esc(label)}</button>`;
+  const tip = s.live ? t("Cerrar la sesión y quitarla del panel") : t("Quitar del panel");
+  return `<button class="ss-x" data-ss="close-session" title="${esc(tip)}" aria-label="${esc(tip)}">✕</button>`;
 }
 
 // Terminada = nadie trabaja ya en sus worktrees de agente: es el momento de quitarlos (sus ramas se quedan).
@@ -265,8 +264,8 @@ function finishedRow(s) {
         <span class="ss-dot"></span><span class="ss-ellip">${esc(s.title)}</span>
         <span class="ss-time">${esc(timeAgo(s.updatedAt))}</span>
         <button class="mini-btn" data-ss="resume">${t("Reanudar")}</button>
-        ${closeButton(s)}
         ${cleanButton(s)}
+        ${closeButton(s)}
       </div>
       ${links.length ? `<div class="ss-badges ss-done-links">${links.map(linkBadge).join("")}</div>` : ""}
     </div>`;
