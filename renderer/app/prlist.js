@@ -10,8 +10,8 @@ function stateChip(pr) {
 function reviewChip(pr) {
   if (pr.state !== "OPEN") return "";
   switch (pr.reviewDecision) {
-    case "APPROVED": return `<span class="chip chip-approved">✓ ${t("Aprobada")}</span>`;
-    case "CHANGES_REQUESTED": return `<span class="chip chip-changes">± ${t("Cambios pedidos")}</span>`;
+    case "APPROVED": return `<span class="chip chip-approved">${icon("check")} ${t("Aprobada")}</span>`;
+    case "CHANGES_REQUESTED": return `<span class="chip chip-changes">${icon("file-diff")} ${t("Cambios pedidos")}</span>`;
     case "REVIEW_REQUIRED": return `<span class="chip chip-review">${t("Falta revisión")}</span>`;
     default: return "";
   }
@@ -29,14 +29,14 @@ function checksIcon(pr) {
   const rollup = pr.commits?.nodes?.[0]?.commit?.statusCheckRollup;
   if (!rollup) return "";
   const map = {
-    SUCCESS: ["✓", "checks-success", t("Checks en verde")],
-    FAILURE: ["✗", "checks-failure", t("Checks fallando")],
-    ERROR: ["✗", "checks-failure", t("Checks con error")],
-    PENDING: ["●", "checks-pending", t("Checks en curso")],
-    EXPECTED: ["●", "checks-pending", t("Checks esperados")],
+    SUCCESS: ["circle-check", "checks-success", t("Checks en verde")],
+    FAILURE: ["circle-x", "checks-failure", t("Checks fallando")],
+    ERROR: ["circle-x", "checks-failure", t("Checks con error")],
+    PENDING: ["circle-dot", "checks-pending", t("Checks en curso")],
+    EXPECTED: ["circle-dot", "checks-pending", t("Checks esperados")],
   };
-  const [icon, cls, title] = map[rollup.state] || ["", "", ""];
-  return icon ? `<span class="checks ${cls}" title="${title}">${icon}</span>` : "";
+  const [name, cls, title] = map[rollup.state] || ["", "", ""];
+  return name ? `<span class="checks ${cls}" title="${title}">${icon(name)}</span>` : "";
 }
 
 /** Avatares con tick verde de quienes han aprobado (estilo Bitbucket). */
@@ -57,7 +57,7 @@ function approvalFaces(pr) {
       ${shown.map((a) => `
         <span class="face">
           <img src="${esc(a.avatarUrl)}" alt="${esc(a.login)}" />
-          <span class="face-tick">✓</span>
+          <span class="face-tick">${icon("check")}</span>
         </span>`).join("")}
       ${extra > 0 ? `<span class="face face-more">+${extra}</span>` : ""}
     </span>`;
@@ -110,10 +110,10 @@ function renderList() {
         <div class="pr-sub">
           <span class="branches">
             <span class="branch" title="${esc(pr.headRefName)}">${esc(pr.headRefName)}</span>
-            <span class="arrow">→</span>
+            <span class="arrow">${icon("arrow-right")}</span>
             <span class="branch" title="${esc(pr.baseRefName)}">${esc(pr.baseRefName)}</span>
           </span>
-          <span class="meta-mini">${esc(pr.author?.login || "?")} · ${timeAgo(pr.updatedAt)} · <span class="checks-success">+${pr.additions ?? 0}</span>/<span class="checks-failure">−${pr.deletions ?? 0}</span> · 💬 ${pr.comments?.totalCount ?? 0}${state.draftKeys.has(`${pr.repository?.nameWithOwner || state.repo}#${pr.number}`) ? ` · 📝 ${t("borradores")}` : ""}</span>
+          <span class="meta-mini">${esc(pr.author?.login || "?")} · ${timeAgo(pr.updatedAt)} · <span class="checks-success">+${pr.additions ?? 0}</span>/<span class="checks-failure">−${pr.deletions ?? 0}</span> · ${icon("message-square")} ${pr.comments?.totalCount ?? 0}${state.draftKeys.has(`${pr.repository?.nameWithOwner || state.repo}#${pr.number}`) ? ` · ${icon("file-pen-line")} ${t("borradores")}` : ""}</span>
         </div>
       </article>`,
     )

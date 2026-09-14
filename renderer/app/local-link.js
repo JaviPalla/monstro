@@ -83,7 +83,7 @@ function renderLocalLinkForm() {
       ${projBlocks}
       <label class="lf-check"><input type="checkbox" id="llf-push" ${f.push ? "checked" : ""} /> ${t("Hacer push de las ramas antes de crear las MR")}</label>
       <div class="lf-actions">
-        <button class="btn" id="llf-cancel">${t("← Volver")}</button>
+        <button class="btn" id="llf-cancel">${icon("arrow-left")} ${t("Volver")}</button>
         <button class="btn btn-primary" id="llf-create" ${f.creating || !f.issue ? "disabled" : ""}>${f.creating ? t("Creando…") : t("Crear MR(s)")}</button>
       </div>
     </div>`;
@@ -132,7 +132,7 @@ function confirmLinkTask() {
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>${t("↗ Vincular en GitLab")}</h3>
+        <h3>${icon("link")} ${t("Vincular en GitLab")}</h3>
         <p class="muted">${t("Se crearán {n} MR vinculadas a <b>{title}</b> ({path}#{iid}){push}. Acción irreversible.", { n: f.projects.length, title: esc(f.issue.title), path: esc(f.issue.projectPath), iid: esc(String(f.issue.iid)), push: f.push ? t(", tras <b>pushear</b> las ramas") : "" })}</p>
         <div class="modal-actions">
           <button class="btn" id="modal-cancel">${t("Cancelar")}</button>

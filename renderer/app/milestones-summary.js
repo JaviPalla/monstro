@@ -186,15 +186,15 @@ function milestoneSummaryHtml() {
     .map(({ it, idx }) => {
       const rel = relevanceMeta(it.relevance);
       return `<div class="ms-sum-row ${it.included ? "" : "excluded"}" data-idx="${idx}" draggable="true">
-        <span class="ms-sum-grip" title="${t("Arrastra para reordenar")}">⠿</span>
+        <span class="ms-sum-grip" title="${t("Arrastra para reordenar")}">${icon("grip-vertical")}</span>
         <input type="checkbox" class="ms-task-check ms-sum-check" ${it.included ? "checked" : ""} title="${t("Incluir en el correo")}" />
         <span class="ms-sum-rel ${rel.cls}">${rel.label}</span>
         <div class="ms-sum-texts">
-          <div class="ms-sum-headline">${it.kind === "epic" ? "📦 " : ""}${esc(it.headline)}</div>
+          <div class="ms-sum-headline">${it.kind === "epic" ? `${icon("layers")} ` : ""}${esc(it.headline)}</div>
           <div class="ms-sum-orig muted">${esc(it.title)}</div>
         </div>
-        <button class="icon-btn ms-sum-edit" title="${t("Editar título")}">✎</button>
-        <button class="icon-btn ms-sum-open" data-url="${esc(it.url)}" title="${t("Abrir en GitLab")}">↗</button>
+        <button class="icon-btn ms-sum-edit" title="${t("Editar título")}">${icon("pencil")}</button>
+        <button class="icon-btn ms-sum-open" data-url="${esc(it.url)}" title="${t("Abrir en GitLab")}">${icon("external-link")}</button>
       </div>`;
     })
     .join("");

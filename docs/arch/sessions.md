@@ -75,6 +75,8 @@ Transcripts are append-only and reach 10 MB. `scanTranscript` keeps `{offset, �
 
 ## Manual badges
 
+Every badge (and the kind badge of the ficha's cards) carries a Lucide icon by kind **and state** (`LINK_ICON` / `linkIcon` in sessions.js): MR/PR open `git-pull-request`, merged `git-merge`, closed `git-pull-request-closed`; issue `circle-dot`, closed `circle-check`; epic `layers`. Unknown state → the open one. "Probar en local" rows: API `server`, Front `app-window`.
+
 `userData/session-tags.json` `{[sessionId]: {add: [url], hide: [key]}}` — own file, so it doesn't go through the `config:set` whitelist. `×` on a manual badge removes it; on an inferred one hides it for that session.
 
 ## Actions (main validates, never trusts renderer paths)

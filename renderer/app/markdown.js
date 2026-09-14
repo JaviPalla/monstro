@@ -46,7 +46,7 @@ function mdInline(text) {
 function mdItemHtml(item) {
   const task = /^\[([ xX])\]\s+/.exec(item.text[0]);
   if (task) item.text[0] = item.text[0].slice(task[0].length);
-  const check = task ? `<span class="md-check">${task[1] === " " ? "☐" : "☑"}</span> ` : "";
+  const check = task ? `<span class="md-check">${icon(task[1] === " " ? "square" : "square-check")}</span> ` : "";
   return `<li${task ? ' class="md-task"' : ""}>${check}${item.text.map(mdInline).join("<br>")}${item.sub.join("")}</li>`;
 }
 

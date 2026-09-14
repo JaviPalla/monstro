@@ -36,7 +36,7 @@ function register(ctx) {
   // Abre la rama de la MR en Rider / VS Code, en un worktree suyo: el clon del usuario no se toca.
   ipcMain.handle("pr:openEditor", async (_event, { repo, branch }) => {
     const dir = await localRepoDir(repo);
-    if (!dir) throw new Error(`No encuentro el clon de ${repo} en tu carpeta de repos locales (Trabajo local → 📁).`);
+    if (!dir) throw new Error(`No encuentro el clon de ${repo} en tu carpeta de repos locales (Trabajo local → carpeta raíz).`);
     const worktree = await local.branchWorktree(dir, branch);
     return { ...agents.openEditor(worktree), worktree };
   });

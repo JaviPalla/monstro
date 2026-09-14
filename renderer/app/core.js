@@ -118,15 +118,15 @@ const BRANCH_RE = /^[\w./-]{1,200}$/;
 // GitLab. El onboarding pregunta cuáles incluir; config.sections (array) las habilita. null = todas.
 // prs no tiene cabecera: su navId ya es el propio bucket "Merge requests", así que no lleva buckets aparte.
 const MENU_SECTIONS = {
-  prs:        { label: "Merge requests",     icon: "🔀", navId: "nav-prs-section",        buckets: [], gitlabOnly: false },
-  historial:  { label: "Historial",          icon: "🗂️", navId: "nav-historial-section",  buckets: ['[data-bucket="merged"]', '[data-bucket="closed"]'], gitlabOnly: false },
-  historico:  { label: "Histórico (grafo)",  icon: "🕸️", navId: "nav-repo-section",       buckets: ["#bucket-history"], gitlabOnly: false },
-  milestones: { label: "Tareas por persona", icon: "👥", navId: "nav-milestones-section", buckets: ["#bucket-milestones", "#bucket-milestones-summary"], gitlabOnly: true },
-  soporte:    { label: "Soporte",            icon: "🛟", navId: "nav-support-section",    buckets: ["#bucket-support", "#bucket-ops"], gitlabOnly: true },
-  releases:   { label: "Releases",           icon: "🚀", navId: "nav-releases-section",   buckets: ["#bucket-releases", "#bucket-releases-publish", "#bucket-releases-pipelines"], gitlabOnly: true },
-  entornos:   { label: "Entornos",           icon: "🌡️", navId: "nav-entornos-section",   buckets: ["#bucket-entornos"], gitlabOnly: true },
-  local:      { label: "Trabajo local",      icon: "💻", navId: "nav-local-section",      buckets: ["#bucket-local-empezar", "#bucket-local-crear", "#bucket-local-vincular", "#bucket-local-historico"], gitlabOnly: true },
-  propuestas: { label: "Propuestas",         icon: "📥", navId: "nav-propuestas-section", buckets: ["#bucket-propuestas"], gitlabOnly: true },
+  prs:        { label: "Merge requests",     icon: "git-pull-request", navId: "nav-prs-section",        buckets: [], gitlabOnly: false },
+  historial:  { label: "Historial",          icon: "history",          navId: "nav-historial-section",  buckets: ['[data-bucket="merged"]', '[data-bucket="closed"]'], gitlabOnly: false },
+  historico:  { label: "Histórico (grafo)",  icon: "git-graph",        navId: "nav-repo-section",       buckets: ["#bucket-history"], gitlabOnly: false },
+  milestones: { label: "Tareas por persona", icon: "signpost",         navId: "nav-milestones-section", buckets: ["#bucket-milestones", "#bucket-milestones-summary"], gitlabOnly: true },
+  soporte:    { label: "Soporte",            icon: "activity",         navId: "nav-support-section",    buckets: ["#bucket-support", "#bucket-ops"], gitlabOnly: true },
+  releases:   { label: "Releases",           icon: "git-branch",       navId: "nav-releases-section",   buckets: ["#bucket-releases", "#bucket-releases-publish", "#bucket-releases-pipelines"], gitlabOnly: true },
+  entornos:   { label: "Entornos",           icon: "thermometer",      navId: "nav-entornos-section",   buckets: ["#bucket-entornos"], gitlabOnly: true },
+  local:      { label: "Trabajo local",      icon: "chart-bar",        navId: "nav-local-section",      buckets: ["#bucket-local-empezar", "#bucket-local-crear", "#bucket-local-vincular", "#bucket-local-historico"], gitlabOnly: true },
+  propuestas: { label: "Propuestas",         icon: "inbox",            navId: "nav-propuestas-section", buckets: ["#bucket-propuestas"], gitlabOnly: true },
 };
 
 // Claves de sección válidas para el proveedor actual, en orden de menú (las GitLab-only se caen en GitHub).
@@ -164,12 +164,16 @@ function timeAgo(iso) {
   return t("ahora");
 }
 
+const TOAST_ICON = { ok: "circle-check", err: "circle-x", warn: "triangle-alert" };
+
 // Devuelve el elemento: `sticky` (para progreso en vivo, p.ej. la descarga de un update, que
 // puede durar más que el timeout) no se auto-borra y lo quita quien lo creó.
 function toast(message, kind = "", onClick = null, sticky = false) {
   const el = document.createElement("div");
   el.className = `toast ${kind}`;
-  el.textContent = message;
+  // El icono (por tipo) va como HTML; el mensaje, siempre como texto.
+  el.innerHTML = TOAST_ICON[kind] ? icon(TOAST_ICON[kind]) : "";
+  el.append(message);
   if (onClick) {
     el.style.cursor = "pointer";
     el.addEventListener("click", onClick);

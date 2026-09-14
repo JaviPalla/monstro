@@ -132,11 +132,17 @@ async function probeEnvHealth() {
 function deployVerdict(deployment, staleDays) {
   if (!deployment) return { cls: "none", ico: "·", label: t("Sin despliegues") };
   const days = deployment.createdAt ? (Date.now() - new Date(deployment.createdAt).getTime()) / 86400000 : 0;
-  if (deployment.createdAt && days > staleDays) return { cls: "stale", ico: "✓", label: t("Desplegado hace mucho") };
-  return { cls: "ok", ico: "✓", label: t("Desplegado correctamente") };
+  if (deployment.createdAt && days > staleDays) return { cls: "stale", ico: icon("check"), label: t("Desplegado hace mucho") };
+  return { cls: "ok", ico: icon("check"), label: t("Desplegado correctamente") };
 }
 
-const HEALTH_ICO = { up: "●", unknown: "◍", down: "○" };
+// Función y no mapa constante: icon() se llama al pintar, no al cargar, porque test-env-mirror.js
+// evalúa este fichero en un vm sin icons.js.
+function healthIcon(status) {
+  if (status === "up") return icon("circle-check");
+  if (status === "unknown") return icon("circle-question-mark");
+  return icon("circle-x");
+}
 
 // Punto de salud (capa 2). Sin URL no pintamos nada: mejor un hueco que un icono gris que se
 // confunda con "caído".
@@ -144,12 +150,12 @@ function healthDotHtml(path, env) {
   if (!env.externalUrl) return "";
   const h = state.environments.health.get(`${path}|${env.name}`);
   if (!h) {
-    return `<span class="env-health probing" title="${t("Comprobando…")}">◌</span>`;
+    return `<span class="env-health probing" title="${t("Comprobando…")}">${icon("loader-circle", "spin")}</span>`;
   }
   const detail = [h.httpStatus ? `HTTP ${h.httpStatus}` : "", h.ms != null ? `${h.ms} ms` : "", h.note || ""]
     .filter(Boolean)
     .join(" · ");
-  return `<span class="env-health ${esc(h.status)}" title="${esc(`${env.externalUrl} — ${detail}`)}">${HEALTH_ICO[h.status] || "○"}</span>`;
+  return `<span class="env-health ${esc(h.status)}" title="${esc(`${env.externalUrl} — ${detail}`)}">${healthIcon(h.status)}</span>`;
 }
 
 // Entornos espejo (config `environments.mirrors`): un entorno que no despliega nada por su cuenta
@@ -185,7 +191,7 @@ function envCellHtml(path, env, staleDays) {
       <span class="env-box-top"><span class="env-ico">${v.ico}</span>${ref}</span>
       <span class="env-box-bot">
         <span class="env-when">${esc(when)}</span>
-        ${env.mirrorOf ? `<span class="env-mirror">↔ ${esc(env.mirrorOf)}</span>` : ""}
+        ${env.mirrorOf ? `<span class="env-mirror">${icon("arrow-left-right")} ${esc(env.mirrorOf)}</span>` : ""}
         ${healthDotHtml(path, env)}
       </span>
     </button>
@@ -265,15 +271,15 @@ function renderEnvironments() {
       </details>
       <div class="env-bar">
         <span class="env-legend">
-          <span class="env-key ok">✓</span> ${t("desplegado")}
-          <span class="env-key stale">✓</span> ${t("rancio")}
+          <span class="env-key ok">${icon("check")}</span> ${t("desplegado")}
+          <span class="env-key stale">${icon("check")}</span> ${t("rancio")}
           <span class="env-sep">·</span>
-          <span class="env-health up">●</span> ${t("responde")}
-          <span class="env-health unknown">◍</span> ${t("sin verificar")}
-          <span class="env-health down">○</span> ${t("caído")}
+          <span class="env-health up">${healthIcon("up")}</span> ${t("responde")}
+          <span class="env-health unknown">${healthIcon("unknown")}</span> ${t("sin verificar")}
+          <span class="env-health down">${healthIcon("down")}</span> ${t("caído")}
         </span>
         ${e.probing ? `<span class="muted">${t("Comprobando salud…")}</span>` : ""}
-        <button id="env-refresh" class="icon-btn" title="${t("Refrescar")}">⟳</button>
+        <button id="env-refresh" class="icon-btn" title="${t("Refrescar")}">${icon("refresh-cw")}</button>
       </div>
     </div>
     ${table}`;

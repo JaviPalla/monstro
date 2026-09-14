@@ -7,7 +7,7 @@
  * típico de XSS abre una etiqueta o se sale de un atributo, y que el formato básico sale bien.
  *
  * `node scripts/test-markdown.js`. El renderer son scripts clásicos en ámbito global: se evalúa el
- * fichero en un contexto vm vacío (no usa el DOM).
+ * fichero en un contexto vm vacío (no usa el DOM), con icons.js antes, como en index.html.
  */
 const fs = require("fs");
 const path = require("path");
@@ -15,7 +15,9 @@ const vm = require("vm");
 const assert = require("assert");
 
 const context = vm.createContext({});
-vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "renderer", "app", "markdown.js"), "utf8"), context);
+for (const file of ["icons.js", "markdown.js"]) {
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "renderer", "app", file), "utf8"), context);
+}
 const md = (text) => context.renderMarkdown(text);
 
 // Todo <a> que salga tiene que ser exactamente el nuestro: href https sin comillas dentro, y nada más.
@@ -66,7 +68,7 @@ assert.strictEqual(
   md("1. Primero\n   - sub a\n   - sub b\n2. Segundo"),
   "<ol><li>Primero<ul><li>sub a</li><li>sub b</li></ul></li><li>Segundo</li></ol>",
 );
-assert.strictEqual(md("- [x] hecho\n- [ ] falta"), '<ul><li class="md-task"><span class="md-check">☑</span> hecho</li><li class="md-task"><span class="md-check">☐</span> falta</li></ul>');
+assert.strictEqual(md("- [x] hecho\n- [ ] falta"), `<ul><li class="md-task"><span class="md-check">${context.icon("square-check")}</span> hecho</li><li class="md-task"><span class="md-check">${context.icon("square")}</span> falta</li></ul>`);
 assert.strictEqual(md("- punto\n  que sigue"), "<ul><li>punto<br>que sigue</li></ul>");
 assert.strictEqual(md("- a\n\n- b\n\nfin"), "<ul><li>a</li><li>b</li></ul><p>fin</p>");
 

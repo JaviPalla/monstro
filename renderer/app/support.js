@@ -64,7 +64,7 @@ function supportCard(iss) {
         <button class="ms-task-title" data-url="${esc(iss.webUrl)}" title="${t("Abrir en GitLab")}">
           ${esc(iss.title)} <span class="ms-iid">#${iss.iid}</span>
         </button>
-        <button class="ms-task-copy" data-url="${esc(iss.webUrl)}" title="${t("Copiar enlace")}">⧉</button>
+        <button class="ms-task-copy" data-url="${esc(iss.webUrl)}" title="${t("Copiar enlace")}">${icon("copy")}</button>
       </div>
       ${chips ? `<div class="ms-task-labels">${chips}</div>` : ""}
     </div>`;
@@ -75,7 +75,7 @@ function supportCard(iss) {
 // "Sin asignar", igual que milestones.
 function supportColumn(g) {
   const sorted = [...g.issues].sort((a, b) => prioRank(a) - prioRank(b));
-  const avatar = g.avatarUrl ? `<img class="ms-avatar" src="${esc(g.avatarUrl)}" alt="" />` : `<span class="ms-avatar ph">∅</span>`;
+  const avatar = g.avatarUrl ? `<img class="ms-avatar" src="${esc(g.avatarUrl)}" alt="" />` : `<span class="ms-avatar ph">${icon("user")}</span>`;
   return `
     <section class="ms-group ms-drop" data-username="${esc(g.username)}" data-userid="${g.id || ""}">
       <header class="ms-group-head">
@@ -168,7 +168,7 @@ function renderSupport() {
       <input id="support-label-filter" class="support-label-filter" type="search" placeholder="${t("Filtrar por etiqueta…")}" value="${esc(s.labelFilter)}" />
       <label class="ms-closed-toggle"><input type="checkbox" id="support-show-closed" ${s.showClosed ? "checked" : ""} /> ${t("Mostrar cerradas")}</label>
       <span class="ms-count"><span class="support-count">0</span> ${t("tareas")}</span>
-      <button id="support-refresh" class="icon-btn" title="${t("Refrescar")}">⟳</button>
+      <button id="support-refresh" class="icon-btn" title="${t("Refrescar")}">${icon("refresh-cw")}</button>
     </div>
     <div class="ms-board support-board"></div>`;
 

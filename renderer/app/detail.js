@@ -66,40 +66,40 @@ function renderDetail() {
 
   detailContent.innerHTML = `
     <div class="detail-inner ${state.detailTab === "changes" ? "detail-full" : ""}">
-      <button class="detail-close" id="detail-close" title="${t("Cerrar (Esc)")}">✕</button>
+      <button class="detail-close" id="detail-close" title="${t("Cerrar (Esc)")}">${icon("x")}</button>
       <div class="detail-title">${esc(pr.title)} <span class="pr-number">#${pr.number}</span></div>
       <div class="detail-sub">
         ${stateChip(pr)} ${reviewChip(pr)} ${mergeStateChip(pr)}
         <span class="branches">
-          <span class="branch">${esc(pr.headRefName)}</span><span class="arrow">→</span><span class="branch">${esc(pr.baseRefName)}</span>
+          <span class="branch">${esc(pr.headRefName)}</span><span class="arrow">${icon("arrow-right")}</span><span class="branch">${esc(pr.baseRefName)}</span>
         </span>
       </div>
 
       <div class="actions">
         <button class="btn btn-accent" id="act-editor" ${pr.state === "OPEN" ? "" : "disabled"}
-                title="${t("Crea un worktree en la rama de la PR y lo abre en su editor: Rider si es .NET, VS Code si no")}">💻 ${t("Abrir en Rider / VS Code")}</button>
+                title="${t("Crea un worktree en la rama de la PR y lo abre en su editor: Rider si es .NET, VS Code si no")}">${icon("code")} ${t("Abrir en Rider / VS Code")}</button>
         <button class="btn btn-primary" id="act-merge" ${canMerge(pr) ? "" : "disabled"}
-                title="${esc(blockReason || t("Merge con merge commit"))}">⇅ ${t("Merge (merge commit)")}</button>
+                title="${esc(blockReason || t("Merge con merge commit"))}">${icon("git-merge")} ${t("Merge (merge commit)")}</button>
         ${state.aiGenerating === pr.number
           ? `<button class="btn btn-ai" id="act-ai" title="${t("Ver por dónde va la review")}"><span class="spinner"></span> <span id="act-ai-step">${esc(state.aiStep || t("Generando review…"))}</span></button>`
           : `<button class="btn btn-ai" id="act-ai" ${pr.state === "OPEN" ? "" : "disabled"}
-                title="${t("Revisa la MR y deja los comentarios como borradores para que los repases: nada se publica hasta que tú lo digas")}">🤖 ${t("Review con IA")}</button>`}
+                title="${t("Revisa la MR y deja los comentarios como borradores para que los repases: nada se publica hasta que tú lo digas")}">${icon("bot")} ${t("Review con IA")}</button>`}
         ${pr.state === "OPEN" && pr.author?.login === state.me?.login
-          ? `<button class="btn" id="act-draft-toggle" title="${pr.isDraft ? t("Marca la PR como lista: notifica a los reviewers") : t("Convierte la PR en borrador: deja de pedir reviews")}">${pr.isDraft ? `🚀 ${t("Marcar lista para review")}` : `↩︎ ${t("Convertir a borrador")}`}</button>`
+          ? `<button class="btn" id="act-draft-toggle" title="${pr.isDraft ? t("Marca la PR como lista: notifica a los reviewers") : t("Convierte la PR en borrador: deja de pedir reviews")}">${pr.isDraft ? `${icon("rocket")} ${t("Marcar lista para review")}` : `${icon("undo-2")} ${t("Convertir a borrador")}`}</button>`
           : ""}
       </div>
       <div class="copy-row">
-        <button class="mini-btn" id="copy-branch" title="${t("Copiar nombre de la rama")}">📋 ${esc(pr.headRefName)}</button>
-        <button class="mini-btn" id="copy-url" title="${t("Copiar URL de la PR")}">🔗 URL</button>
+        <button class="mini-btn" id="copy-branch" title="${t("Copiar nombre de la rama")}">${icon("copy")} ${esc(pr.headRefName)}</button>
+        <button class="mini-btn" id="copy-url" title="${t("Copiar URL de la PR")}">${icon("link")} URL</button>
       </div>
-      ${blockReason && pr.state === "OPEN" ? `<p class="muted">⚠️ ${esc(blockReason)}</p>` : ""}
+      ${blockReason && pr.state === "OPEN" ? `<p class="muted">${icon("triangle-alert")} ${esc(blockReason)}</p>` : ""}
 
       <div class="tabs">
         <button class="tab ${state.detailTab === "conv" ? "active" : ""}" data-tab="conv">
           ${t("Conversación")} <span class="count">${pr.comments?.totalCount ?? 0}</span>
         </button>
         <button class="tab ${state.detailTab === "changes" ? "active" : ""}" data-tab="changes">
-          ${t("Cambios")} <span class="count">${t("{n} ficheros", { n: pr.changedFiles })} · ${t("{n} hilos", { n: threadCount })}${state.drafts.filter((d) => d.kind === "inline").length ? ` · 📝 ${state.drafts.filter((d) => d.kind === "inline").length}` : ""}</span>
+          ${t("Cambios")} <span class="count">${t("{n} ficheros", { n: pr.changedFiles })} · ${t("{n} hilos", { n: threadCount })}${state.drafts.filter((d) => d.kind === "inline").length ? ` · ${icon("file-pen-line")} ${state.drafts.filter((d) => d.kind === "inline").length}` : ""}</span>
         </button>
       </div>
 
@@ -148,7 +148,7 @@ function commentBlock(comment) {
   if (comment.isPendingDraft && comment.draftNoteId === state.editingDraftNoteId) {
     return `
       <div class="comment pending-draft editing">
-        <div class="comment-head"><b>✏️ ${t("Editando borrador en GitLab")}</b></div>
+        <div class="comment-head"><b>${icon("pencil")} ${t("Editando borrador en GitLab")}</b></div>
         <div class="pending-editor">
           <textarea class="draft-editor" rows="5">${esc(comment.body || "")}</textarea>
           <div class="composer-actions">
@@ -160,10 +160,10 @@ function commentBlock(comment) {
   }
   // Borrador de review en GitLab (draft note): nadie más lo ve todavía y la API no trae autor ni fecha.
   const head = comment.isPendingDraft
-    ? `<b>📝 ${t("Borrador en GitLab")}</b>
+    ? `<b>${icon("file-pen-line")} ${t("Borrador en GitLab")}</b>
         <span class="muted">${t("sin publicar")}</span>
-        ${comment.draftNoteId ? `<button class="draft-edit pending-edit" data-draft-note="${comment.draftNoteId}" title="${t("Editar borrador")}">✏️</button>
-          <button class="draft-del pending-del" data-draft-note="${comment.draftNoteId}" title="${t("Borrar borrador de GitLab")}">🗑</button>` : ""}`
+        ${comment.draftNoteId ? `<button class="draft-edit pending-edit" data-draft-note="${comment.draftNoteId}" title="${t("Editar borrador")}">${icon("pencil")}</button>
+          <button class="draft-del pending-del" data-draft-note="${comment.draftNoteId}" title="${t("Borrar borrador de GitLab")}">${icon("trash-2")}</button>` : ""}`
     : `<img src="${esc(comment.author?.avatarUrl || "")}" alt="" />
         <b>${esc(comment.author?.login || "?")}</b>
         <span class="muted">${timeAgo(comment.createdAt)}</span>`;
@@ -248,7 +248,7 @@ function renderConversationTab() {
     <div class="composer">
       <textarea id="new-comment" rows="3" placeholder="${t("Escribe un comentario… se guarda como borrador hasta que publiques")}"></textarea>
       <div class="composer-actions">
-        <button class="btn btn-accent" id="send-comment">📝 ${t("Guardar borrador")}</button>
+        <button class="btn btn-accent" id="send-comment">${icon("file-pen-line")} ${t("Guardar borrador")}</button>
       </div>
     </div>
     <details class="desc-fold" ${longDescription ? "" : "open"}>
@@ -317,11 +317,11 @@ function threadBlock(thread) {
   const resolveBtn = !thread.id
     ? ""
     : thread.isResolved
-      ? (thread.viewerCanUnresolve ? `<button class="btn thread-resolve" data-resolve-id="${esc(thread.id)}" data-resolved="false" title="${t("Reabre la conversación en GitHub")}">↺ ${t("Reabrir")}</button>` : "")
-      : (thread.viewerCanResolve ? `<button class="btn thread-resolve resolve-ok" data-resolve-id="${esc(thread.id)}" data-resolved="true" title="${t("Marca la conversación como resuelta en GitHub")}">✓ ${t("Resolver")}</button>` : "");
+      ? (thread.viewerCanUnresolve ? `<button class="btn thread-resolve" data-resolve-id="${esc(thread.id)}" data-resolved="false" title="${t("Reabre la conversación en GitHub")}">${icon("rotate-ccw")} ${t("Reabrir")}</button>` : "")
+      : (thread.viewerCanResolve ? `<button class="btn thread-resolve resolve-ok" data-resolve-id="${esc(thread.id)}" data-resolved="true" title="${t("Marca la conversación como resuelta en GitHub")}">${icon("check")} ${t("Resolver")}</button>` : "");
   return `
     <div class="thread ${thread.isResolved ? "resolved" : ""}">
-      ${thread.isResolved ? `<div class="thread-tag">✓ ${t("Resuelto")}</div>` : ""}
+      ${thread.isResolved ? `<div class="thread-tag">${icon("check")} ${t("Resuelto")}</div>` : ""}
       ${comments.map(commentBlock).join("")}
       <div class="thread-reply">
         <textarea rows="2" placeholder="${t("Responder…")}"></textarea>

@@ -17,6 +17,7 @@
 .local-repo-meta { margin-top: 6px; display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--text-muted); }
 .local-cur { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .local-dirty { color: var(--accent); }
+.local-dirty .lucide { width: 0.75em; height: 0.75em; }
 .local-err { color: var(--red); }
 .local-repo.clickable { cursor: pointer; }
 .local-repo.clickable:hover { border-color: var(--accent); background: var(--bg-hover); }
@@ -115,7 +116,7 @@ div.lf-proj { border: 1px solid var(--border); border-radius: 10px; padding: 10p
 .lh-kind.lh-epic { color: var(--green); }
 .lh-title { flex: 1; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lh-date { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
-.lh-del { font: inherit; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 2px 7px; border-radius: 6px; line-height: 1; }
+.lh-del { display: inline-flex; align-items: center; font: inherit; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 2px 7px; border-radius: 6px; line-height: 1; }
 .lh-del:hover { background: var(--bg-hover); color: var(--red); }
 .lh-items { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
 .lh-sub { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
@@ -132,7 +133,7 @@ div.lf-proj { border: 1px solid var(--border); border-radius: 10px; padding: 10p
 .lh-proj-name { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); min-width: 160px; }
 .lh-proj-pills { display: flex; flex-wrap: wrap; gap: 6px; }
 .lh-proj .ms-proj-ic, .lh-sub .ms-proj-ic { width: 16px; height: 16px; font-size: 9px; }
-.lh-warn { color: var(--yellow, #d29922); font-size: 14px; }
+.lh-warn { display: inline-flex; color: var(--yellow, #d29922); font-size: 14px; }
 .lh-detail { font: inherit; font-size: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--accent); cursor: pointer; padding: 3px 9px; border-radius: 7px; white-space: nowrap; }
 .lh-detail:hover { border-color: var(--accent); background: var(--bg-hover); }
 .lh-proj.err .local-err, .lh-d-block.err .local-err { color: var(--red); font-size: 12px; }
@@ -296,7 +297,7 @@ div.lf-proj { border: 1px solid var(--border); border-radius: 10px; padding: 10p
 .lr-proj-sub { font-size: 12px; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .lr-timeline { list-style: none; margin: 0; padding: 8px 10px; max-height: 280px; overflow-y: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
 .lr-timeline li { display: flex; gap: 7px; align-items: baseline; line-height: 1.35; }
-.tl-ic { flex-shrink: 0; width: 14px; text-align: center; color: var(--text-muted); }
+.tl-ic { flex-shrink: 0; color: var(--text-muted); }
 .tl-tx { min-width: 0; word-break: break-word; }
 .lr-timeline .tl-tool .tl-tx { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); }
 .lr-timeline .tl-say .tl-tx { color: var(--text-muted); }

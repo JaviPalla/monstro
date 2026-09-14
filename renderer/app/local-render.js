@@ -41,8 +41,8 @@ function renderLocal() {
     const info = l.info[r.dir] || {};
     const meta = info.error
       ? `<span class="local-err">${esc(info.error)}</span>`
-      : `<span class="local-cur">⎇ ${esc(info.current || "—")}</span>
-         ${info.dirty ? `<span class="local-dirty" title="${esc(t("Cambios sin commitear"))}">${t("● sucio")}</span>` : ""}
+      : `<span class="local-cur">${icon("git-branch")} ${esc(info.current || "—")}</span>
+         ${info.dirty ? `<span class="local-dirty" title="${esc(t("Cambios sin commitear"))}">${icon("circle", "fill")} ${t("sucio")}</span>` : ""}
          <span class="local-count">${t("{n} ramas · {m} worktrees", { n: (info.branches || []).length, m: (info.worktrees || []).length })}</span>`;
     const selectable = Boolean(r.gitlabPath);
     const checked = l.selected.has(r.dir);
@@ -72,7 +72,7 @@ function renderLocal() {
               ${projectIconHtml(key)}
               <span class="ms-proj-name">${esc(projectMeta(key).name)}</span>
               <span class="local-group-path" title="${esc(key)}">${esc(key)}</span>
-              ${known ? `<span class="local-badge ok" title="${esc(t("Proyecto configurado en Monstro"))}">✓</span>` : ""}
+              ${known ? `<span class="local-badge ok" title="${esc(t("Proyecto configurado en Monstro"))}">${icon("check")}</span>` : ""}
               ${folders.length > 1 ? `<span class="local-group-count">${t("{n} carpetas", { n: folders.length })}</span>` : ""}
             </div>`;
       return `<div class="local-group">${groupHead}<div class="local-group-folders">${folders.map(folderCard).join("")}</div></div>`;
@@ -80,7 +80,7 @@ function renderLocal() {
     .join("");
 
   const selCount = l.selected.size;
-  const btnLabel = isCrear ? (selCount > 1 ? t("Crear épica →") : t("Crear tarea →")) : t("Vincular →");
+  const btnLabel = `${isCrear ? (selCount > 1 ? t("Crear épica") : t("Crear tarea")) : t("Vincular")} ${icon("arrow-right")}`;
   const selNote = isCrear && selCount > 1 ? t(" · se creará una Epic") : "";
   const actionBar = repos.some((r) => r.gitlabPath)
     ? `<div class="local-actionbar">
@@ -92,11 +92,11 @@ function renderLocal() {
   list.innerHTML =
     head +
     `<div class="local-root">
-      <span class="local-root-path" title="${esc(l.rootDir)}">📁 ${esc(l.rootDir)}</span>
+      <span class="local-root-path" title="${esc(l.rootDir)}">${icon("folder")} ${esc(l.rootDir)}</span>
       <button class="btn local-change" id="local-pick">${t("Cambiar…")}</button>
     </div>
     ${repos.length ? `<div class="local-repos">${cards}</div>` : `<div class="local-empty"><p>${t("No se han encontrado repos git directamente bajo ese directorio.")}</p></div>`}
-    ${repos.length ? `<p class="local-legend"><span class="local-dirty">${t("● sucio")}</span> ${t("= el repo tiene cambios sin commitear; se commitearán (con tu mensaje + el #ID de la issue) al crear la tarea.")}</p>` : ""}
+    ${repos.length ? `<p class="local-legend"><span class="local-dirty">${icon("circle", "fill")} ${t("sucio")}</span> ${t("= el repo tiene cambios sin commitear; se commitearán (con tu mensaje + el #ID de la issue) al crear la tarea.")}</p>` : ""}
     ${actionBar}`;
   $("#local-pick")?.addEventListener("click", pickLocalRoot);
   list.querySelectorAll(".local-repo.selectable").forEach((el) =>
