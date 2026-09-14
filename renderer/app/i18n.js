@@ -986,7 +986,12 @@ Object.assign(I18N_EN, {
   // textos de los códigos que manda main (LR_TEXT en app/sessions-local.js)
   "certificado https": "https certificate",
   "{host} en /etc/hosts": "{host} in /etc/hosts",
-  "El dashboard todavía no tiene override de APIs locales (su domains.json va commiteado), así que hablará con el dev compartido.": "The dashboard has no local API override yet (its domains.json is committed), so it will talk to the shared dev.",
+  "El dashboard en local va siempre a {url} (lo fija su domains.json, no hay variable que lo mueva) y sus notificaciones a producción.": "Locally the dashboard always goes to {url} (fixed by its domains.json, no variable moves it) and its notifications go to production.",
+  "Lo dejo también en su {file} (solo en este worktree, git lo ignora): así un pnpm dev que lance el agente apunta a la misma API.": "I also write it to its {file} (only in this worktree, git ignores it): so a pnpm dev started by the agent points at the same API.",
+  "Local": "Local",
+  "Dev": "Dev",
+  "no levantada": "not running",
+  "ya levantada": "already running",
   "La landing corre en localhost: el CORS de la API (solo *.opensalud.es|mx) bloquearía sus llamadas a una API local desde el navegador.": "The landing runs on localhost: the API's CORS (only *.opensalud.es|mx) would block its calls to a local API from the browser.",
   "No encuentro el SDK de dotnet en tu PATH.": "I can't find the dotnet SDK in your PATH.",
   "El certificado https de desarrollo no está listo: `dotnet dev-certs https --trust`.": "The https development certificate isn't ready: `dotnet dev-certs https --trust`.",

@@ -275,6 +275,9 @@ async function launchOnLinks(s, action, keys) {
 }
 
 // Claude crea la tarea, pero solo tras tu OK: nada sale a GitLab sin que lo confirmes.
+// Un front que levante el propio agente no pasa por "Probar en local": nadie le pone las variables.
+const LOCAL_FRONT_HINT = "Si levantas un front en local y hay una API levantada en local, apúntalo a ella sin tocar ficheros versionados: launcher → LOCAL_ENV_API=https://localhost:<puerto> en el .env.local del worktree; landing → API_LOCAL_DOMAIN en nuxt/.env. El dashboard va siempre a https://localhost:44381.";
+
 function implementPrompt(task, project, epicsProject) {
   return [
     task,
@@ -285,6 +288,7 @@ function implementPrompt(task, project, epicsProject) {
     "2. Propón tipo, título y descripción, y ESPERA a que te diga que sí.",
     `3. Créala con glab (las epics van en ${epicsProject}; si es epic, crea dentro también la tarea de ${project}) y dame su URL.`,
     "Después implementa aquí, en este worktree: parte de la rama base actualizada (git fetch) y pon el número de la tarea en la rama y en los commits. Pregúntame antes de hacer push o abrir la MR.",
+    LOCAL_FRONT_HINT,
   ].join("\n");
 }
 
@@ -303,6 +307,7 @@ function implementMultiPrompt(task, clones, epicsProject, slug) {
     "3. Créalas con glab y dame sus URLs.",
     `4. En cada proyecto que toques, un worktree nuevo desde su rama base actualizada: git -C <clon> fetch origin y git -C <clon> worktree add .worktrees/${slug} -b <rama con el número de su tarea> origin/<rama base>. Si .worktrees/ no está en su .gitignore, añádelo a .git/info/exclude. Trabaja solo ahí.`,
     "Después implementa: una MR por proyecto, cada una enlazada a su tarea. Pregúntame antes de cada push y de abrir cada MR. No borres los worktrees al acabar: se limpian desde Monstro (Agents) cuando cierres esta sesión.",
+    LOCAL_FRONT_HINT,
   ].join("\n");
 }
 

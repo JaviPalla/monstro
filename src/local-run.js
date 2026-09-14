@@ -98,6 +98,10 @@ const CATALOG = {
     // El shell manda sobre .env.local y .env; `development` deja en el dev compartido todo lo que no levantemos.
     env: { LOCAL_ENVIRONMENT: "development" },
     apiVars: { [OHC]: "LOCAL_ENV_API", [NOTIFICATIONS]: "LOCAL_ENV_NOTIFICATIONS" },
+    // Fichero gitignored que lee cualquier `pnpm dev` (también el que lance el agente): ahí va el override.
+    overrideFile: ".env.local",
+    // ponytail: copiadas de su domains.json (apis.*.es.development); si cambian allí, aquí también.
+    devUrls: { api: "https://api-dev.openhealthcare.eu", notifications: "https://notifications-api-dev.openhealthcare.eu" },
     // Los certs de mkcert son locales y están en .gitignore: un worktree nuevo no los trae y sin ellos
     // el dev server https no levanta.
     localFiles: ["certs"],
@@ -113,7 +117,10 @@ const CATALOG = {
     devArgs: ["--host"],
     env: {},
     apiVars: {},
-    warn: { code: "dashboard-no-override" },
+    // En `pnpm dev` su entorno es SIEMPRE `local` (NODE_ENV ≠ production) → domains.json `api.local`, sin
+    // variable que lo mueva. Y sus notificaciones `local` apuntan a producción.
+    fixedApis: { api: "https://localhost:44381" },
+    warn: { code: "dashboard-fixed-api", url: "https://localhost:44381" },
   },
   "OpenSaludGroup/landing-profesionales": {
     name: "Landing profesionales",
@@ -126,6 +133,9 @@ const CATALOG = {
     host: "localhost",
     env: {},
     apiVars: { [OHC]: "API_LOCAL_DOMAIN" },
+    // `nuxt dev` solo carga el .env (no .env.local).
+    overrideFile: ".env",
+    devUrls: { api: "https://api-dev.openhealthcare.eu" },
     warn: { code: "landing-cors" },
   },
 };
@@ -136,7 +146,7 @@ const CATALOG = {
  * `scripts/test-local-run.js` comprueba que los tres lados no se separen.
  *
  * needs      env-file · dotnet · dev-certs · docker · node-modules · pnpm · hosts-entry {host}
- * warnings   dashboard-no-override · landing-cors · dotnet-missing · dev-certs-missing ·
+ * warnings   dashboard-fixed-api {url} · override-file {file} · landing-cors · dotnet-missing · dev-certs-missing ·
  *            pnpm-missing · hosts-missing {host} · fixed-port-busy {port} ·
  *            port-moved {defaultPort, port} · new-worktree-env {branch, file} ·
  *            new-worktree-env-copy {branch, file} · env-copy {file} ·
@@ -365,6 +375,78 @@ function copyLocalFiles({ project, base, clone } = {}) {
   return copied;
 }
 
+/* ---------- a qué API apunta cada front ---------- */
+
+// APIs que ya responden en este Mac: lo arrancado en esta ejecución de Monstro y, si no, lo que conteste
+// en su puerto por defecto (otra sesión, tu clon, un `dotnet run` a mano).
+async function runningApis({ healthPaths = {}, healthExpect = {} } = {}) {
+  const found = {};
+  await Promise.all(Object.entries(POINTS_TO_KEY).map(async ([project, key]) => {
+    const def = CATALOG[project];
+    const fallback = baseUrl(def, def.port);
+    const candidates = [started.get(project), { url: fallback, probeUrl: `${fallback}${healthPaths[project] || def.healthPath}` }].filter(Boolean);
+    for (const c of candidates) {
+      if (await probe(c.probeUrl, healthExpect[project] || def.expect)) {
+        found[key] = { url: c.url, project };
+        return;
+      }
+    }
+  }));
+  return found;
+}
+
+// Por cada API que el front sabe redirigir: su URL local (la del plan o, si no está en él, la que ya
+// corre), la de dev y la elegida. Local por defecto siempre que haya una; `chosen` ({ api: "dev" }) es lo
+// que marcaste en la ficha. `fallback`: la que ya corre, por si desmarcas la del plan.
+function frontTargets(def, localApis, running, chosen = {}) {
+  return Object.keys(def.apiVars || {}).map((project) => {
+    const key = POINTS_TO_KEY[project];
+    const planned = localApis[key] || null;
+    const local = planned || running[key] || null;
+    return {
+      key,
+      apiProject: project,
+      local: local?.url || null,
+      running: Boolean(local && !planned),
+      fallback: planned ? running[key]?.url || null : null,
+      dev: def.devUrls?.[key] || null,
+      choice: local && chosen?.[key] !== "dev" ? "local" : "dev",
+    };
+  });
+}
+
+// Bloque que Monstro gestiona en el fichero de entorno (gitignored) del front: así un `pnpm dev` que lance
+// el agente, o tú a mano, apunta a la misma API que la pestaña de Monstro. Solo en worktrees de agente.
+const OVERRIDE_START = "# >>> Monstro · Probar en local (se reescribe en cada arranque)";
+const OVERRIDE_END = "# <<< Monstro";
+
+// El contenido con el bloque de Monstro sustituido (o quitado si no hay nada que poner); lo demás, intacto.
+// Va al final: dotenv se queda con la última aparición de una clave repetida.
+function withOverrides(content, vars) {
+  const kept = [];
+  let inside = false;
+  for (const line of String(content || "").split("\n")) {
+    if (line === OVERRIDE_START) inside = true;
+    else if (line === OVERRIDE_END) inside = false;
+    else if (!inside) kept.push(line);
+  }
+  while (kept.length && kept.at(-1) === "") kept.pop();
+  const lines = Object.entries(vars).map(([key, value]) => `${key}=${value}`);
+  const block = lines.length ? [OVERRIDE_START, ...lines, OVERRIDE_END] : [];
+  const out = [...kept, ...(kept.length && block.length ? [""] : []), ...block];
+  return out.length ? `${out.join("\n")}\n` : "";
+}
+
+function persistOverrides({ persistFile, env }) {
+  if (!persistFile) return;
+  const before = fs.existsSync(persistFile) ? fs.readFileSync(persistFile, "utf8") : "";
+  const after = withOverrides(before, env || {});
+  if (after !== before) fs.writeFileSync(persistFile, after);
+}
+
+// Solo se escribe en un fichero que git ignora: nada de lo que Monstro deje puede colarse en un commit.
+const gitIgnored = (dir, rel) => pexec("git", ["-C", dir, "check-ignore", "-q", rel], { timeout: 5000 }).then(() => true, () => false);
+
 /* ---------- plan ---------- */
 
 // Orden del plan: APIs antes que fronts (los fronts necesitan sus puertos), lo no arrancable al final,
@@ -395,7 +477,7 @@ function blockedItem(entry, def, blocked) {
  * nunca se fía de rutas que vengan del renderer); `base` es la raíz del repo o del worktree. Devuelve
  * { hostsLine, items, plans }; `plans` lleva el comando y la sonda, que no viajan al renderer.
  */
-async function buildPlan(entries, { healthPaths = {}, healthExpect = {} } = {}) {
+async function buildPlan(entries, { healthPaths = {}, healthExpect = {}, targets = {}, detectRunning = true } = {}) {
   const ordered = [...entries].sort((a, b) => rank(a.project) - rank(b.project) || orderOf(a.project) - orderOf(b.project));
   const items = [];
   const tail = []; // lo que no se puede arrancar va al final de la lista
@@ -414,12 +496,14 @@ async function buildPlan(entries, { healthPaths = {}, healthExpect = {} } = {}) 
     const dir = runDir(entry.base, def);
     rows.push({ entry, def, port, dir, check: await preflight(def, { ...entry, dir }) });
   }
-  // Un front solo apunta a las APIs del plan que de verdad se van a poder arrancar.
-  const pointsTo = {};
+  // APIs locales a las que puede apuntar un front: las del plan que de verdad se van a poder arrancar y
+  // las que ya responden en este Mac.
+  const localApis = {};
   for (const { entry, def, port, check } of rows) {
     const key = POINTS_TO_KEY[entry.project];
-    if (key && port && !check.blocked) pointsTo[key] = baseUrl(def, port);
+    if (key && port && !check.blocked) localApis[key] = { url: baseUrl(def, port), project: entry.project };
   }
+  const running = detectRunning ? await runningApis({ healthPaths, healthExpect }) : {};
   const hosts = [];
   for (const { entry, def, port, dir, check } of rows) {
     const warnings = [...(entry.warnings || []), ...check.warnings];
@@ -440,6 +524,12 @@ async function buildPlan(entries, { healthPaths = {}, healthExpect = {} } = {}) 
       warnings.push({ code: "new-worktree-env", branch: entry.branch, file: def.envFile });
     }
     if (check.needsHosts) hosts.push(def.host);
+    const apiTargets = def.kind === "front" ? frontTargets(def, localApis, running, targets[entry.project]) : [];
+    // A qué apunta de verdad: las APIs locales elegidas (el resto, al dev de LOCAL_ENVIRONMENT) o lo que
+    // fije el propio front (dashboard).
+    const aims = { ...(def.fixedApis || {}), ...Object.fromEntries(apiTargets.filter((x) => x.choice === "local").map((x) => [x.key, x.local])) };
+    const persistFile = def.overrideFile && (entry.worktree || entry.newWorktree) && (await gitIgnored(dir, def.overrideFile)) ? path.join(dir, def.overrideFile) : null;
+    if (persistFile) warnings.push({ code: "override-file", file: def.overrideFile });
     const url = baseUrl(def, finalPort);
     const item = {
       project: entry.project,
@@ -450,7 +540,8 @@ async function buildPlan(entries, { healthPaths = {}, healthExpect = {} } = {}) 
       port: finalPort,
       url,
       openUrl: `${url}${def.openPath || ""}`,
-      pointsTo: def.kind === "front" ? pointsToFor(def, pointsTo) : {},
+      pointsTo: aims,
+      targets: apiTargets,
       needs: check.needs,
       warnings,
       blocked,
@@ -460,7 +551,9 @@ async function buildPlan(entries, { healthPaths = {}, healthExpect = {} } = {}) 
       def,
       item,
       base: entry.base,
-      command: buildCommand(def, { port: finalPort, pointsTo }),
+      command: buildCommand(def, { port: finalPort, pointsTo: aims }),
+      persistFile,
+      env: def.kind === "front" ? frontEnv(def, aims) : null,
       // La ruta y el texto de la sonda salen de config.environments (los mismos que Entornos usa
       // contra dev/staging); el catálogo solo pone el respaldo.
       probeUrl: `${url}${healthPaths[entry.project] || def.healthPath || "/"}`,
@@ -468,16 +561,6 @@ async function buildPlan(entries, { healthPaths = {}, healthExpect = {} } = {}) 
     });
   }
   return { hostsLine: hostsLineFor(hosts), items: [...items, ...tail], plans };
-}
-
-// Solo las APIs que este front sabe redirigir y que además entran en el plan.
-function pointsToFor(def, pointsTo) {
-  const out = {};
-  for (const project of Object.keys(def.apiVars || {})) {
-    const key = POINTS_TO_KEY[project];
-    if (key && pointsTo[key]) out[key] = pointsTo[key];
-  }
-  return out;
 }
 
 /* ---------- lo que se ha arrancado en esta ejecución ---------- */
@@ -539,6 +622,8 @@ module.exports = {
   runDir,
   buildCommand,
   frontEnv,
+  withOverrides,
+  persistOverrides,
   portFree,
   freePort,
   hostsLineFor,

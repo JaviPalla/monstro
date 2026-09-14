@@ -64,7 +64,8 @@ const SAMPLES = {
   ],
   // warnings: se puede arrancar, pero hay que saberlo
   warnings: [
-    { code: "dashboard-no-override" },
+    { code: "dashboard-fixed-api", url: "https://localhost:44381" },
+    { code: "override-file", file: ".env.local" },
     { code: "landing-cors" },
     { code: "dotnet-missing" },
     { code: "dev-certs-missing" },
@@ -175,6 +176,17 @@ assert.strictEqual(lr.hostsLineFor([]), null);
 assert.strictEqual(lr.hostsLineFor(["localdashboard.opensalud.es"]), "127.0.0.1 localdashboard.opensalud.es");
 assert.strictEqual(lr.hostsLineFor(["a.es", "b.es", "a.es"]), "127.0.0.1 a.es b.es");
 
+/* ---------- override en el .env.local del worktree: un bloque de Monstro, lo demás intacto ---------- */
+
+const withBlock = lr.withOverrides("LOCAL_ENVIRONMENT=local\n", { LOCAL_ENV_API: "https://localhost:44381" });
+assert.ok(withBlock.startsWith("LOCAL_ENVIRONMENT=local\n\n# >>> Monstro"), withBlock);
+assert.ok(withBlock.endsWith("\nLOCAL_ENV_API=https://localhost:44381\n# <<< Monstro\n"), withBlock);
+// Reescribir sustituye el bloque (no lo duplica) y quitarlo deja lo tuyo como estaba.
+assert.strictEqual(lr.withOverrides(withBlock, { LOCAL_ENV_API: "https://localhost:44382" }).match(/# >>> Monstro/g).length, 1);
+assert.ok(lr.withOverrides(withBlock, { LOCAL_ENV_API: "https://localhost:44382" }).includes("44382") && !lr.withOverrides(withBlock, { LOCAL_ENV_API: "https://localhost:44382" }).includes("44381"));
+assert.strictEqual(lr.withOverrides(withBlock, {}), "LOCAL_ENVIRONMENT=local\n");
+assert.strictEqual(lr.withOverrides("", {}), "");
+
 (async () => {
   /* ---------- puertos: el de por defecto cogido → el siguiente hueco ---------- */
 
@@ -219,7 +231,7 @@ assert.strictEqual(lr.hostsLineFor(["a.es", "b.es", "a.es"]), "127.0.0.1 a.es b.
     { project: LAUNCHER, base: path.join(tmp, "launcher"), branch: "feat/x" },
     { project: "OpenSaludGroup/opensalud", base: null, branch: null },
     { project: OHC, base: path.join(tmp, "api"), branch: "feat/y" },
-  ]);
+  ], { detectRunning: false }); // sin mirar lo que ya corra en este Mac: el test no puede depender de eso
   const byProject = Object.fromEntries(items.map((i) => [i.project, i]));
 
   // Orden: APIs primero (los fronts necesitan sus puertos), lo no arrancable al final.
@@ -241,11 +253,44 @@ assert.strictEqual(lr.hostsLineFor(["a.es", "b.es", "a.es"]), "127.0.0.1 a.es b.
   assert.ok(!plans.get(LAUNCHER).command.includes("LOCAL_ENV_NOTIFICATIONS"));
   assert.strictEqual(byProject[LAUNCHER].blocked, null);
 
+  // Selector: Local por defecto con la URL exacta; eligiendo Dev el comando ya no lleva el override.
+  assert.deepStrictEqual(
+    byProject[LAUNCHER].targets.find((x) => x.key === "api"),
+    { key: "api", apiProject: OHC, local: api.url, running: false, fallback: null, dev: "https://api-dev.openhealthcare.eu", choice: "local" },
+  );
+  const toDev = await lr.buildPlan([
+    { project: OHC, base: path.join(tmp, "api"), branch: "feat/y" },
+    { project: LAUNCHER, base: path.join(tmp, "launcher"), branch: "feat/x" },
+  ], { detectRunning: false, targets: { [LAUNCHER]: { api: "dev" } } });
+  assert.deepStrictEqual(toDev.items.find((i) => i.project === LAUNCHER).pointsTo, {});
+  assert.ok(!toDev.plans.get(LAUNCHER).command.includes("LOCAL_ENV_API"));
+
+  // API ya levantada fuera de este plan (otra sesión, tu clon): el front apunta a ella igual. Era el fallo.
+  const other = http.createServer((_req, res) => res.end("Healthy"));
+  await new Promise((resolve) => other.listen({ port: 0, host: "127.0.0.1" }, resolve));
+  const otherUrl = `http://127.0.0.1:${other.address().port}`;
+  lr.remember(OHC, { url: otherUrl, openUrl: otherUrl, dir: "/tmp", port: other.address().port, kind: "api", probeUrl: `${otherUrl}/health`, expect: "Healthy" });
+  const soloFront = await lr.buildPlan([{ project: LAUNCHER, base: path.join(tmp, "launcher"), branch: "feat/x" }]);
+  const aimed = soloFront.items[0].targets.find((x) => x.key === "api");
+  assert.deepStrictEqual([aimed.local, aimed.running, aimed.choice], [otherUrl, true, "local"]);
+  assert.ok(soloFront.plans.get(LAUNCHER).command.includes(`LOCAL_ENV_API='${otherUrl}'`));
+  // Con la API también en el plan manda la del plan, y la que ya corre queda de reserva por si la desmarcas.
+  const both = await lr.buildPlan([
+    { project: OHC, base: path.join(tmp, "api"), branch: "feat/y" },
+    { project: LAUNCHER, base: path.join(tmp, "launcher"), branch: "feat/x" },
+  ]);
+  const withFallback = both.items.find((i) => i.project === LAUNCHER).targets.find((x) => x.key === "api");
+  assert.deepStrictEqual([withFallback.local, withFallback.running, withFallback.fallback], [both.items.find((i) => i.project === OHC).url, false, otherUrl]);
+  lr.started.clear();
+  await new Promise((resolve) => other.close(resolve));
+
   // Sin node_modules no tiene sentido arrancar: bloquea ESE ítem, no el plan.
   assert.ok(byProject[DASHBOARD].needs.some((n) => n.code === "node-modules"));
   assert.deepStrictEqual(byProject[DASHBOARD].blocked, { code: "node-modules-missing" });
-  assert.deepStrictEqual(byProject[DASHBOARD].pointsTo, {});
-  assert.ok(byProject[DASHBOARD].warnings.some((w) => w.code === "dashboard-no-override"));
+  // El dashboard no se puede redirigir: se dice a dónde va de verdad, sin selector.
+  assert.deepStrictEqual(byProject[DASHBOARD].pointsTo, { api: "https://localhost:44381" });
+  assert.deepStrictEqual(byProject[DASHBOARD].targets, []);
+  assert.ok(byProject[DASHBOARD].warnings.some((w) => w.code === "dashboard-fixed-api"));
 
   // Fuera del catálogo: bloqueado con su motivo y sin nada que arrancar.
   const ouicare = byProject["OpenSaludGroup/opensalud"];
@@ -273,7 +318,7 @@ assert.strictEqual(lr.hostsLineFor(["a.es", "b.es", "a.es"]), "127.0.0.1 a.es b.
     { project: OHC, base: path.join(tmp, "sinenv"), branch: "feat/y", newWorktree: true },
     { project: LAUNCHER, base: path.join(tmp, "launcher"), branch: "feat/x" },
     { project: DASHBOARD, base: path.join(tmp, "dashboard"), branch: "feat/z", newWorktree: true },
-  ]);
+  ], { detectRunning: false });
   const roto = sinEnv.items.find((i) => i.project === OHC);
   assert.deepStrictEqual(roto.needs.find((n) => n.code === "env-file"), { code: "env-file", file: "openhealthcareapi/.env" });
   assert.deepStrictEqual(roto.blocked, { code: "env-missing", file: "openhealthcareapi/.env" });
