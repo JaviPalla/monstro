@@ -254,23 +254,49 @@ async function processInfo(pids) {
   return info;
 }
 
-function liveSessions() {
+// ~/.claude/sessions/<pid>.json de procesos interactivos vivos (varios pueden compartir sessionId).
+function liveProcesses() {
   const dir = path.join(CLAUDE_DIR, "sessions");
   let files;
   try { files = fs.readdirSync(dir).filter((f) => f.endsWith(".json")); } catch { return []; }
-  // La extensión de VS Code relanza el proceso al reanudar y el viejo puede seguir vivo con el mismo
-  // sessionId: una fila por sesión, la del proceso más reciente.
-  const bySession = new Map();
+  const out = [];
   for (const f of files) {
     try {
       const s = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
       // ponytail: un PID reciclado por otro proceso daría la sesión por viva; comparar procStart si pasa.
-      if (!UUID_RE.test(s.sessionId || "") || !Number.isInteger(s.pid) || (s.kind && s.kind !== "interactive") || !isAlive(s.pid)) continue;
-      const prev = bySession.get(s.sessionId);
-      if (!prev || (s.startedAt || 0) > (prev.startedAt || 0)) bySession.set(s.sessionId, s);
+      if (UUID_RE.test(s.sessionId || "") && Number.isInteger(s.pid) && (!s.kind || s.kind === "interactive") && isAlive(s.pid)) out.push(s);
     } catch { /* fichero a medio escribir: saldrá en el siguiente poll */ }
   }
+  return out;
+}
+
+function liveSessions() {
+  // La extensión de VS Code relanza el proceso al reanudar y el viejo puede seguir vivo con el mismo
+  // sessionId: una fila por sesión, la del proceso más reciente.
+  const bySession = new Map();
+  for (const s of liveProcesses()) {
+    const prev = bySession.get(s.sessionId);
+    if (!prev || (s.startedAt || 0) > (prev.startedAt || 0)) bySession.set(s.sessionId, s);
+  }
   return [...bySession.values()];
+}
+
+// "Cerrar" del panel: SIGTERM a TODOS los procesos de la sesión (la extensión de VS Code deja vivos los de las
+// pestañas que cierras, a veces más de uno por sesión). Solo si el PID sigue siendo un `claude`: los PID se reciclan.
+async function closeSession(sessionId) {
+  const pids = liveProcesses().filter((s) => s.sessionId === sessionId).map((s) => s.pid);
+  const killed = [];
+  for (const pid of pids) {
+    const comm = await pexec("ps", ["-o", "comm=", "-p", String(pid)], { timeout: 5000 }).then(({ stdout }) => path.basename(stdout.trim()), () => "");
+    if (comm !== "claude") continue;
+    try {
+      process.kill(pid, "SIGTERM");
+      killed.push(pid);
+    } catch { /* murió entre medias */ }
+  }
+  // Hasta 2 s a que salgan: así el refresco de después ya no la ve viva.
+  for (let i = 0; i < 10 && killed.some(isAlive); i++) await new Promise((r) => setTimeout(r, 200));
+  return killed.length;
 }
 
 // sessionId → transcript más reciente (se indexa por nombre de fichero, sin adivinar cómo codifica el cwd).
@@ -496,6 +522,8 @@ async function buildSession({ id, live, transcript }, opts) {
   if (!live && !title) return null; // abierta y cerrada sin llegar a escribir nada
   const updatedAt = acc.lastAt || live?.updatedAt || live?.startedAt || transcript?.mtimeMs || 0;
   if (!live && updatedAt < opts.cutoff) return null; // mtime reciente pero sin actividad en 24h
+  // Quitada del panel; vuelve si la reanudas y habla después de quitarla.
+  if (!live && opts.tags[id]?.dismissedAt >= updatedAt) return null;
   const dirs = new Map(acc.dirs);
   if (live && !dirs.has(live.cwd)) dirs.set(live.cwd, 0);
   const repos = await sessionRepos(acc, dirs);
@@ -611,4 +639,11 @@ function untag(sessionId, key) {
   fs.writeFileSync(tagsPath(), JSON.stringify(tags, null, 2));
 }
 
-module.exports = { list, tag, untag, parseLink, scanTranscript, hostFromChain, lastTurn, sessionActivity, repoOf, relOf, clipText, transcriptFor, agentWorktree, shellQuote, claudeCommand, launchSlug };
+// Saca una sesión terminada del panel. Nada se borra: el transcript sigue ahí para `claude --resume`.
+function dismiss(sessionId) {
+  const tags = loadTags();
+  tagEntry(tags, sessionId).dismissedAt = Date.now();
+  fs.writeFileSync(tagsPath(), JSON.stringify(tags, null, 2));
+}
+
+module.exports = { list, tag, untag, dismiss, closeSession, parseLink, scanTranscript, hostFromChain, lastTurn, sessionActivity, repoOf, relOf, clipText, transcriptFor, agentWorktree, shellQuote, claudeCommand, launchSlug };

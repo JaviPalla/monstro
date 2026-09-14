@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld("monstro", {
   sessionsPickDir: () => ipcRenderer.invoke("sessions:pickDir"),
   sessionsImplement: (prompt, dir) => ipcRenderer.invoke("sessions:implement", { prompt, dir }),
   sessionsCleanWorktrees: (sessionId) => ipcRenderer.invoke("sessions:cleanWorktrees", { sessionId }),
+  sessionsClose: (sessionId) => ipcRenderer.invoke("sessions:close", { sessionId }),
   sessionsDetail: (sessionId) => ipcRenderer.invoke("sessions:detail", { sessionId }),
   sessionsLinkDetails: (sessionId) => ipcRenderer.invoke("sessions:linkDetails", { sessionId }),
   sessionsLaunchOnLinks: (sessionId, action, keys) => ipcRenderer.invoke("sessions:launchOnLinks", { sessionId, action, keys: keys ?? null }),

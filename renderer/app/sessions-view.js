@@ -324,7 +324,7 @@ function sessionView(s) {
       <button class="detail-close" data-ss="close-view" title="${esc(t("Cerrar (Esc)"))}">✕</button>
       <div class="detail-title sv-title"><span class="ss-dot"></span>${esc(s.title)}</div>
       <div class="detail-sub"><b class="sv-state">${esc(stateLabel(s))}</b>${where.map((w) => `<span>${esc(w)}</span>`).join("")}<span>${esc(timeAgo(s.updatedAt))}</span></div>
-      <div class="sv-actions">${openButton(s)}${s.live ? "" : `<button class="ss-go-btn" data-ss="resume">${t("Reanudar")}</button>${cleanButton(s)}`}</div>
+      <div class="sv-actions">${openButton(s)}${s.live ? "" : `<button class="ss-go-btn" data-ss="resume">${t("Reanudar")}</button>${cleanButton(s)}`}${closeButton(s)}</div>
       ${questionOnTop ? questionBlock(s) : ""}
       ${linksBlock(s)}
       ${localRunBlock(s)}

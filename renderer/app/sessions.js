@@ -225,9 +225,18 @@ function sessionCard(s) {
       <div class="ss-actions">
         ${openButton(s)}
         <button class="mini-btn" data-ss="add" title="${esc(t("Asociar MR, issue o epic"))}">+</button>
+        ${closeButton(s)}
       </div>
       ${tagForm}
     </div>`;
+}
+
+// Viva: para su proceso (la extensión de VS Code deja vivos los de pestañas cerradas) y la saca del panel.
+// Terminada: solo la saca. Trabajando no se ofrece: se cortaría a medias.
+function closeButton(s) {
+  if (s.state === "working") return "";
+  const [label, tip] = s.live ? [t("Cerrar"), t("Cerrar la sesión y quitarla del panel")] : [t("Quitar"), t("Quitar del panel")];
+  return `<button class="mini-btn" data-ss="close-session" title="${esc(tip)}">${esc(label)}</button>`;
 }
 
 // Terminada = nadie trabaja ya en sus worktrees de agente: es el momento de quitarlos (sus ramas se quedan).
@@ -256,6 +265,7 @@ function finishedRow(s) {
         <span class="ss-dot"></span><span class="ss-ellip">${esc(s.title)}</span>
         <span class="ss-time">${esc(timeAgo(s.updatedAt))}</span>
         <button class="mini-btn" data-ss="resume">${t("Reanudar")}</button>
+        ${closeButton(s)}
         ${cleanButton(s)}
       </div>
       ${links.length ? `<div class="ss-badges ss-done-links">${links.map(linkBadge).join("")}</div>` : ""}
@@ -509,6 +519,18 @@ async function onSessionAction(action, id, el) {
       if (!confirm(`${ask}\n\n${session.worktrees.join("\n")}`)) break;
       const results = await window.monstro.sessionsCleanWorktrees(id);
       toast(cleanSummary(results), results.every((r) => r.ok) ? "ok" : "err");
+      await loadSessions();
+      break;
+    }
+    case "close-session": {
+      if (!session) break;
+      const ask = session.live
+        ? t("¿Cierro esta sesión? Se para su proceso de Claude (si aún la tienes abierta en una pestaña, esa pestaña deja de funcionar) y sale del panel. Podrás reanudarla con claude --resume.")
+        : t("¿Quito esta sesión del panel? No se borra nada: podrás reanudarla con claude --resume.");
+      if (!confirm(`${ask}\n\n${session.title}`)) break;
+      await window.monstro.sessionsClose(id);
+      if (viewingId() === id) hideDetail();
+      toast(session.live ? t("Sesión cerrada") : t("Sesión quitada del panel"), "ok");
       await loadSessions();
       break;
     }

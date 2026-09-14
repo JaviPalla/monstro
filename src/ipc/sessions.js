@@ -359,6 +359,14 @@ function register(ctx) {
     startDirOf(s);
     return focusSession(s);
   });
+  // Cerrar (viva: para su proceso) y sacarla del panel. Trabajando no: se cortaría a medias.
+  ipcMain.handle("sessions:close", async (_event, { sessionId }) => {
+    const s = sessionOf(sessionId);
+    if (s.state === "working") throw new Error("Está trabajando: espera a que acabe o párala desde su terminal.");
+    const closed = s.live ? await sessions.closeSession(s.sessionId) : 0;
+    sessions.dismiss(s.sessionId);
+    return { closed };
+  });
   ipcMain.handle("sessions:appIcons", () => appIcons());
   ipcMain.handle("sessions:resume", async (_event, { sessionId }) => {
     const s = known.get(sessionId);
