@@ -329,6 +329,9 @@ button.ss-badge { cursor: pointer; }
 .svl-port { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; color: var(--text-muted); }
 .svl-state { font-size: 12px; font-weight: 600; }
 .svl-url, .svl-points, .svl-warn { min-width: 0; font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.svl-targets { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.svl-target { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 11.5px; color: var(--text-muted); }
+.svl-target select { max-width: 100%; padding: 1px 4px; border: 1px solid var(--border); border-radius: 6px; font: inherit; color: var(--text); background: var(--bg); }
 .svl-needs, .svl-blocked { font-size: 11.5px; }
 .svl-needs { color: var(--red); }
 .svl-blocked { color: var(--text-muted); }

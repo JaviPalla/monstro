@@ -60,7 +60,7 @@ contextBridge.exposeInMainWorld("monstro", {
   sessionsLaunchOnLinks: (sessionId, action, keys) => ipcRenderer.invoke("sessions:launchOnLinks", { sessionId, action, keys: keys ?? null }),
   // "Probar en local": plan de lo que se puede levantar de esa sesión, arranque y estado de lo arrancado.
   localRunPlan: (sessionId) => ipcRenderer.invoke("localRun:plan", { sessionId }),
-  localRunStart: (sessionId, projects) => ipcRenderer.invoke("localRun:start", { sessionId, projects }),
+  localRunStart: (sessionId, projects, targets) => ipcRenderer.invoke("localRun:start", { sessionId, projects, targets }),
   localRunStatus: () => ipcRenderer.invoke("localRun:status"),
   // Eventos push de los agentes (timeline/estado/notificación). Devuelve un de-suscriptor.
   onAgentEvent: (channel, cb) => {

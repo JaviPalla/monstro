@@ -30,7 +30,8 @@ const LR_TEXT = {
   pnpm: () => "pnpm",
   "hosts-entry": (p) => t("{host} en /etc/hosts", p),
   // --- warnings: lo que hay que hacer, o lo que va a pasar igualmente ---
-  "dashboard-no-override": () => t("El dashboard todavía no tiene override de APIs locales (su domains.json va commiteado), así que hablará con el dev compartido."),
+  "dashboard-fixed-api": (p) => t("El dashboard en local va siempre a {url} (lo fija su domains.json, no hay variable que lo mueva) y sus notificaciones a producción.", p),
+  "override-file": (p) => t("Lo dejo también en su {file} (solo en este worktree, git lo ignora): así un pnpm dev que lance el agente apunta a la misma API.", p),
   "landing-cors": () => t("La landing corre en localhost: el CORS de la API (solo *.opensalud.es|mx) bloquearía sus llamadas a una API local desde el navegador."),
   "dotnet-missing": () => t("No encuentro el SDK de dotnet en tu PATH."),
   "dev-certs-missing": () => t("El certificado https de desarrollo no está listo: `dotnet dev-certs https --trust`."),
@@ -84,7 +85,7 @@ function lrEntry(id) {
 function lrKey(id) {
   const entry = sessionsUi.localRun.get(id);
   if (!entry?.open) return "0";
-  return `${entry.mode}${entry.loading ? "…" : ""}${entry.v}|${[...(entry.picked || [])].sort().join(",")}`;
+  return `${entry.mode}${entry.loading ? "…" : ""}${entry.v}|${[...(entry.picked || [])].sort().join(",")}|${JSON.stringify(entry.targets || {})}`;
 }
 
 // Tiene sentido ofrecerlo si la sesión toca MRs/PRs o si alguno de sus repos está clonado aquí.
@@ -138,7 +139,7 @@ function lrHostsHtml(line) {
 function lrPointsHtml(points) {
   const parts = Object.entries(points || {})
     .filter(([, url]) => url)
-    .map(([key, url]) => `${t(LR_POINTS_LABEL[key] || key)} → ${String(url).replace(/^https?:\/\//, "")}`);
+    .map(([key, url]) => `${t(LR_POINTS_LABEL[key] || key)} → ${url}`);
   return parts.length ? `<span class="svl-points">${esc(t("apunta a"))} ${esc(parts.join(" · "))}</span>` : "";
 }
 
@@ -148,8 +149,30 @@ function lrKindHtml(item) {
   return item?.kind ? `<span class="svl-kind svl-k-${esc(item.kind)}">${esc(LR_KIND_LABEL[item.kind] || item.kind)}</span>` : "";
 }
 
+// URL local: la de la API marcada en este plan, o la que ya está levantada (si la desmarcas, esa). Sin
+// ninguna, Dev.
+function lrChoice(entry, item, target) {
+  const planned = !target.running && Boolean(entry.picked?.has(target.apiProject));
+  const url = target.running || planned ? target.local : target.fallback;
+  const wanted = entry.targets?.[item.project]?.[target.key] ?? target.choice;
+  return { url, choice: url && wanted === "local" ? "local" : "dev" };
+}
+
+// Por cada API del front, Local o Dev, cada opción con la URL exacta a la que irá.
+function lrTargetsHtml(item, entry) {
+  const rows = item.targets.map((target) => {
+    const { url, choice } = lrChoice(entry, item, target);
+    const already = target.running || (url && url === target.fallback);
+    const local = url ? `${url}${already ? ` · ${t("ya levantada")}` : ""}` : t("no levantada");
+    const option = (value, label, text, disabled) => `<option value="${value}"${choice === value ? " selected" : ""}${disabled ? " disabled" : ""}>${esc(label)} · ${esc(text)}</option>`;
+    return `<span class="svl-target">${esc(t(LR_POINTS_LABEL[target.key] || target.key))} →`
+      + `<select data-project="${esc(item.project)}" data-key="${esc(target.key)}">${option("local", t("Local"), local, !url)}${target.dev ? option("dev", t("Dev"), target.dev, false) : ""}</select></span>`;
+  });
+  return `<span class="svl-targets">${rows.join("")}</span>`;
+}
+
 // Una fila del plan: qué se levanta, con qué rama y en qué URL. Lo bloqueado va en gris y sin casilla.
-function lrPlanRow(item, picked) {
+function lrPlanRow(item, picked, entry) {
   const blocked = lrText(item.blocked);
   const box = item.blocked
     ? `<span class="svl-box-off" title="${esc(blocked)}">—</span>`
@@ -157,13 +180,13 @@ function lrPlanRow(item, picked) {
   const meta = [
     item.branch && `<span class="branch">${esc(item.branch)}</span>`,
     item.port && `<span class="svl-port">:${esc(String(item.port))}</span>`,
-    item.url && `<span class="svl-url" title="${esc(item.url)}">${esc(lrShortUrl(item.url))}</span>`,
+    item.url && `<span class="svl-url" title="${esc(item.url)}">${esc(item.url)}</span>`,
   ].filter(Boolean).join("");
   const lines = [
     item.blocked && `<span class="svl-blocked">${esc(blocked)}</span>`,
     (item.needs || []).length && `<span class="svl-needs">${esc(t("Te falta: {list}", { list: item.needs.map(lrText).join(" · ") }))}</span>`,
     (item.warnings || []).length && `<span class="svl-warn">${item.warnings.map((w) => esc(lrText(w))).join(" · ")}</span>`,
-    lrPointsHtml(item.pointsTo),
+    item.targets?.length ? lrTargetsHtml(item, entry) : lrPointsHtml(item.pointsTo),
   ].filter(Boolean).join("");
   return `
     <label class="svl-row${item.blocked ? " off" : ""}">
@@ -183,7 +206,7 @@ function lrPlanPanel(entry) {
   return `
     ${entry.plan.hostsLine ? lrHostsHtml(entry.plan.hostsLine) : ""}
     <p class="svl-note">${esc(t("Una pestaña de Ghostty por proyecto, en tu shell y con tus variables."))}</p>
-    <div class="svl-rows">${items.map((i) => lrPlanRow(i, picked.has(i.project))).join("")}</div>
+    <div class="svl-rows">${items.map((i) => lrPlanRow(i, picked.has(i.project), entry)).join("")}</div>
     <button class="ss-go-btn" data-ss="local-go"${n ? "" : " disabled"}>${esc(t("Levantar {n}", { n }))}</button>`;
 }
 
@@ -255,7 +278,12 @@ async function lrStart(s, el) {
   if (!projects.length) return;
   el.disabled = true;
   try {
-    const result = await window.monstro.localRunStart(s.sessionId, projects);
+    // Lo que ves en cada selector es lo que se manda (main lo vuelve a validar).
+    const targets = {};
+    for (const item of entry.plan.items) {
+      if (item.targets?.length && projects.includes(item.project)) targets[item.project] = Object.fromEntries(item.targets.map((x) => [x.key, lrChoice(entry, item, x).choice]));
+    }
+    const result = await window.monstro.localRunStart(s.sessionId, projects, targets);
     const started = result?.started || [];
     const skipped = result?.skipped || [];
     toast(lrStartSummary(started, skipped), started.length ? (skipped.length ? "warn" : "ok") : "err");
@@ -347,6 +375,18 @@ async function onLocalRunAction(action, s, el) {
       break;
   }
 }
+
+// Selector Local/Dev de un front: se guarda en el estado del panel, como lo marcado.
+document.addEventListener("change", (event) => {
+  const select = event.target.closest?.(".svl-target select");
+  const id = select?.closest("[data-id]")?.dataset.id;
+  if (!id) return;
+  const entry = lrEntry(id);
+  entry.targets ??= {};
+  (entry.targets[select.dataset.project] ??= {})[select.dataset.key] = select.value;
+  entry.v++;
+  renderSessionView(true);
+});
 
 // Selftest `sessions-view:<texto>#local`: el panel abierto con su plan ya cargado. SOLO lee (localRun:plan):
 // nunca llama a localRun:start.

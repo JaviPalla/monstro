@@ -9,6 +9,7 @@ const fs = require("fs");
 const config = require("../config");
 const local = require("../local");
 const localRun = require("../local-run");
+const { agentWorktree } = require("../sessions");
 const sessionsIpc = require("./sessions");
 
 const PROJECT_RE = /^[\w.-]+(\/[\w.-]+)+$/;
@@ -23,7 +24,7 @@ async function entriesFor(s) {
   for (const r of s.repos) {
     // `clone` aunque la sesión ya tenga carpeta: de ahí salen el .env y demás ficheros que git ignora.
     if (r.project && r.dir && !byProject.has(r.project)) {
-      byProject.set(r.project, { project: r.project, base: r.dir, branch: r.branch || null, clone: clones.find((c) => c.gitlabPath === r.project)?.dir || null });
+      byProject.set(r.project, { project: r.project, base: r.dir, branch: r.branch || null, clone: clones.find((c) => c.gitlabPath === r.project)?.dir || null, worktree: agentWorktree(r.dir) });
     }
   }
   for (const link of s.links.filter((l) => l.kind === "mr" || l.kind === "pr")) {
@@ -40,6 +41,7 @@ async function entriesFor(s) {
       project: link.project,
       base: existing || clone,
       clone,
+      worktree: Boolean(existing && agentWorktree(existing)),
       branch,
       newWorktree: Boolean(branch && !existing),
       warnings: branch ? [] : [{ code: "mr-branch-unknown", iid: link.iid }],
@@ -62,9 +64,20 @@ function checkedProjects(projects) {
   return new Set(projects);
 }
 
+// { [front]: { [api]: "local" | "dev" } } de la ficha: lo que no encaje se ignora (y se queda en Local).
+function checkedTargets(targets) {
+  const out = {};
+  for (const [project, byKey] of Object.entries(targets && typeof targets === "object" ? targets : {})) {
+    if (!PROJECT_RE.test(project) || !byKey || typeof byKey !== "object") continue;
+    out[project] = Object.fromEntries(Object.entries(byKey).filter(([key, value]) => /^[a-z]+$/.test(key) && (value === "local" || value === "dev")));
+  }
+  return out;
+}
+
 // El renderer solo manda paths de proyecto: la sesión, las carpetas y los comandos se resuelven otra vez aquí.
-async function start(s, projects) {
+async function start(s, projects, targets) {
   const wanted = checkedProjects(projects);
+  const chosen = checkedTargets(targets);
   const entries = (await entriesFor(s)).filter((e) => wanted.has(e.project));
   const skipped = [];
   for (const project of wanted) {
@@ -75,6 +88,7 @@ async function start(s, projects) {
     if (!entry.newWorktree) continue;
     try {
       entry.base = await local.branchWorktree(entry.clone, entry.branch);
+      entry.worktree = agentWorktree(entry.base);
       entry.newWorktree = false;
     } catch (err) {
       entry.base = entry.clone;
@@ -85,7 +99,7 @@ async function start(s, projects) {
   // Antes de planificar: el .env (y los certs del launcher) del clon al worktree, que git no los lleva.
   // Así el preflight ya los ve y no bloquea por algo que Monstro puede resolver solo.
   for (const entry of entries) localRun.copyLocalFiles(entry);
-  const { items, plans } = await localRun.buildPlan(entries, probeConfig());
+  const { items, plans } = await localRun.buildPlan(entries, { ...probeConfig(), targets: chosen });
   const started = [];
   // En orden: primero las APIs (los fronts necesitan sus puertos), que es como salen del plan.
   for (const item of items) {
@@ -98,6 +112,8 @@ async function start(s, projects) {
       skipped.push({ project: item.project, reason: { code: "dir-gone", dir: item.dir } });
       continue;
     }
+    // El comando ya lleva las variables: el fichero es para lo que arranque el agente después.
+    try { localRun.persistOverrides(step); } catch (err) { console.error("[localRun] override", err); }
     try {
       await sessionsIpc.openInGhostty(item.dir, step.command);
       localRun.remember(item.project, { url: item.url, openUrl: item.openUrl, dir: item.dir, port: item.port, kind: item.kind, probeUrl: step.probeUrl, expect: step.expect });
@@ -111,7 +127,7 @@ async function start(s, projects) {
 
 function register() {
   ipcMain.handle("localRun:plan", async (_event, { sessionId } = {}) => plan(sessionsIpc.sessionOf(sessionId)));
-  ipcMain.handle("localRun:start", async (_event, { sessionId, projects } = {}) => start(sessionsIpc.sessionOf(sessionId), projects));
+  ipcMain.handle("localRun:start", async (_event, { sessionId, projects, targets } = {}) => start(sessionsIpc.sessionOf(sessionId), projects, targets));
   ipcMain.handle("localRun:status", () => localRun.status());
 }
 
