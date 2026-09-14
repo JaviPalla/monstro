@@ -82,7 +82,7 @@ button.ss-sec { cursor: pointer; }
 .ss-sec .ss-dot { box-shadow: none; }
 .ss-sec-waiting { color: var(--yellow); }
 .ss-sec-working { color: var(--green); }
-.ss-chevron { width: 10px; font-size: 10px; }
+.ss-chevron { display: inline-flex; width: 10px; font-size: 10px; }
 
 .ss-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: var(--text-muted); }
 .waiting .ss-dot, .ss-sec-waiting .ss-dot { background: var(--yellow); }
@@ -111,8 +111,9 @@ button.ss-sec { cursor: pointer; }
 .ss-x {
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
   width: 16px; height: 16px; padding: 0; border: 1.5px solid var(--red); border-radius: 50%;
-  font-size: 8px; line-height: 1; color: var(--red); background: transparent; cursor: pointer;
+  font-size: 10px; line-height: 1; color: var(--red); background: transparent; cursor: pointer;
 }
+.ss-x .lucide { stroke-width: 3; }
 .ss-x:hover { color: #fff; background: var(--red); }
 .sv .detail-sub > .ss-x::before { content: none; }
 .ss-meta { margin: 2px 0 7px 15px; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -154,6 +155,7 @@ button.ss-sec { cursor: pointer; }
 .ss-badge {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   max-width: 100%;
   padding: 0 7px;
   border: 1px solid transparent;
@@ -168,8 +170,9 @@ button.ss-sec { cursor: pointer; }
 }
 button.ss-badge { cursor: pointer; }
 .ss-badge button { padding: 0; border: none; font: inherit; color: inherit; background: none; cursor: pointer; }
-.ss-badge .ss-x { display: none; margin-left: 3px; opacity: 0.7; }
-.ss-badge:hover .ss-x { display: inline; }
+.ss-link { display: inline-flex; align-items: center; gap: 4px; }
+.ss-badge .ss-x { display: none; opacity: 0.7; }
+.ss-badge:hover .ss-x { display: inline-flex; }
 .ss-mr, .ss-pr { background: var(--purple-bg); color: var(--purple); }
 .ss-issue { background: var(--green-bg); color: var(--green); }
 .ss-epic { background: var(--orange-bg); color: var(--orange); }
@@ -284,8 +287,8 @@ button.ss-badge { cursor: pointer; }
 .sv-link.done { opacity: 0.7; }
 .sv-link-top { display: flex; align-items: center; gap: 6px; }
 .sv-link-top .chip { padding: 1px 8px; }
-.sv-pipe { font-size: 11px; font-weight: 600; white-space: nowrap; }
-.sv-link-x { margin-left: auto; padding: 0 4px; border: none; font: inherit; color: var(--text-muted); background: none; cursor: pointer; opacity: 0; }
+.sv-pipe { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.sv-link-x { display: inline-flex; margin-left: auto; padding: 0 4px; border: none; font: inherit; color: var(--text-muted); background: none; cursor: pointer; opacity: 0; }
 .sv-link:hover .sv-link-x { opacity: 0.8; }
 .sv-link-title { display: -webkit-box; overflow: hidden; font-size: 13px; line-height: 1.4; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .sv-link-title b { font-weight: 600; color: var(--text-muted); }
@@ -300,7 +303,7 @@ button.ss-badge { cursor: pointer; }
 .svl { margin: 14px 0 4px; }
 .svl-head { display: flex; align-items: center; gap: 6px; }
 .svl-toggle.active { border-color: var(--accent); color: var(--accent); }
-.svl-x { padding: 0 6px; border: none; font: inherit; color: var(--text-muted); background: none; cursor: pointer; }
+.svl-x { display: inline-flex; padding: 0 6px; border: none; font: inherit; color: var(--text-muted); background: none; cursor: pointer; }
 .svl-x:hover { color: var(--text); }
 .svl-body { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--bg); }
 .svl-body > .mini-btn, .svl-body > .ss-go-btn { margin-top: 12px; }
@@ -323,7 +326,7 @@ button.ss-badge { cursor: pointer; }
 .svl-main { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
 .svl-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; font-size: 13px; }
 .svl-top b { font-weight: 600; }
-.svl-kind { padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; line-height: 17px; background: var(--bg-hover); color: var(--text-muted); }
+.svl-kind { display: inline-flex; align-items: center; gap: 3px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; line-height: 17px; background: var(--bg-hover); color: var(--text-muted); }
 .svl-k-api { background: var(--green-bg); color: var(--green); }
 .svl-k-front { background: var(--yellow-bg); color: var(--yellow); }
 .svl-port { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; color: var(--text-muted); }
@@ -351,8 +354,8 @@ button.ss-badge { cursor: pointer; }
 .sv-dir { margin: 10px 0 -2px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; color: var(--text-muted); }
 .sv-diff { margin: 6px 0; }
 .sv-diff summary { padding: 7px 12px; font-weight: 500; }
-.sv-diff summary::before { content: "▸"; font-size: 10px; color: var(--text-muted); }
-.sv-diff[open] summary::before { content: "▾"; }
+.sv-diff summary::before { content: ""; display: inline-block; flex-shrink: 0; width: 10px; height: 10px; background: var(--text-muted); mask: var(--lucide-chevron-right) center / contain no-repeat; }
+.sv-diff[open] summary::before { transform: rotate(90deg); }
 .sv-diff .diff-path { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sv-trunc { padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; line-height: 17px; background: var(--yellow-bg); color: var(--yellow); }
 .sv-nodiff { padding: 8px 14px; }

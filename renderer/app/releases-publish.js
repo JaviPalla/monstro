@@ -32,9 +32,15 @@ function pubStatusKey(res) {
 
 // Icono de estado de pipeline (mismo mapeo SUCCESS/FAILURE/ERROR/PENDING que checksIcon del detalle).
 function pipelineDot(state) {
-  const map = { SUCCESS: ["✓", "ok"], FAILURE: ["✗", "err"], ERROR: ["✗", "err"], PENDING: ["●", "pending"], EXPECTED: ["●", "pending"] };
-  const [icon, cls] = map[state] || ["·", "muted"];
-  return `<span class="rel-pipe ${cls}" title="${t("Pipeline")}: ${esc(state || "—")}">${icon}</span>`;
+  const map = {
+    SUCCESS: [icon("circle-check"), "ok"],
+    FAILURE: [icon("circle-x"), "err"],
+    ERROR: [icon("circle-x"), "err"],
+    PENDING: [icon("circle-dot"), "pending"],
+    EXPECTED: [icon("circle-dot"), "pending"],
+  };
+  const [ico, cls] = map[state] || ["·", "muted"];
+  return `<span class="rel-pipe ${cls}" title="${t("Pipeline")}: ${esc(state || "—")}">${ico}</span>`;
 }
 
 function renderReleasePublish() {
@@ -90,14 +96,14 @@ function renderReleasePublish() {
       .map((res) => {
         // Un fallo no trae tag: con las dos variantes el mismo proyecto saldría dos veces igual, así
         // que la rama de origen es lo único que las distingue.
-        if (!res.ok) return `<div class="rel-pub-card err" title="${esc(res.error || "")}"><span class="rel-pub-ico">✕</span> <b>${esc(res.name)}</b> <code class="rel-pub-tag">${esc(res.ref || p.results.base)}</code>: ${esc(res.error || t("error"))}</div>`;
+        if (!res.ok) return `<div class="rel-pub-card err" title="${esc(res.error || "")}"><span class="rel-pub-ico">${icon("x")}</span> <b>${esc(res.name)}</b> <code class="rel-pub-tag">${esc(res.ref || p.results.base)}</code>: ${esc(res.error || t("error"))}</div>`;
         const st = p.status.get(pubStatusKey(res));
         const pipe = st?.pipeline ? pipelineDot(st.pipeline.state) : `<span class="rel-pipe muted" title="${t("Sin pipeline aún")}">·</span>`;
         const envs = (st?.environments || [])
           .map((e) => `<span class="rel-env ${e.state === "available" ? "up" : ""}">${esc(e.name)}</span>`)
           .join("");
-        const relBtn = res.releaseUrl ? `<a class="rel-pub-btn" data-url="${esc(res.releaseUrl)}" href="#">🏷️ ${t("Ver release")}</a>` : "";
-        const pipeBtn = st?.pipeline?.webUrl ? `<a class="rel-pub-btn pipe" data-url="${esc(st.pipeline.webUrl)}" href="#">⚙️ ${t("Ver pipeline")}</a>` : "";
+        const relBtn = res.releaseUrl ? `<a class="rel-pub-btn" data-url="${esc(res.releaseUrl)}" href="#">${icon("tag")} ${t("Ver release")}</a>` : "";
+        const pipeBtn = st?.pipeline?.webUrl ? `<a class="rel-pub-btn pipe" data-url="${esc(st.pipeline.webUrl)}" href="#">${icon("workflow")} ${t("Ver pipeline")}</a>` : "";
         return `<div class="rel-pub-card ok">
           <div class="rel-pub-cardtop">${pipe} <b class="rel-pub-name">${esc(res.name)}</b> <code class="rel-pub-tag">${esc(res.tag)}</code></div>
           <div class="rel-pub-cardbtns">${relBtn}${pipeBtn || `<span class="muted rel-pub-pending">${t("Pipeline pendiente…")}</span>`}</div>
@@ -108,7 +114,7 @@ function renderReleasePublish() {
     resultsHtml = `
       <div class="rel-summary ${cls}">Release <code>${esc(p.results.base)}.x</code> ${t("desde")} <code>${esc((p.results.refs || [p.results.ref]).join(" · "))}</code> · ${ok === 1 ? t("{n} publicada", { n: ok }) : t("{n} publicadas", { n: ok })}${fail ? ` · ${t("{n} con error", { n: fail })}` : ""}</div>
       <div class="rel-pub-cards">${rowsHtml}</div>
-      ${ok ? `<div class="rel-pub-cta"><button class="btn ghost" id="rel-pub-goto-pipelines">${t("Ver pipelines de despliegue")} →</button></div>` : ""}`;
+      ${ok ? `<div class="rel-pub-cta"><button class="btn ghost" id="rel-pub-goto-pipelines">${t("Ver pipelines de despliegue")} ${icon("arrow-right")}</button></div>` : ""}`;
   }
 
   list.innerHTML = `
@@ -224,7 +230,7 @@ function confirmAndPublishReleases() {
   const targets = r.projects.filter((proj) => r.selected.has(proj.path));
   if (!targets.length) return;
   const base = calverBase(pubBaseRef(p.ref));
-  const msNote = p.milestone ? `<div class="rel-confirm-note">🏷️ ${t("Milestone")}: <b>${esc(p.milestone)}</b></div>` : "";
+  const msNote = p.milestone ? `<div class="rel-confirm-note">${icon("tag")} ${t("Milestone")}: <b>${esc(p.milestone)}</b></div>` : "";
   const root = $("#modal-root");
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">

@@ -7,7 +7,7 @@
 .env-filters { flex-direction: column; align-items: stretch; gap: 10px; }
 .env-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .env-legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); }
-.env-legend .env-key { font-weight: 700; margin-left: 6px; }
+.env-legend .env-key { display: inline-flex; align-items: center; font-weight: 700; margin-left: 6px; }
 .env-legend .env-key.ok { color: var(--green); }
 .env-legend .env-key.stale { color: var(--yellow); }
 .env-legend .env-key.err { color: var(--red); }
@@ -47,7 +47,7 @@
 .env-box.waiting { border-left-color: var(--text-muted); opacity: 0.8; }
 .env-box.waiting .env-ico { color: var(--text-muted); }
 .env-box.none { opacity: 0.55; }
-.env-ico { font-weight: 700; font-size: 12px; }
+.env-ico { display: inline-flex; align-items: center; flex-shrink: 0; font-weight: 700; font-size: 12px; }
 .env-box.ok .env-ico { color: var(--green); }
 .env-box.stale .env-ico { color: var(--yellow); }
 .env-box.err .env-ico { color: var(--red); }
@@ -69,7 +69,7 @@
 
 /* Punto de salud. `unknown` es ámbar a propósito: 200 con HTML NO es prueba de que la app esté
    sana (una SPA sirve index.html en cualquier ruta), así que no se pinta verde. */
-.env-health { font-size: 12px; line-height: 1; }
+.env-health { display: inline-flex; align-items: center; font-size: 12px; line-height: 1; }
 .env-health.up { color: var(--green); }
 .env-health.unknown { color: var(--yellow); }
 .env-health.down { color: var(--red); }
@@ -84,7 +84,7 @@
   list-style: none; display: flex; align-items: center; gap: 8px;
 }
 .env-picker > summary::-webkit-details-marker { display: none; }
-.env-picker > summary::before { content: "▸"; font-size: 10px; color: var(--text-muted); transition: transform 0.15s; }
+.env-picker > summary::before { content: ""; width: 10px; height: 10px; background: var(--text-muted); mask: var(--lucide-chevron-right) center / contain no-repeat; transition: transform 0.15s; }
 .env-picker[open] > summary::before { transform: rotate(90deg); }
 .env-picker-n { font-weight: 400; color: var(--text-muted); font-size: 12px; }
 .env-picker .ms-proj-chips { margin-top: 10px; }

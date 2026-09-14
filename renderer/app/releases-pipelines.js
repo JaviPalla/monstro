@@ -8,17 +8,17 @@
 
 // status crudo de GitLab -> [icono, clase]. `manual` = job sin lanzar (lanzable).
 const JOB_ICON = {
-  success: ["✓", "ok"],
-  failed: ["✗", "err"],
-  canceled: ["⊘", "muted"],
-  skipped: ["»", "muted"],
-  manual: ["▶", "manual"],
-  running: ["◐", "pending"],
-  pending: ["●", "pending"],
-  created: ["○", "muted"],
-  preparing: ["●", "pending"],
-  scheduled: ["◷", "pending"],
-  waiting_for_resource: ["●", "pending"],
+  success: [icon("circle-check"), "ok"],
+  failed: [icon("circle-x"), "err"],
+  canceled: [icon("circle-slash"), "muted"],
+  skipped: [icon("circle-dashed"), "muted"],
+  manual: [icon("circle-play"), "manual"],
+  running: [icon("loader-circle", "spin"), "pending"],
+  pending: [icon("circle-dot"), "pending"],
+  created: [icon("circle"), "muted"],
+  preparing: [icon("circle-dot"), "pending"],
+  scheduled: [icon("clock"), "pending"],
+  waiting_for_resource: [icon("circle-dot"), "pending"],
 };
 
 // Lanza la carga de la pipeline de un proyecto (última release o el tag pedido) y re-renderiza.
@@ -60,14 +60,14 @@ async function playReleaseJob(path, jobId, projectName) {
 }
 
 function jobRowHtml(path, projName, job) {
-  const [icon, cls] = JOB_ICON[job.status] || ["·", "muted"];
+  const [ico, cls] = JOB_ICON[job.status] || ["·", "muted"];
   const busy = state.releases.pipelines.busy.has(job.id);
   const playBtn = job.manual
-    ? `<button class="rel-job-play" data-path="${esc(path)}" data-job="${esc(String(job.id))}" data-name="${esc(projName)}" ${busy ? "disabled" : ""} title="${t("Lanzar job manual")}">${busy ? "…" : "▶"}</button>`
+    ? `<button class="rel-job-play" data-path="${esc(path)}" data-job="${esc(String(job.id))}" data-name="${esc(projName)}" ${busy ? "disabled" : ""} title="${t("Lanzar job manual")}">${busy ? "…" : icon("play")}</button>`
     : "";
   const log = job.webUrl ? `<a class="rel-job-log" data-url="${esc(job.webUrl)}" href="#" title="${t("Ver log en GitLab")}">log</a>` : "";
   return `<div class="rel-job ${cls}">
-    <span class="rel-job-ico">${icon}</span>
+    <span class="rel-job-ico">${ico}</span>
     <span class="rel-job-name" title="${esc(job.status)}">${esc(job.name)}</span>
     ${playBtn}${log}
   </div>`;
@@ -97,7 +97,7 @@ function projectCardHtml(p) {
     } else {
       const dot = pipelineDot(data.pipeline.state);
       const pipeLink = data.pipeline.webUrl
-        ? `<a class="rel-pl-pipelink" data-url="${esc(data.pipeline.webUrl)}" href="#">${t("Ver pipeline")} →</a>`
+        ? `<a class="rel-pl-pipelink" data-url="${esc(data.pipeline.webUrl)}" href="#">${t("Ver pipeline")} ${icon("arrow-right")}</a>`
         : "";
       // Jobs agrupados por stage, en orden de aparición.
       const stages = [];
@@ -157,7 +157,7 @@ function renderReleasePipelines() {
     <div class="rel-view">
       <header class="rel-head">
         <h2>${t("Pipelines de despliegue")}</h2>
-        <p class="rel-sub">${t("Estado de la pipeline de la última release de cada proyecto. Cambia el selector para ver releases anteriores, lanza los jobs manuales (▶) o abre el log en GitLab.")}</p>
+        <p class="rel-sub">${t("Estado de la pipeline de la última release de cada proyecto. Cambia el selector para ver releases anteriores, lanza los jobs manuales ({icon}) o abre el log en GitLab.", { icon: icon("play") })}</p>
       </header>
 
       <div class="rel-projects-head">

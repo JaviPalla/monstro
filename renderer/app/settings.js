@@ -5,7 +5,7 @@ function cherryPickSettingsCard(cfg) {
   const branches = cp.branches || [];
   return `
     <div class="settings-card">
-      <h4>${t("Cherry-pick de hotfix")} 🍒</h4>
+      <h4>${icon("cherry")} ${t("Cherry-pick de hotfix")}</h4>
       <p class="muted">${t("Las MR cuya rama origen empiece por el prefijo y vayan a la release branch ofrecen, tras el merge, replicar su contenido a otras ramas (te pregunta primero, nunca automático).")}</p>
       <div class="add-repo">
         <input type="text" id="cp-prefix" value="${esc(cp.prefix || "")}" placeholder="hotfix/" />
@@ -60,7 +60,7 @@ function openSettings() {
   const cfg = state.config;
   root.innerHTML = `
     <div class="settings-inner">
-      <button class="btn" id="settings-back">← ${t("Volver")}</button>
+      <button class="btn" id="settings-back">${icon("arrow-left")} ${t("Volver")}</button>
       <h2 style="margin-top:14px">${t("Ajustes")}</h2>
       <div class="settings-card">
         <h4>${t("Proveedor")}</h4>
@@ -70,7 +70,7 @@ function openSettings() {
           <button class="btn" id="save-gitlab-base">${t("Guardar URL")}</button>
         </div>` : ""}
         <div class="add-repo">
-          <button class="btn" id="switch-provider" data-target="${isGitlab() ? "github" : "gitlab"}">${t("Cambiar a {name}", { name: isGitlab() ? "GitHub 🐙" : "GitLab 🦊" })}</button>
+          <button class="btn" id="switch-provider" data-target="${isGitlab() ? "github" : "gitlab"}">${t("Cambiar a {name}", { name: isGitlab() ? "GitHub" : "GitLab" })}</button>
         </div>
         <p class="muted">${t("Cambiar de proveedor reinicia el onboarding (repos y token se piden de nuevo).")}</p>
       </div>
@@ -79,7 +79,7 @@ function openSettings() {
         <div id="repo-lines">
           ${cfg.repos.map((r) => `<div class="repo-line">${esc(r)} <button class="btn" data-del="${esc(r)}">${t("Quitar")}</button></div>`).join("")}
         </div>
-        <details id="repo-suggest-details">
+        <details id="repo-suggest-details" class="fold">
           <summary>${t("Buscar mis repositorios")}</summary>
           <p class="muted">${t("Los mismos que te propone el onboarding al iniciar la aplicación. Marca o desmarca para añadirlos o quitarlos.")}</p>
           <div id="repo-suggest" class="repo-picker"><div class="empty">${t("Buscando tus repositorios…")}</div></div>
@@ -90,9 +90,9 @@ function openSettings() {
         </div>
       </div>
       ${isGitlab() ? `<div class="settings-card">
-        <h4>${t("Proyectos de releases")} 🚀</h4>
+        <h4>${icon("rocket")} ${t("Proyectos de releases")}</h4>
         <p class="muted">${t("Qué proyectos se ofrecen en los selectores de Ramas y Publicar. Sin ninguno marcado se ofrecen todos los del grupo.")}</p>
-        <details id="rel-projects-details">
+        <details id="rel-projects-details" class="fold">
           <summary>${t("Elegir proyectos")}</summary>
           <div id="rel-projects" class="ms-proj-filter"><span class="muted">${t("Cargando proyectos del grupo…")}</span></div>
         </details>
@@ -106,9 +106,9 @@ function openSettings() {
         </div>
       </div>
       ${isGitlab() ? `<div class="settings-card">
-        <h4>${t("Bandeja de propuestas")} 📥</h4>
+        <h4>${icon("inbox")} ${t("Bandeja de propuestas")}</h4>
         <p class="muted">${t("Cuenta de Outlook donde llegan las propuestas. Necesita un registro de aplicación en Azure AD como cliente público con el permiso Mail.ReadWrite.")}</p>
-        <details class="mail-help">
+        <details class="mail-help fold">
           <summary>${t("¿De dónde saco el Client ID?")}</summary>
           <ol>
             <li>${t("Abre el portal de Azure → Microsoft Entra ID → Registros de aplicaciones → Nuevo registro.")}</li>
@@ -128,12 +128,12 @@ function openSettings() {
         </div>
       </div>` : ""}
       <div class="settings-card">
-        <h4>${t("Apartados del menú")} 🧭</h4>
+        <h4>${icon("compass")} ${t("Apartados del menú")}</h4>
         <p class="muted">${t("Activa u oculta secciones de la barra lateral. Tiene que quedar al menos una.")}</p>
         <div id="settings-sections" class="repo-picker"></div>
       </div>
       <div class="settings-card">
-        <h4>${t("IA (Review con IA 🤖)")}</h4>
+        <h4>${icon("bot")} ${t("IA (Review con IA)")}</h4>
         <p class="muted" id="ai-status-line">${t("Comprobando backend…")}</p>
         <div class="add-repo">
           <select id="ai-model" disabled><option>${t("Cargando modelos…")}</option></select>
@@ -151,7 +151,7 @@ function openSettings() {
       </div>
       ${isGitlab() ? cherryPickSettingsCard(cfg) : ""}
       <div class="settings-card">
-        <h4>${t("Actualizaciones")} ⬆️</h4>
+        <h4>${icon("circle-arrow-up")} ${t("Actualizaciones")}</h4>
         <p class="muted">${t("Versión instalada:")} <b>v${esc(cfg.appVersion || "?")}</b></p>
         <label style="display:block;margin:8px 0">
           <input type="checkbox" id="check-updates" ${cfg.checkUpdates ? "checked" : ""} />
@@ -163,7 +163,7 @@ function openSettings() {
         <p class="muted" id="update-status"></p>
       </div>
       <div class="settings-card">
-        <h4>${t("Idioma")} 🌐</h4>
+        <h4>${icon("languages")} ${t("Idioma")}</h4>
         <p class="muted">${t("Idioma de la interfaz. Por defecto sigue el idioma del sistema.")}</p>
         <div class="add-repo">
           <select id="app-language">
@@ -174,7 +174,7 @@ function openSettings() {
         </div>
       </div>
       <div class="settings-card">
-        <h4>${t("Tema de interfaz")} ✦</h4>
+        <h4>${icon("sun-moon")} ${t("Tema de interfaz")}</h4>
         <p class="muted">${t("Aspecto visual general de la aplicación.")}</p>
         <div class="add-repo">
           <select id="ui-theme">
@@ -184,7 +184,7 @@ function openSettings() {
         </div>
       </div>
       <div class="settings-card">
-        <h4>${t("Tema de sintaxis")} 🎨</h4>
+        <h4>${icon("palette")} ${t("Tema de sintaxis")}</h4>
         <p class="muted">${t("Colores del resaltado de código en la pantalla de Cambios.")}</p>
         <div class="add-repo">
           <select id="syntax-theme">
@@ -276,7 +276,7 @@ function openSettings() {
     el.innerHTML = names
       .map(
         (name) => `<button class="repo-option ${chosen.has(name) ? "selected" : ""}" data-suggest="${esc(name)}">
-          <span class="repo-check">${chosen.has(name) ? "✓" : ""}</span>
+          <span class="repo-check">${chosen.has(name) ? icon("check") : ""}</span>
           <span class="repo-name">${esc(name)}</span>
           ${isPrivate.get(name) ? `<span class="chip chip-draft">${t("privado")}</span>` : ""}
         </button>`,
@@ -362,7 +362,7 @@ function openSettings() {
     try {
       const r = await window.monstro.checkUpdates();
       if (r.error) line.textContent = t("No se pudo comprobar: {detail}", { detail: r.error });
-      else if (r.newer) line.innerHTML = `✨ ${t("Hay una versión nueva: {v}", { v: `v${esc(r.latest)}` })} — <a href="#" id="update-link">${t("descargar ↗")}</a>`;
+      else if (r.newer) line.innerHTML = `${icon("sparkles")} ${t("Hay una versión nueva: {v}", { v: `v${esc(r.latest)}` })} — <a href="#" id="update-link">${t("descargar")} ${icon("external-link")}</a>`;
       else line.textContent = t("Ya tienes la última versión (v{v})", { v: r.latest || r.current });
       $("#update-link")?.addEventListener("click", (e) => { e.preventDefault(); window.monstro.openExternal(r.url); });
     } finally {
@@ -417,8 +417,8 @@ function openSettings() {
   window.monstro.aiStatus().then((s) => {
     const line = $("#ai-status-line");
     if (line) line.innerHTML = s.backend
-      ? `✓ <b>${esc(s.backend)}</b> — ${esc(s.detail)}`
-      : `✗ ${esc(s.detail)}`;
+      ? `${icon("check")} <b>${esc(s.backend)}</b> — ${esc(s.detail)}`
+      : `${icon("x")} ${esc(s.detail)}`;
 
     const modelSel = $("#ai-model");
     const effortSel = $("#ai-effort");
@@ -464,7 +464,7 @@ function openSettings() {
       const result = await window.monstro.aiPing();
       toast(result.ok ? t("IA OK vía {backend}", { backend: result.backend }) : t("IA no disponible: {detail}", { detail: result.detail }), result.ok ? "ok" : "err");
       const line = $("#ai-status-line");
-      if (line) line.innerHTML = `${result.ok ? "✓" : "✗"} <b>${esc(result.backend || t("sin backend"))}</b> — ${esc(result.detail)}`;
+      if (line) line.innerHTML = `${icon(result.ok ? "check" : "x")} <b>${esc(result.backend || t("sin backend"))}</b> — ${esc(result.detail)}`;
     } finally {
       btn.disabled = false;
       btn.textContent = t("Probar conexión con Claude");
@@ -488,8 +488,8 @@ function sectionToggleRows(selected) {
       const sec = MENU_SECTIONS[key];
       const on = selected.has(key);
       return `<button class="repo-option section-option ${on ? "selected" : ""}" data-section="${key}">
-        <span class="repo-check">${on ? "✓" : ""}</span>
-        <span class="section-ico">${sec.icon}</span>
+        <span class="repo-check">${on ? icon("check") : ""}</span>
+        <span class="section-ico">${icon(sec.icon)}</span>
         <span class="repo-name">${t(sec.label)}</span>
       </button>`;
     })
@@ -519,11 +519,11 @@ async function renderSectionPicker() {
     <div class="welcome">
       <div class="welcome-logo">${mascot(64)}</div>
       <h2>${t("¿Qué apartados quieres ver?")}</h2>
-      <p class="muted">${t("Activa solo lo que uses — podrás cambiarlo cuando quieras en Ajustes ⚙. Empieza por un perfil:")}</p>
+      <p class="muted">${t("Activa solo lo que uses — podrás cambiarlo cuando quieras en Ajustes {icon}. Empieza por un perfil:", { icon: icon("settings") })}</p>
       <div class="provider-choice section-presets">
-        <button class="repo-option" data-preset="desarrollo"><span class="repo-name">🧑‍💻 ${t("Desarrollo")}</span></button>
-        <button class="repo-option" data-preset="operaciones"><span class="repo-name">🛟 ${t("Operaciones")}</span></button>
-        <button class="repo-option" data-preset="todo"><span class="repo-name">✨ ${t("Todo")}</span></button>
+        <button class="repo-option" data-preset="desarrollo"><span class="repo-name">${icon("code")} ${t("Desarrollo")}</span></button>
+        <button class="repo-option" data-preset="operaciones"><span class="repo-name">${icon("life-buoy")} ${t("Operaciones")}</span></button>
+        <button class="repo-option" data-preset="todo"><span class="repo-name">${icon("sparkles")} ${t("Todo")}</span></button>
       </div>
       <div id="section-picker" class="repo-picker"></div>
       <div class="welcome-actions">
@@ -563,13 +563,13 @@ async function renderProviderChooser() {
     <div class="welcome">
       <div class="welcome-logo">${mascot(64)}</div>
       <h2>${t("¿Con qué trabajas?")}</h2>
-      <p class="muted">${t("Elige tu proveedor. Podrás cambiarlo luego en Ajustes ⚙.")}</p>
+      <p class="muted">${t("Elige tu proveedor. Podrás cambiarlo luego en Ajustes {icon}.", { icon: icon("settings") })}</p>
       <div class="provider-choice">
         <button class="repo-option provider-option" data-provider="github">
-          <span class="repo-name">🐙 GitHub</span>
+          <span class="repo-name">GitHub</span>
         </button>
         <button class="repo-option provider-option" data-provider="gitlab">
-          <span class="repo-name">🦊 GitLab</span>
+          <span class="repo-name">GitLab</span>
         </button>
       </div>
       <div class="add-repo picker-manual" id="gitlab-base-row" style="display:none">
@@ -630,7 +630,7 @@ async function renderWelcome() {
         <div>
           <b>${t("Crea el token")}</b>
           <p class="muted">${t("Abre la página (ya con el nombre y los permisos {scopes} preparados), genera el token y cópialo.", { scopes })}</p>
-          <button class="btn btn-accent" id="welcome-open-pat">${t("Crear token en {name} ↗", { name: providerName() })}</button>
+          <button class="btn btn-accent" id="welcome-open-pat">${t("Crear token en {name}", { name: providerName() })} ${icon("external-link")}</button>
         </div>
       </div>
 
@@ -650,12 +650,12 @@ async function renderWelcome() {
         <div>
           <b>${t("Conecta Claude")}</b> <span class="chip ${aiOk ? "chip-open" : "chip-draft"}">${aiOk ? t("listo") : t("opcional")}</span>
           <p class="muted">${aiOk
-            ? t("Detectado: {detail} — el botón 🤖 Review con IA ya funciona.", { detail: esc(aiStatus.detail) })
-            : `${t("Para el botón 🤖 Review con IA: instala")} <a href="#" data-ext="https://claude.com/claude-code">Claude Code</a> ${t("y ábrelo una vez para autenticarte (Monstro usará tu sesión), o exporta")} <code>ANTHROPIC_API_KEY</code>.`}</p>
+            ? t("Detectado: {detail} — el botón {icon} Review con IA ya funciona.", { detail: esc(aiStatus.detail), icon: icon("bot") })
+            : `${t("Para el botón {icon} Review con IA: instala", { icon: icon("bot") })} <a href="#" data-ext="https://claude.com/claude-code">Claude Code</a> ${t("y ábrelo una vez para autenticarte (Monstro usará tu sesión), o exporta")} <code>ANTHROPIC_API_KEY</code>.`}</p>
         </div>
       </div>
 
-      <details class="welcome-alt">
+      <details class="welcome-alt fold">
         <summary>${t("¿Prefieres la terminal?")}</summary>
         <p class="muted">${t("Si tienes el CLI oficial, Monstro coge el token solo:")} <code>${cliCmd}</code>. ${t("O exporta")} <code>${envVar}</code>. ${t("Después pulsa Reintentar.")}</p>
         <button class="btn" id="welcome-retry">${t("He hecho login — Reintentar")}</button>
@@ -688,7 +688,7 @@ async function renderRepoPicker() {
     <div class="welcome">
       <div class="welcome-logo">${mascot(64)}</div>
       <h2>${t("¿Qué repositorios quieres ver?")}</h2>
-      <p class="muted">${t("Conectado como")} <b>${esc(state.me?.login || "?")}</b>. ${t("Marca los repos que Monstro vigilará — podrás cambiarlos cuando quieras en Ajustes ⚙.")}</p>
+      <p class="muted">${t("Conectado como")} <b>${esc(state.me?.login || "?")}</b>. ${t("Marca los repos que Monstro vigilará — podrás cambiarlos cuando quieras en Ajustes {icon}.", { icon: icon("settings") })}</p>
       <div id="repo-picker" class="repo-picker"><div class="empty">${t("Buscando tus repositorios…")}</div></div>
       <div class="add-repo picker-manual">
         <input type="text" id="picker-manual-input" placeholder="${t("¿Falta alguno? Escríbelo: {fmt}", { fmt: repoPlaceholder() })}" />
@@ -712,7 +712,7 @@ async function renderRepoPicker() {
         .map(
           (name) => `
         <button class="repo-option ${selected.has(name) ? "selected" : ""}" data-repo="${esc(name)}">
-          <span class="repo-check">${selected.has(name) ? "✓" : ""}</span>
+          <span class="repo-check">${selected.has(name) ? icon("check") : ""}</span>
           <span class="repo-name">${esc(name)}</span>
           ${isPrivate.get(name) ? `<span class="chip chip-draft">${t("privado")}</span>` : ""}
         </button>`,

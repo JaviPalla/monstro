@@ -76,7 +76,7 @@
 .rel-confirm-note { font-size: 12px; color: var(--text); background: var(--yellow-bg); padding: 6px 9px; border-radius: 7px; }
 
 /* Estado de pipeline/entornos (Publicar) + tarjetas de resultado (OPE-25). */
-.rel-pipe { font-weight: 700; }
+.rel-pipe { display: inline-flex; align-items: center; font-weight: 700; }
 .rel-pipe.ok { color: var(--green); }
 .rel-pipe.err { color: var(--red); }
 .rel-pipe.pending { color: var(--yellow); }
@@ -117,7 +117,7 @@
 .rel-stage-name { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 3px; }
 .rel-stage-jobs { display: flex; flex-direction: column; gap: 3px; }
 .rel-job { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
-.rel-job-ico { width: 14px; text-align: center; font-weight: 700; }
+.rel-job-ico { display: inline-flex; align-items: center; justify-content: center; width: 14px; flex-shrink: 0; font-weight: 700; }
 .rel-job.ok .rel-job-ico { color: var(--green); }
 .rel-job.err .rel-job-ico { color: var(--red); }
 .rel-job.pending .rel-job-ico { color: var(--yellow); }
@@ -125,6 +125,7 @@
 .rel-job.muted .rel-job-ico { color: var(--text-muted); }
 .rel-job-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rel-job-play {
+  display: inline-flex; align-items: center;
   font: inherit; font-size: 11px; cursor: pointer; padding: 1px 7px; border-radius: 6px;
   border: 1px solid var(--accent); color: var(--accent); background: transparent;
 }

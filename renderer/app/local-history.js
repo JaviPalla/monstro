@@ -41,7 +41,7 @@ function renderLocalHistory() {
   const projRow = (r, withTask) =>
     r.ok
       ? `<div class="lh-proj"><span class="lh-proj-name">${projectIconHtml(r.projectPath)}${esc(projectMeta(r.projectPath).name)}</span><span class="lh-proj-pills">${withTask && r.task ? lhPill("issue", r.task.url, t("Tarea #{n}", { n: r.task.iid })) + lhIssueBadges(r.projectPath, r.task.iid) : ""}${lhPill("mr", r.mr.url, `MR !${r.mr.number}`)}${lhMrBadge(r.projectPath, r.mr.number)}${r.commit ? lhPill("commit", r.commit.url, r.commit.sha.slice(0, 8)) : ""}</span></div>`
-      : `<div class="lh-proj err"><span class="lh-proj-name">${esc(r.projectPath)}</span><span class="local-err">⚠ ${esc(r.error)}</span></div>`;
+      : `<div class="lh-proj err"><span class="lh-proj-name">${esc(r.projectPath)}</span><span class="local-err">${icon("triangle-alert")} ${esc(r.error)}</span></div>`;
   const cards = entries
     .map((e) => {
       let items = "";
@@ -53,7 +53,7 @@ function renderLocalHistory() {
       } else {
         items = `<div class="lh-pills">${lhPill(e.issue.isEpic ? "epic" : "issue", e.issue.url, `${e.issue.isEpic ? "Epic" : "Issue"} ${e.issue.projectPath}#${e.issue.iid}`)}${lhIssueBadges(e.issue.projectPath, e.issue.iid)}</div>${(e.results || []).map((r) => projRow(r, false)).join("")}`;
       }
-      const warn = entryHasWarning(e) ? `<span class="lh-warn" title="${esc(t("Algún paso no se completó — abre el detalle"))}">⚠</span>` : "";
+      const warn = entryHasWarning(e) ? `<span class="lh-warn" title="${esc(t("Algún paso no se completó — abre el detalle"))}">${icon("triangle-alert")}</span>` : "";
       return `
         <div class="lh-card lh-k-${esc(e.kind)}">
           <div class="lh-head">
@@ -61,8 +61,8 @@ function renderLocalHistory() {
             <span class="lh-title">${esc(e.title || t("(sin título)"))}</span>
             ${warn}
             <time class="lh-date">${esc(lhDate(e.ts))}</time>
-            <button class="lh-detail" data-id="${esc(e.id)}">${t("Detalle →")}</button>
-            <button class="lh-del" data-id="${esc(e.id)}" title="${esc(t("Quitar del histórico"))}" aria-label="${esc(t("Quitar del histórico"))}">✕</button>
+            <button class="lh-detail" data-id="${esc(e.id)}">${t("Detalle")} ${icon("arrow-right")}</button>
+            <button class="lh-del" data-id="${esc(e.id)}" title="${esc(t("Quitar del histórico"))}" aria-label="${esc(t("Quitar del histórico"))}">${icon("x")}</button>
           </div>
           <div class="lh-items">${items}</div>
         </div>`;
@@ -82,7 +82,7 @@ function renderLocalHistoryDetail() {
   const e = state.local.historyDetail;
   const stepsHtml = (steps) =>
     (steps || []).length
-      ? `<ul class="lh-steps">${steps.map((s) => `<li class="${s.ok === false ? "bad" : "good"}">${s.ok === false ? "✕" : "✓"} ${esc(s.text)}</li>`).join("")}</ul>`
+      ? `<ul class="lh-steps">${steps.map((s) => `<li class="${s.ok === false ? "bad" : "good"}">${s.ok === false ? icon("x") : icon("check")} ${esc(s.text)}</li>`).join("")}</ul>`
       : `<p class="muted lh-nosteps">${t("Sin pasos locales registrados.")}</p>`;
   let body = "";
   let primaryMr = null;
@@ -103,7 +103,7 @@ function renderLocalHistoryDetail() {
       .map((r) => {
         const links = r.ok
           ? `<div class="lh-pills">${r.task ? lhPill("issue", r.task.url, t("Tarea #{n}", { n: r.task.iid })) : ""}${lhPill("mr", r.mr.url, `MR !${r.mr.number}`)}${r.commit ? lhPill("commit", r.commit.url, `Commit ${r.commit.sha.slice(0, 8)}`) : ""}</div>`
-          : `<div class="local-err">⚠ ${esc(r.error)}</div>`;
+          : `<div class="local-err">${icon("triangle-alert")} ${esc(r.error)}</div>`;
         return `<div class="lh-d-block ${r.ok ? "" : "err"}"><div class="lh-sub">${projectIconHtml(r.projectPath)}${esc(projectMeta(r.projectPath).name)}</div>${links}${stepsHtml(r.steps)}</div>`;
       })
       .join("");
@@ -116,7 +116,7 @@ function renderLocalHistoryDetail() {
     </div>
     <div class="lh-detail-body">${body}</div>
     <div class="lf-actions" style="margin:0 20px 28px">
-      <button class="btn" id="lhd-back">${t("← Volver al histórico")}</button>
+      <button class="btn" id="lhd-back">${icon("arrow-left")} ${t("Volver al histórico")}</button>
       ${primaryMr ? `<button class="btn btn-accent" id="lhd-openmr">${t("Ver MR en Monstro")}</button>` : ""}
     </div>`;
   list.querySelectorAll("a[data-ext]").forEach((a) => a.addEventListener("click", (ev) => { ev.preventDefault(); window.monstro.openExternal(a.getAttribute("href")); }));

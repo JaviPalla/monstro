@@ -10,7 +10,7 @@ const SV_SELFTEST_WAIT_MS = 12000; // por debajo de los 20 s del selftest (main.
 const LINK_KIND_LABEL = { mr: "MR", pr: "PR", issue: "Issue", epic: "Epic" };
 // Estado de la MR/tarea → [clase del chip (prs.css), texto]. El texto se traduce al pintar.
 const LINK_STATE = { OPEN: ["chip-open", "Abierta"], MERGED: ["chip-merged", "Fusionada"], CLOSED: ["chip-closed", "Cerrada"] };
-const PIPELINE_LABEL = { SUCCESS: ["checks-success", "✓", "Pipeline en verde"], FAILURE: ["checks-failure", "✗", "Pipeline fallida"], PENDING: ["checks-pending", "●", "Pipeline en curso"] };
+const PIPELINE_LABEL = { SUCCESS: ["checks-success", "circle-check", "Pipeline en verde"], FAILURE: ["checks-failure", "circle-x", "Pipeline fallida"], PENDING: ["checks-pending", "circle-dot", "Pipeline en curso"] };
 
 // Por sesión y tipo: { at, v, data, json, error, pending }. `at` = la versión pedida (updatedAt, links + franja
 // de 2 min, texto de la pregunta); `v` sube solo si cambió lo recibido y entra en la clave de repintado.
@@ -134,7 +134,7 @@ function linkCard(l, launch) {
   const pipe = PIPELINE_LABEL[l.pipeline];
   const closed = l.state === "MERGED" || l.state === "CLOSED";
   const branches = l.sourceBranch
-    ? `<span class="branches"><span class="branch">${esc(l.sourceBranch)}</span><span class="arrow">→</span><span class="branch">${esc(l.targetBranch || "?")}</span></span>`
+    ? `<span class="branches"><span class="branch">${esc(l.sourceBranch)}</span><span class="arrow">${icon("arrow-right")}</span><span class="branch">${esc(l.targetBranch || "?")}</span></span>`
     : "";
   const button = (action, label, tip) =>
     `<button class="mini-btn" data-ss="launch-links" data-action="${action}" data-key="${esc(l.key)}" title="${esc(closed ? t(chipText) : tip)}"${closed ? " disabled" : ""}>${esc(label)}</button>`;
@@ -144,10 +144,10 @@ function linkCard(l, launch) {
   return `
     <div class="sv-link${closed ? " done" : ""}" data-ss="link" data-key="${esc(l.key)}" title="${esc(l.url || "")}">
       <div class="sv-link-top">
-        <span class="ss-badge ss-${l.kind}">${esc(LINK_KIND_LABEL[l.kind] || l.kind)}</span>
+        <span class="ss-badge ss-${l.kind}">${linkIcon(l)}${esc(LINK_KIND_LABEL[l.kind] || l.kind)}</span>
         ${chipText ? `<span class="chip ${chipClass}">${esc(t(chipText))}</span>` : ""}
-        ${pipe ? `<span class="sv-pipe ${pipe[0]}" title="${esc(t(pipe[2]))}">${pipe[1]} pipeline</span>` : ""}
-        <button class="sv-link-x" data-ss="hide" data-key="${esc(l.key)}" title="${esc(t("Quitar"))}">×</button>
+        ${pipe ? `<span class="sv-pipe ${pipe[0]}" title="${esc(t(pipe[2]))}">${icon(pipe[1])} pipeline</span>` : ""}
+        <button class="sv-link-x" data-ss="hide" data-key="${esc(l.key)}" title="${esc(t("Quitar"))}">${icon("x")}</button>
       </div>
       <div class="sv-link-title"><b>${l.kind === "mr" ? "!" : "#"}${esc(String(l.iid))}</b> ${esc(l.title || "")}</div>
       <div class="sv-link-meta">${l.author ? `<span>@${esc(l.author)}</span>` : ""}${branches}<span class="sv-link-project">${esc(l.project || "")}</span></div>
@@ -321,7 +321,7 @@ function sessionView(s) {
   const body = tab === "plan" ? planTab(s) : tab === "changes" ? changesTab(s) : summaryTab(s, !questionOnTop);
   return `
     <div class="detail-inner sv ${s.state}" data-id="${esc(s.sessionId)}">
-      <button class="detail-close" data-ss="close-view" title="${esc(t("Cerrar (Esc)"))}">✕</button>
+      <button class="detail-close" data-ss="close-view" title="${esc(t("Cerrar (Esc)"))}">${icon("x")}</button>
       <div class="detail-title sv-title"><span class="ss-dot"></span>${esc(s.title)}</div>
       <div class="detail-sub"><b class="sv-state">${esc(stateLabel(s))}</b>${where.map((w) => `<span>${esc(w)}</span>`).join("")}<span>${esc(timeAgo(s.updatedAt))}</span>${closeButton(s)}</div>
       <div class="sv-actions">${openButton(s)}${s.live ? "" : `<button class="ss-go-btn" data-ss="resume">${t("Reanudar")}</button>${cleanButton(s)}`}</div>

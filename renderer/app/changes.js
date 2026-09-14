@@ -15,7 +15,11 @@ function renderChangesTab() {
   }
 
   const { map: anchored, orphans } = threadsByAnchor();
-  const statusIcon = { added: "🟢", removed: "🔴", modified: "🟡", renamed: "🔵" };
+  // El color va por CSS (.status-ico.st-<estado>); un estado desconocido se queda en gris.
+  const statusIcon = { added: "square-plus", removed: "square-minus", modified: "square-dot", renamed: "square-arrow-right" };
+  const statusIco = (status) => statusIcon[status]
+    ? `<span class="status-ico st-${status}">${icon(statusIcon[status])}</span>`
+    : `<span class="status-ico">${icon("square")}</span>`;
 
   // Comentarios (hilos de GitHub) y borradores locales por fichero, para el índice lateral.
   const commentsPerFile = new Map();
@@ -37,10 +41,10 @@ function renderChangesTab() {
       const draftCount = draftsPerFile.get(file.filename) || 0;
       return `
       <button class="file-nav-row" data-target="diff-f${fi}" title="${esc(file.filename)}">
-        <span class="status-ico">${statusIcon[file.status] || "⚪"}</span>
+        ${statusIco(file.status)}
         <span class="file-nav-name">${esc(file.filename)}</span>
-        ${comments ? `<span class="file-nav-badge badge-comments ${unresolved ? "" : "all-resolved"}" title="${unresolved ? t("{n} comentario(s) sin resolver", { n: unresolved }) : t("Todos los hilos resueltos")}">💬 ${comments}</span>` : ""}
-        ${draftCount ? `<span class="file-nav-badge badge-drafts" title="${t("{n} borrador(es) local(es)", { n: draftCount })}">📝 ${draftCount}</span>` : ""}
+        ${comments ? `<span class="file-nav-badge badge-comments ${unresolved ? "" : "all-resolved"}" title="${unresolved ? t("{n} comentario(s) sin resolver", { n: unresolved }) : t("Todos los hilos resueltos")}">${icon("message-square")} ${comments}</span>` : ""}
+        ${draftCount ? `<span class="file-nav-badge badge-drafts" title="${t("{n} borrador(es) local(es)", { n: draftCount })}">${icon("file-pen-line")} ${draftCount}</span>` : ""}
       </button>`;
     })
     .join("");
@@ -49,7 +53,7 @@ function renderChangesTab() {
   const pendingTotal = state.conversation?.pendingDrafts || 0;
   const pendingInline = (state.conversation?.reviewThreads?.nodes || []).some((th) => th.isPendingDraft);
   const pendingBar = pendingTotal
-    ? `<div class="gl-drafts-bar">📝 ${t("{n} comentarios de review pendientes de publicar en GitLab", { n: pendingTotal })}
+    ? `<div class="gl-drafts-bar">${icon("file-pen-line")} ${t("{n} comentarios de review pendientes de publicar en GitLab", { n: pendingTotal })}
         <span style="flex:1"></span>
         ${pendingInline ? `<button class="btn" id="gl-drafts-first">${t("Ir al primero")}</button>` : ""}
         <button class="btn btn-primary" id="gl-drafts-publish" title="${t("Publica todos tus borradores de esta MR en GitLab (pide confirmación)")}">${t("Publicar en GitLab")}</button>
@@ -77,9 +81,9 @@ function renderChangesTab() {
         return `
         <details class="diff-file" id="diff-f${fi}" data-file="${esc(file.filename)}" ${state.openFiles.has(file.filename) ? "open" : ""}>
           <summary>
-            <span class="status-ico">${statusIcon[file.status] || "⚪"}</span>
+            ${statusIco(file.status)}
             <span class="diff-path">${esc(file.previousFilename ? `${file.previousFilename} → ` : "")}${esc(file.filename)}</span>
-            ${comments ? `<span class="file-nav-badge badge-comments">💬 ${comments}</span>` : ""}
+            ${comments ? `<span class="file-nav-badge badge-comments">${icon("message-square")} ${comments}</span>` : ""}
             <span class="muted"><span class="checks-success">+${file.additions}</span> / <span class="checks-failure">−${file.deletions}</span></span>
           </summary>
           ${file.patch
@@ -92,9 +96,9 @@ function renderChangesTab() {
       </div>
     </div>
     <div class="comment-nav" id="comment-nav">
-      <button class="btn" id="cn-prev" title="${t("Comentario anterior")}">↑</button>
+      <button class="btn" id="cn-prev" title="${t("Comentario anterior")}">${icon("arrow-up")}</button>
       <span class="comment-nav-count" id="cn-count"></span>
-      <button class="btn" id="cn-next" title="${t("Comentario siguiente")}">↓</button>
+      <button class="btn" id="cn-next" title="${t("Comentario siguiente")}">${icon("arrow-down")}</button>
     </div>`;
 
   // índice lateral: saltar al fichero (abriendo su diff)
@@ -142,7 +146,7 @@ function renderChangesTab() {
       btn.disabled = true;
       try {
         await window.monstro.resolveThread(btn.dataset.resolveId, resolved);
-        toast(resolved ? t("Conversación resuelta ✓") : t("Conversación reabierta"), "ok");
+        toast(resolved ? t("Conversación resuelta") : t("Conversación reabierta"), "ok");
         state.conversation = await window.monstro.prConversation(detailRepo(), state.detailPR.number);
         renderDetailInPlace();
       } catch (err) {
@@ -191,7 +195,7 @@ async function publishGitlabDrafts() {
   try {
     await window.monstro.publishDraftNotes(detailRepo(), state.detailPR.number);
     state.conversation = await window.monstro.prConversation(detailRepo(), state.detailPR.number);
-    toast(t("{n} comentarios publicados en GitLab ✓", { n }), "ok");
+    toast(t("{n} comentarios publicados en GitLab", { n }), "ok");
     renderDetailInPlace();
   } catch (err) {
     toast(t("No se pudieron publicar los comentarios: {err}", { err: String(err.message || err) }), "err");
@@ -237,13 +241,13 @@ function openInlineComposer(tr) {
   row.innerHTML = `
     <td colspan="3">
       <div class="composer inline">
-        <div class="muted" style="margin-bottom:6px">📝 ${t("Borrador en")} <code>${esc(path)}</code> ${t("línea")} ${esc(line)} (${side === "LEFT" ? t("versión anterior") : t("versión nueva")}) — ${t("no se publica hasta que tú lo digas")}</div>
+        <div class="muted" style="margin-bottom:6px">${icon("file-pen-line")} ${t("Borrador en")} <code>${esc(path)}</code> ${t("línea")} ${esc(line)} (${side === "LEFT" ? t("versión anterior") : t("versión nueva")}) — ${t("no se publica hasta que tú lo digas")}</div>
         <textarea rows="3" placeholder="${t("Tu comentario…")}"></textarea>
         <div class="composer-actions">
           ${severityPicker({})}
           <span style="flex:1"></span>
           <button class="btn cancel">${t("Cancelar")}</button>
-          <button class="btn btn-accent send">📝 ${t("Guardar borrador")}</button>
+          <button class="btn btn-accent send">${icon("file-pen-line")} ${t("Guardar borrador")}</button>
         </div>
       </div>
     </td>`;

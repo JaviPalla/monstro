@@ -65,7 +65,7 @@ function renderLocalStart() {
         <span class="ls-title">${esc(t.title)}</span>
         <span class="ls-proj">${t.projectPath ? projectIconHtml(t.projectPath) + esc(projectMeta(t.projectPath).name) : ""} <span class="muted">#${esc(String(t.iid))}</span></span>
       </div>
-      <span class="ls-go">Preparar plan →</span>
+      <span class="ls-go">Preparar plan ${icon("arrow-right")}</span>
     </div>`;
 
   const toolbar = `
@@ -73,7 +73,7 @@ function renderLocalStart() {
       <input id="ls-q" class="ls-search" type="search" placeholder="Buscar por título o proyecto…" value="${esc(f.query)}" />
       <label class="ls-toggle"><input type="checkbox" id="ls-done" ${f.showDone ? "checked" : ""} /> Mostrar terminadas${hiddenDone > 0 && !f.showDone ? ` (${hiddenDone})` : ""}</label>
       <span class="muted ls-count">${tasks.length} tarea${tasks.length === 1 ? "" : "s"}</span>
-      <button class="btn local-change" id="ls-refresh">↻ Recargar</button>
+      <button class="btn local-change" id="ls-refresh">${icon("refresh-cw")} Recargar</button>
     </div>`;
 
   const body = l.tasksError
@@ -164,8 +164,8 @@ function renderLocalPlanForm() {
         </div>
         ${pf.error ? `<div class="error-box">${esc(pf.error)}</div>` : ""}
         <div class="lf-actions">
-          <button class="btn" id="pf-back">← Volver</button>
-          <button class="btn btn-primary" id="pf-gen" ${pf.generating ? "disabled" : ""}>${pf.generating ? "Generando plan…" : "Generar plan →"}</button>
+          <button class="btn" id="pf-back">${icon("arrow-left")} Volver</button>
+          <button class="btn btn-primary" id="pf-gen" ${pf.generating ? "disabled" : ""}>${pf.generating ? "Generando plan…" : `Generar plan ${icon("arrow-right")}`}</button>
         </div>
       </div>`;
     wirePlanFormInputs();
@@ -194,32 +194,32 @@ function renderLocalPlanForm() {
   const mapRows = pf.mapping.map((m, i) => `
     <div class="pf-map-row">
       <span class="pf-map-theme ${m.repoPath ? "" : "unset"}">${esc(projectMeta(m.theme).name || m.theme)}</span>
-      <span class="pf-map-arrow">→</span>
+      <span class="pf-map-arrow">${icon("arrow-right")}</span>
       <select class="pf-map-sel" data-i="${i}">
         <option value="">— sin asignar (se omite) —</option>
         ${pf.avail.map((a) => `<option value="${esc(a.path)}" ${m.repoPath === a.path ? "selected" : ""}>${esc(a.name)}</option>`).join("")}
       </select>
     </div>`).join("");
-  const mappingHtml = `<div class="pf-sec pf-map"><h3>🔗 Asignar a proyectos locales</h3>
-    <p class="muted">Cada bloque se ejecuta en un repo <b>clonado en tu directorio raíz</b> y <b>seleccionable en la app</b>. ${unresolved ? `<b class="local-err">${unresolved} sin asignar</b> — elígelo en cada uno.` : "Todo asignado ✓"}</p>
+  const mappingHtml = `<div class="pf-sec pf-map"><h3>${icon("link")} Asignar a proyectos locales</h3>
+    <p class="muted">Cada bloque se ejecuta en un repo <b>clonado en tu directorio raíz</b> y <b>seleccionable en la app</b>. ${unresolved ? `<b class="local-err">${unresolved} sin asignar</b> — elígelo en cada uno.` : `${icon("check")} Todo asignado`}</p>
     ${pf.avail.length ? mapRows : `<p class="local-err">No hay repos locales que casen con tus remotos seleccionables. Añádelos en Ajustes y clónalos bajo el directorio raíz.</p>`}</div>`;
 
   list.innerHTML = head + `
     <div class="pf-plan ${pf.approved ? "approved" : ""}">
       <div class="pf-plan-meta">Generado con <b>${meta}</b></div>
-      ${plan.objectives.length ? `<div class="pf-sec"><h3>🎯 Objetivos</h3>${ul(plan.objectives)}</div>` : ""}
-      ${plan.requirements.length ? `<div class="pf-sec"><h3>📋 Requisitos</h3>${ul(plan.requirements)}</div>` : ""}
-      ${plan.projects.length ? `<div class="pf-sec"><h3>📦 Trabajo por proyecto</h3>${projs}</div>` : ""}
+      ${plan.objectives.length ? `<div class="pf-sec"><h3>${icon("target")} Objetivos</h3>${ul(plan.objectives)}</div>` : ""}
+      ${plan.requirements.length ? `<div class="pf-sec"><h3>${icon("clipboard-list")} Requisitos</h3>${ul(plan.requirements)}</div>` : ""}
+      ${plan.projects.length ? `<div class="pf-sec"><h3>${icon("package")} Trabajo por proyecto</h3>${projs}</div>` : ""}
       ${mappingHtml}
-      ${plan.tests.length ? `<div class="pf-sec"><h3>🧪 Pruebas a realizar</h3>${ul(plan.tests)}</div>` : ""}
-      ${pf.approved ? `<div class="pf-approved-note">✓ Plan aprobado. Pulsa <b>Lanzar agentes</b>: un worktree + un agente autónomo por proyecto asignado. El plan se guardará como nota en la ${pf.task.isEpic ? "Epic" : "Issue"} de GitLab.${pf.launchError ? `<br><span class="local-err">⚠ ${esc(pf.launchError)}</span>` : ""}</div>` : ""}
+      ${plan.tests.length ? `<div class="pf-sec"><h3>${icon("flask-conical")} Pruebas a realizar</h3>${ul(plan.tests)}</div>` : ""}
+      ${pf.approved ? `<div class="pf-approved-note">${icon("check")} Plan aprobado. Pulsa <b>Lanzar agentes</b>: un worktree + un agente autónomo por proyecto asignado. El plan se guardará como nota en la ${pf.task.isEpic ? "Epic" : "Issue"} de GitLab.${pf.launchError ? `<br><span class="local-err">${icon("triangle-alert")} ${esc(pf.launchError)}</span>` : ""}</div>` : ""}
     </div>
     <div class="lf-actions">
-      <button class="btn" id="pf-edit">← Editar indicaciones</button>
-      <button class="btn" id="pf-regen" ${pf.generating ? "disabled" : ""}>↻ Regenerar</button>
+      <button class="btn" id="pf-edit">${icon("arrow-left")} Editar indicaciones</button>
+      <button class="btn" id="pf-regen" ${pf.generating ? "disabled" : ""}>${icon("refresh-cw")} Regenerar</button>
       ${pf.approved
-        ? `<button class="btn btn-primary" id="pf-launch" ${pf.launching || !mappedCount ? "disabled" : ""} title="${mappedCount ? "" : "Asigna al menos un proyecto"}">${pf.launching ? "Lanzando…" : `🚀 Lanzar agentes${mappedCount ? ` (${mappedCount})` : ""}`}</button>`
-        : `<button class="btn btn-primary" id="pf-approve" ${mappedCount ? "" : "disabled"} title="${mappedCount ? "" : "Asigna al menos un proyecto"}">Aprobar plan ✓</button>`}
+        ? `<button class="btn btn-primary" id="pf-launch" ${pf.launching || !mappedCount ? "disabled" : ""} title="${mappedCount ? "" : "Asigna al menos un proyecto"}">${pf.launching ? "Lanzando…" : `${icon("rocket")} Lanzar agentes${mappedCount ? ` (${mappedCount})` : ""}`}</button>`
+        : `<button class="btn btn-primary" id="pf-approve" ${mappedCount ? "" : "disabled"} title="${mappedCount ? "" : "Asigna al menos un proyecto"}">${icon("check")} Aprobar plan</button>`}
     </div>`;
   list.querySelectorAll("a[data-ext]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); window.monstro.openExternal(a.getAttribute("href")); }));
   list.querySelectorAll(".pf-map-sel").forEach((sel) => sel.addEventListener("change", () => { pf.mapping[+sel.dataset.i].repoPath = sel.value; renderLocal(); }));

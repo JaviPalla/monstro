@@ -17,13 +17,13 @@ function severityOf(draft) {
 
 function severityBubble(draft) {
   const key = severityOf(draft);
-  return `<span class="sev sev-${key}" title="${t("Prioridad")}">${SEVERITIES[key].dot} ${SEVERITIES[key].label()}</span>`;
+  return `<span class="sev sev-${key}" title="${t("Prioridad")}">${icon("circle", "fill")} ${SEVERITIES[key].label()}</span>`;
 }
 
 function severityPicker(draft) {
   const current = severityOf(draft);
   return `<select class="sev-select">${Object.entries(SEVERITIES)
-    .map(([key, s]) => `<option value="${key}" ${key === current ? "selected" : ""}>${s.dot} ${s.label()}</option>`)
+    .map(([key, s]) => `<option value="${key}" ${key === current ? "selected" : ""}>${s.label()}</option>`)
     .join("")}</select>`;
 }
 
@@ -61,7 +61,7 @@ function draftCard(draft) {
   if (state.editingDraftId === draft.id) {
     return `
       <div class="draft-card ${draft.ai ? "ai" : ""} editing" data-draft="${draft.id}">
-        <div class="draft-head">✏️ ${t("EDITANDO")} <span class="muted">· ${where}</span></div>
+        <div class="draft-head">${icon("pencil")} ${t("EDITANDO")} <span class="muted">· ${where}</span></div>
         <textarea class="draft-editor" rows="5">${esc(draft.body)}</textarea>
         <div class="composer-actions">
           ${severityPicker(draft)}
@@ -76,10 +76,10 @@ function draftCard(draft) {
     : "";
   return `
     <div class="draft-card ${draft.ai ? "ai" : ""}" data-draft="${draft.id}">
-      <div class="draft-head">${severityBubble(draft)} ${draft.ai ? `🤖 ${t("BORRADOR (IA)")}` : `📝 ${t("BORRADOR")}`} <span class="muted">· ${where}${aiMeta}</span>
-        <button class="draft-edit" title="${t("Editar borrador")}">✏️</button>
-        <button class="draft-pub" title="${t("Publicar solo este borrador en GitHub")}">↗ ${t("Publicar")}</button>
-        <button class="draft-del" title="${t("Eliminar borrador")}">🗑</button>
+      <div class="draft-head">${severityBubble(draft)} ${draft.ai ? `${icon("bot")} ${t("BORRADOR (IA)")}` : `${icon("file-pen-line")} ${t("BORRADOR")}`} <span class="muted">· ${where}${aiMeta}</span>
+        <button class="draft-edit" title="${t("Editar borrador")}">${icon("pencil")}</button>
+        <button class="draft-pub" title="${t("Publicar solo este borrador en GitHub")}">${icon("send")} ${t("Publicar")}</button>
+        <button class="draft-del" title="${t("Eliminar borrador")}">${icon("trash-2")}</button>
       </div>
       <div class="draft-body">${esc(draft.body)}</div>
     </div>`;
@@ -132,7 +132,7 @@ async function openAiReviewModal(pr) {
     root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>🤖 ${t("Review con IA de #{n}", { n: pr.number })}</h3>
+        <h3>${icon("bot")} ${t("Review con IA de #{n}", { n: pr.number })}</h3>
         <p class="muted">${t("Elige con qué revisar. Los comentarios quedan en borradores: no se publica nada hasta que tú lo digas.")}</p>
         <div class="pf-ai-row">
           <select id="air-model">${status.models.map((m) => `<option value="${esc(m.id)}" ${m.id === model ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select>
@@ -170,7 +170,7 @@ function renderAiProgressModal(pr) {
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>🤖 ${t("Revisando #{n}…", { n: pr.number })}</h3>
+        <h3>${icon("bot")} ${t("Revisando #{n}…", { n: pr.number })}</h3>
         <p class="muted">${esc(state.aiRunLabel || "")} — ${t("puedes cerrar esta ventana, la review sigue.")}</p>
         <ul class="lr-timeline" id="air-steps">${steps}</ul>
         <div class="modal-actions">
@@ -346,7 +346,7 @@ function confirmPublishSingle(draft) {
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>↗ ${t("Publicar este borrador")}</h3>
+        <h3>${icon("send")} ${t("Publicar este borrador")}</h3>
         <p class="muted">${esc(where)} — ${t("se publica como comentario (sin veredicto). El resto de borradores no se tocan.")}</p>
         <div class="draft-card ${draft.ai ? "ai" : ""}" style="max-height:180px;overflow-y:auto"><div class="draft-body">${esc(publishBody(draft))}</div></div>
         <div class="modal-actions">
@@ -370,7 +370,7 @@ function confirmPublishSingle(draft) {
         comments: draft.kind === "inline" ? [{ ...draft, body: publishBody(draft) }] : [],
       });
       await removeDraft(draft.id);
-      toast(t("Borrador publicado ✓"), "ok");
+      toast(t("Borrador publicado"), "ok");
       state.conversation = await window.monstro.prConversation(detailRepo(), state.selected);
       renderDetail();
     } catch (err) {
@@ -383,9 +383,9 @@ function draftsBar() {
   if (!state.drafts.length) return "";
   return `
     <div class="drafts-bar">
-      <button class="drafts-count" id="drafts-view" title="${t("Ver todos los borradores")}">📝 <b>${state.drafts.length}</b> ${state.drafts.length > 1 ? t("borradores sin publicar") : t("borrador sin publicar")}</button>
-      <button class="icon-btn" id="drafts-prev" title="${t("Borrador anterior")}">↑</button>
-      <button class="icon-btn" id="drafts-next" title="${t("Borrador siguiente")}">↓</button>
+      <button class="drafts-count" id="drafts-view" title="${t("Ver todos los borradores")}">${icon("file-pen-line")} <b>${state.drafts.length}</b> ${state.drafts.length > 1 ? t("borradores sin publicar") : t("borrador sin publicar")}</button>
+      <button class="icon-btn" id="drafts-prev" title="${t("Borrador anterior")}">${icon("arrow-up")}</button>
+      <button class="icon-btn" id="drafts-next" title="${t("Borrador siguiente")}">${icon("arrow-down")}</button>
       <span style="flex:1"></span>
       <button class="btn" id="drafts-discard">${t("Descartar todos")}</button>
       <button class="btn btn-primary" id="drafts-publish">${t("Publicar…")}</button>
@@ -463,11 +463,11 @@ function openDraftsViewer() {
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal modal-wide">
-        <h3>📝 ${t("Se publicarían {count} comentarios en #{num}", { num: state.selected, count: drafts.length })}</h3>
+        <h3>${icon("file-pen-line")} ${t("Se publicarían {count} comentarios en #{num}", { num: state.selected, count: drafts.length })}</h3>
         <p class="muted">${t("Revísalos y edítalos a tu gusto. Nada sale de tu Mac hasta que pulses Publicar.")}</p>
         <div class="drafts-viewer">
           ${drafts.map((d) => {
-            const where = `${severityBubble(d)} ${d.ai ? "🤖" : "📝"} ${d.kind === "inline"
+            const where = `${severityBubble(d)} ${d.ai ? icon("bot") : icon("file-pen-line")} ${d.kind === "inline"
               ? `<code>${esc(d.path)}</code>:${d.line} <span class="muted">(${d.side === "LEFT" ? t("anterior") : t("nueva")})</span>`
               : `<span class="muted">${t("comentario general")}</span>`}`;
             if (state.editingDraftId === d.id) {
@@ -487,10 +487,10 @@ function openDraftsViewer() {
               <div class="viewer-where">${where}</div>
               <div class="viewer-body">${esc(d.body)}</div>
               <div class="viewer-actions">
-                <button class="btn viewer-go" data-id="${d.id}">${t("Ir ↗")}</button>
-                <button class="btn viewer-edit" data-id="${d.id}" title="${t("Editar borrador")}">✏️</button>
+                <button class="btn viewer-go" data-id="${d.id}">${t("Ir")} ${icon("arrow-right")}</button>
+                <button class="btn viewer-edit" data-id="${d.id}" title="${t("Editar borrador")}">${icon("pencil")}</button>
                 <button class="btn viewer-pub" data-id="${d.id}" title="${t("Publicar solo este borrador")}">${t("Publicar")}</button>
-                <button class="btn viewer-del" data-id="${d.id}">🗑</button>
+                <button class="btn viewer-del" data-id="${d.id}" title="${t("Eliminar borrador")}">${icon("trash-2")}</button>
               </div>
             </div>`;
           }).join("")}
@@ -580,9 +580,9 @@ function openPublishModal() {
         <h3>${state.drafts.length > 1 ? t("Publicar {n} borradores como review", { n: state.drafts.length }) : t("Publicar {n} borrador como review", { n: state.drafts.length })}</h3>
         <p class="muted">${t("{inline} en línea · {general}", { inline: inline.length, general: general.length === 1 ? t("{n} general", { n: general.length }) : t("{n} generales", { n: general.length }) })} — ${t("se publican en una sola review.")}</p>
         <div class="verdict">
-          <label><input type="radio" name="verdict" value="COMMENT" checked /> 💬 ${t("Comentar")}</label>
-          <label><input type="radio" name="verdict" value="APPROVE" /> ✅ ${t("Aprobar")}</label>
-          <label><input type="radio" name="verdict" value="REQUEST_CHANGES" /> ± ${t("Pedir cambios")}</label>
+          <label><input type="radio" name="verdict" value="COMMENT" checked /> ${icon("message-square")} ${t("Comentar")}</label>
+          <label><input type="radio" name="verdict" value="APPROVE" /> ${icon("circle-check")} ${t("Aprobar")}</label>
+          <label><input type="radio" name="verdict" value="REQUEST_CHANGES" /> ${icon("file-diff")} ${t("Pedir cambios")}</label>
         </div>
         <div class="modal-actions">
           <button class="btn" id="modal-cancel">${t("Cancelar")}</button>
@@ -616,7 +616,7 @@ async function publishDrafts(event) {
     });
     state.drafts = [];
     await saveDrafts();
-    toast(t("Review publicada ({verdict})", { verdict: event === "APPROVE" ? t("aprobada ✅") : event === "REQUEST_CHANGES" ? t("cambios pedidos") : t("comentarios") }), "ok");
+    toast(t("Review publicada ({verdict})", { verdict: event === "APPROVE" ? t("aprobada") : event === "REQUEST_CHANGES" ? t("cambios pedidos") : t("comentarios") }), "ok");
     state.conversation = await window.monstro.prConversation(detailRepo(), pr.number);
     renderDetail();
   } catch (err) {

@@ -103,7 +103,7 @@ function renderMdBlocks(text) {
     const line = raw.trimEnd();
     let m;
     if ((m = /^(#{1,4})\s+(.*)$/.exec(line))) { closeList(); const lvl = Math.min(m[1].length + 2, 6); out.push(`<h${lvl}>${inline(m[2])}</h${lvl}>`); }
-    else if ((m = /^[-*]\s+\[([ xX])\]\s+(.*)$/.exec(line))) { if (list !== "task") { closeList(); out.push('<ul class="md-task">'); list = "task"; } out.push(`<li>${m[1].toLowerCase() === "x" ? "☑" : "☐"} ${inline(m[2])}</li>`); }
+    else if ((m = /^[-*]\s+\[([ xX])\]\s+(.*)$/.exec(line))) { if (list !== "task") { closeList(); out.push('<ul class="md-task">'); list = "task"; } out.push(`<li>${m[1].toLowerCase() === "x" ? icon("square-check") : icon("square")} ${inline(m[2])}</li>`); }
     else if ((m = /^[-*]\s+(.*)$/.exec(line))) { if (list !== "ul") { closeList(); out.push("<ul>"); list = "ul"; } out.push(`<li>${inline(m[1])}</li>`); }
     else if (!line.trim()) { closeList(); }
     else { closeList(); out.push(`<p>${inline(line)}</p>`); }
@@ -209,7 +209,7 @@ function localMetaSection(f) {
       <div class="lf-labels">
         <div class="lbl-group"><span class="lbl-cat">${t("Tipo de usuario")}</span>${USER_LABELS.map(labelChip).join("")}</div>
         <div class="lbl-group"><span class="lbl-cat">${t("Prioridad")}</span>${PRIO_LABELS.map(labelChip).join("")}</div>
-        ${others.length ? `<details class="lbl-more"><summary>${t("Más etiquetas ({n})", { n: others.length })}</summary><div class="lbl-group">${others.map(labelChip).join("")}</div></details>` : ""}
+        ${others.length ? `<details class="lbl-more fold"><summary>${t("Más etiquetas ({n})", { n: others.length })}</summary><div class="lbl-group">${others.map(labelChip).join("")}</div></details>` : ""}
       </div>
     </div>`;
 }
@@ -229,8 +229,8 @@ function renderLocalForm() {
     <div class="lf">
       <div class="lf-mode">
         <span>${t("Contenido:")}</span>
-        <button class="lf-chip ${f.mode === "ia" ? "on" : ""}" id="lf-mode-ia">${t("✨ Generar con IA")}</button>
-        <button class="lf-chip ${f.mode === "manual" ? "on" : ""}" id="lf-mode-manual">${t("✍️ A mano")}</button>
+        <button class="lf-chip ${f.mode === "ia" ? "on" : ""}" id="lf-mode-ia">${icon("sparkles")} ${t("Generar con IA")}</button>
+        <button class="lf-chip ${f.mode === "manual" ? "on" : ""}" id="lf-mode-manual">${icon("pen-line")} ${t("A mano")}</button>
         ${f.mode === "ia" ? `<button class="btn" id="lf-suggest" ${f.aiLoading ? "disabled" : ""}>${f.aiLoading ? t("Generando…") : t("Sugerir con IA")}</button>` : ""}
       </div>
       ${f.error ? `<div class="error-box">${esc(f.error)}</div>` : ""}
@@ -239,7 +239,7 @@ function renderLocalForm() {
       ${localMetaSection(f)}
       <label class="lf-check"><input type="checkbox" id="lf-push" ${f.push ? "checked" : ""} /> ${t("Hacer push de las ramas a origin antes de crear las MR")}</label>
       <div class="lf-actions">
-        <button class="btn" id="lf-cancel">${t("← Volver")}</button>
+        <button class="btn" id="lf-cancel">${icon("arrow-left")} ${t("Volver")}</button>
         <button class="btn btn-primary" id="lf-create" ${f.creating ? "disabled" : ""}>${f.creating ? t("Creando…") : f.epic ? t("Crear Epic + tareas") : t("Crear Issue + MR")}</button>
       </div>
     </div>`;
@@ -317,7 +317,7 @@ function confirmCreateLocalTask() {
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>${t("↗ Crear en GitLab")}</h3>
+        <h3>${icon("send")} ${t("Crear en GitLab")}</h3>
         <p class="muted">${summary}</p>
         <div class="modal-actions">
           <button class="btn" id="modal-cancel">${t("Cancelar")}</button>
@@ -357,7 +357,7 @@ async function createLocalTask() {
       toast(t("Epic + {ok}/{total} tareas creadas", { ok, total: res.results.length }), ok === res.results.length ? "ok" : "warn");
     } else {
       await window.monstro.localCreateTask({ ...localProjPayload(f.projects[0], f.push), labels, milestoneId: f.milestoneId });
-      toast(t("Issue + MR creadas ✓"), "ok");
+      toast(t("Issue + MR creadas"), "ok");
     }
     // #1: al terminar, llevar al histórico actualizado (con el detalle de lo creado y el log de pasos).
     state.local.form = null;

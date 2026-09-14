@@ -77,7 +77,7 @@ function renderHistory() {
   list.innerHTML = `
     <div class="history-toolbar">
       <div class="branch-chips">${chips}</div>
-      <button class="icon-btn" id="history-refresh" title="${t("Recargar grafo")}">⟳</button>
+      <button class="icon-btn" id="history-refresh" title="${t("Recargar grafo")}">${icon("refresh-cw")}</button>
     </div>
     <div class="graph-wrap">
       <div class="graph-svg" style="width:${width}px">${svg}</div>
@@ -125,7 +125,7 @@ function openCommitPanel(oid) {
   detailPane.classList.remove("hidden", "wide");
   detailContent.innerHTML = `
     <div class="detail-inner">
-      <button class="detail-close" id="detail-close">✕</button>
+      <button class="detail-close" id="detail-close" title="${t("Cerrar")}">${icon("x")}</button>
       <div class="detail-title">${esc(c.messageHeadline)}</div>
       <div class="detail-sub">
         ${row.refs.map((r) => `<span class="branch">${esc(r)}</span>`).join("")}
@@ -141,10 +141,10 @@ function openCommitPanel(oid) {
 
       <div class="section-h">${t("Acciones")}</div>
       <div class="actions" style="flex-direction:column;align-items:stretch">
-        <button class="btn" id="cp-copy">📋 ${t("Copiar SHA")}</button>
-        <button class="btn" id="cp-branch">🌱 ${t("Crear rama desde aquí…")}</button>
-        <button class="btn" id="cp-reset">⏪ ${t("Mover una rama a este commit…")}</button>
-        ${pr && pr.state === "MERGED" ? `<button class="btn btn-danger" id="cp-revert">↩️ ${t("Revertir #{n} ({mode})", { n: pr.number, mode: isGitlab() ? t("commit de revert") : t("crea PR de revert") })}</button>` : ""}
+        <button class="btn" id="cp-copy">${icon("copy")} ${t("Copiar SHA")}</button>
+        <button class="btn" id="cp-branch">${icon("git-branch-plus")} ${t("Crear rama desde aquí…")}</button>
+        <button class="btn" id="cp-reset">${icon("rewind")} ${t("Mover una rama a este commit…")}</button>
+        ${pr && pr.state === "MERGED" ? `<button class="btn btn-danger" id="cp-revert">${icon("undo-2")} ${t("Revertir #{n} ({mode})", { n: pr.number, mode: isGitlab() ? t("commit de revert") : t("crea PR de revert") })}</button>` : ""}
       </div>
       <p class="muted">${t("“Mover una rama” reescribe la punta de la rama (force). Monstro te pedirá confirmación escrita; aún así, úsalo sabiendo lo que haces.")}</p>
     </div>`;
@@ -166,7 +166,7 @@ function createBranchModal(commit) {
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>🌱 ${t("Crear rama en")} <code>${commit.abbreviatedOid}</code></h3>
+        <h3>${icon("git-branch-plus")} ${t("Crear rama en")} <code>${commit.abbreviatedOid}</code></h3>
         <input type="text" id="nb-name" placeholder="feature/mi-rama" style="width:100%;margin-top:8px" class="modal-input" />
         <div class="modal-actions">
           <button class="btn" id="modal-cancel">${t("Cancelar")}</button>
@@ -198,7 +198,7 @@ function resetBranchModal(commit) {
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>⏪ ${t("Mover rama a")} <code>${commit.abbreviatedOid}</code></h3>
+        <h3>${icon("rewind")} ${t("Mover rama a")} <code>${commit.abbreviatedOid}</code></h3>
         <p class="muted">${t("Esto hace un <b>force update</b> de la referencia: la rama pasará a apuntar a este commit y lo que tenga por delante se pierde de la rama. Las ramas protegidas lo rechazarán.")}</p>
         <select id="rb-branch" class="modal-input" style="width:100%;margin-top:8px">${options}</select>
         <input type="text" id="rb-confirm" placeholder="${t("Escribe el nombre exacto de la rama para confirmar")}" style="width:100%;margin-top:8px" class="modal-input" />
@@ -234,7 +234,7 @@ function revertPRModal(pr) {
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>↩️ ${t("Revertir #{n}", { n: pr.number })}</h3>
+        <h3>${icon("undo-2")} ${t("Revertir #{n}", { n: pr.number })}</h3>
         <p>${desc}</p>
         <div class="modal-actions">
           <button class="btn" id="modal-cancel">${t("Cancelar")}</button>

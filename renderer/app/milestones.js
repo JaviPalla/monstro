@@ -127,7 +127,7 @@ function childCard(c, statusSet) {
           ${esc(c.title)} ${c.iid ? `<span class="ms-iid">#${c.iid}</span>` : ""}
         </button>
         ${mrButtons(c.mrs)}
-        <button class="ms-task-copy" data-url="${esc(c.webUrl)}" title="${t("Copiar enlace")}">⧉</button>
+        <button class="ms-task-copy" data-url="${esc(c.webUrl)}" title="${t("Copiar enlace")}">${icon("copy")}</button>
       </div>
       ${chips ? `<div class="ms-task-labels">${chips}</div>` : ""}
     </div>`;
@@ -137,10 +137,10 @@ function milestoneCard(iss, statusSet) {
   const chips = labelChips(iss.labels, statusSet);
   const key = issueKey(iss);
   const selected = state.milestones.selected.has(key);
-  const copyBtn = `<button class="ms-task-copy" data-url="${esc(iss.webUrl)}" title="${t("Copiar enlace")}">⧉</button>`;
+  const copyBtn = `<button class="ms-task-copy" data-url="${esc(iss.webUrl)}" title="${t("Copiar enlace")}">${icon("copy")}</button>`;
   // Menú de acciones rápidas (desplegable nativo): avanzar el estado de flujo o cerrar la tarea.
   const menuBtn = `<details class="ms-task-menu">
-        <summary class="ms-task-menu-btn" title="${t("Acciones")}">⋯</summary>
+        <summary class="ms-task-menu-btn" title="${t("Acciones")}">${icon("ellipsis")}</summary>
         <div class="ms-task-menu-pop">
           <button class="ms-menu-item" data-act="pending-check">${t("Marcar como pending check")}</button>
           <button class="ms-menu-item" data-act="finished">${t("Marcar como finished")}</button>
@@ -165,7 +165,7 @@ function milestoneCard(iss, statusSet) {
     <div class="ms-task ms-epic ${iss.state === "closed" ? "closed" : ""} ${selected ? "selected" : ""}" draggable="true" ${head}>
       <div class="ms-task-top">
         <input type="checkbox" class="ms-task-check" ${selected ? "checked" : ""} title="${t("Seleccionar")}" />
-        <button class="ms-epic-caret ${loaded ? "open" : ""}" title="${t("Desplegar tareas")}">›</button>
+        <button class="ms-epic-caret ${loaded ? "open" : ""}" title="${t("Desplegar tareas")}">${icon("chevron-right")}</button>
         ${title}
         <span class="ms-epic-tag">Epic</span>
         ${copyBtn}
@@ -327,14 +327,14 @@ function statusFilterHelp() {
           <span class="msfh-chip neutral"><span class="lbl">${t("etiqueta")}</span></span>
           <span class="msfh-cap">${t("Sin filtro")}</span>
         </span>
-        <span class="msfh-arr">→</span>
+        <span class="msfh-arr">${icon("arrow-right")}</span>
         <span class="msfh-state st2">
-          <span class="msfh-chip inc"><span class="chk">✓</span> <span class="lbl">${t("etiqueta")}</span></span>
+          <span class="msfh-chip inc"><span class="chk">${icon("check")}</span> <span class="lbl">${t("etiqueta")}</span></span>
           <span class="msfh-cap">${t("Solo estas")}</span>
         </span>
-        <span class="msfh-arr">→</span>
+        <span class="msfh-arr">${icon("arrow-right")}</span>
         <span class="msfh-state st3">
-          <span class="msfh-chip exc"><span class="ex">✕</span> <span class="lbl">${t("etiqueta")}</span></span>
+          <span class="msfh-chip exc"><span class="ex">${icon("x")}</span> <span class="lbl">${t("etiqueta")}</span></span>
           <span class="msfh-cap">${t("Ocultas")}</span>
         </span>
       </div>
@@ -354,13 +354,13 @@ function readableText(hex) {
 // Indicadores Terminadas/Comprobadas como pastillas. En la cabecera del milestone se muestra
 // también el número (showCount); en la de cada persona solo el % (n/m en el tooltip).
 function metricChips(mm, showCount = false) {
-  const chip = (cls, icon, count, total, pct, name) => {
+  const chip = (cls, ico, count, total, pct, name) => {
     const num = showCount ? `<span class="ms-chip-n">${count}/${total}</span> ` : "";
-    return `<span class="ms-chip ${cls}" title="${name} ${count}/${total}">${icon} ${num}${pct}%</span>`;
+    return `<span class="ms-chip ${cls}" title="${name} ${count}/${total}">${ico} ${num}${pct}%</span>`;
   };
   return (
-    chip("term", "✓", mm.doneCount, mm.doneTotal, mm.donePct, t("Terminadas")) +
-    chip("check", "◉", mm.checkedCount, mm.checkedTotal, mm.checkedPct, t("Comprobadas"))
+    chip("term", icon("check"), mm.doneCount, mm.doneTotal, mm.donePct, t("Terminadas")) +
+    chip("check", icon("badge-check"), mm.checkedCount, mm.checkedTotal, mm.checkedPct, t("Comprobadas"))
   );
 }
 
@@ -416,9 +416,9 @@ function renderMilestones() {
         mode === "include"
           ? `background:${color};color:${readableText(lab?.color)};border-color:${color}`
           : `background:transparent;color:var(--text);border-color:${color}`;
-      const icon = mode === "include" ? `<span class="chk">✓</span> ` : mode === "exclude" ? `<span class="ex">✕</span> ` : "";
+      const mark = mode === "include" ? `<span class="chk">${icon("check")}</span> ` : mode === "exclude" ? `<span class="ex">${icon("x")}</span> ` : "";
       const hint = mode === "include" ? t("Solo estas · clic: ocultar") : mode === "exclude" ? t("Ocultas · clic: quitar filtro") : t("Clic: solo estas");
-      return `<button class="ms-status-chip ${cls}" data-label="${esc(label)}" style="${style}" title="${hint}">${icon}<span class="lbl">${esc(label)}</span></button>`;
+      return `<button class="ms-status-chip ${cls}" data-label="${esc(label)}" style="${style}" title="${hint}">${mark}<span class="lbl">${esc(label)}</span></button>`;
     })
     .join("");
 
@@ -432,7 +432,7 @@ function renderMilestones() {
           return `
         <section class="ms-group ms-drop" data-username="${esc(g.username)}" data-userid="${g.id || ""}">
           <header class="ms-group-head">
-            ${g.avatarUrl ? `<img class="ms-avatar" src="${esc(g.avatarUrl)}" alt="" />` : `<span class="ms-avatar ph">∅</span>`}
+            ${g.avatarUrl ? `<img class="ms-avatar" src="${esc(g.avatarUrl)}" alt="" />` : `<span class="ms-avatar ph">${icon("user")}</span>`}
             <span class="ms-group-name">${esc(g.name)}</span>
             <span class="ms-group-chips">${metricChips(gm)}</span>
             <span class="ms-group-count">${g.issues.length}</span>
@@ -474,7 +474,7 @@ function renderMilestones() {
         <label class="ms-closed-toggle"><input type="checkbox" id="ms-show-unassigned" ${m.filters.showUnassigned ? "checked" : ""} /> ${t("Mostrar sin asignar")}</label>
         <label class="ms-closed-toggle"><input type="checkbox" id="ms-sort-prio" ${m.filters.sortPriority ? "checked" : ""} /> ${t("Ordenar por prioridad")}</label>
         <span class="ms-counter">${visible.length === 1 ? t("{n} tarea", { n: visible.length }) : t("{n} tareas", { n: visible.length })}</span>
-        <button class="icon-btn" id="ms-refresh" title="${t("Recargar")}">⟳</button>
+        <button class="icon-btn" id="ms-refresh" title="${t("Recargar")}">${icon("refresh-cw")}</button>
       </div>
     </div>
     <div class="ms-bulk-bar ${selCount ? "" : "hidden"}">

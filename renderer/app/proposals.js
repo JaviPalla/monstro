@@ -190,7 +190,7 @@ function renderProposals() {
   list.innerHTML = `${error}
     <div class="ms-filters">
       <span class="muted">${t("Bandeja")}: ${esc(p.status.folder)} · ${t("{n} sin procesar", { n: p.emails.length })}</span>
-      <button id="prop-refresh" class="icon-btn" title="${t("Refrescar")}">⟳</button>
+      <button id="prop-refresh" class="icon-btn" title="${t("Refrescar")}">${icon("refresh-cw")}</button>
       <button id="prop-logout" class="btn">${t("Desconectar")}</button>
     </div>
     ${p.busy ? `<div class="loading">${t("Analizando el correo con IA…")}</div>` : ""}
@@ -239,7 +239,7 @@ function renderProposalDraft(p) {
     <div class="lf-field">${t("Tareas hijas")}</div>
     ${tasks || `<div class="empty">${t("La IA no ha propuesto ninguna tarea.")}</div>`}
     <div class="lf-actions">
-      <button class="btn" id="prop-cancel">${t("← Volver")}</button>
+      <button class="btn" id="prop-cancel">${icon("arrow-left")} ${t("Volver")}</button>
       <button class="btn btn-primary" id="prop-create" ${p.busy ? "disabled" : ""}>${p.busy ? t("Creando…") : t("Crear en GitLab")}</button>
     </div>
   </div>`;

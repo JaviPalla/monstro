@@ -142,14 +142,14 @@ function renderReleases() {
     const ad = r.results.appDate;
     const adHtml = ad
       ? ad.ok
-        ? `<div class="rel-res-row ok">📝 Ouicare AppDate ${ad.skipped ? `${t("ya estaba en")} <b>${esc(ad.date)}</b>` : `→ <b>${esc(ad.date)}</b>`}</div>`
-        : `<div class="rel-res-row err">📝 Ouicare AppDate: ${esc(ad.error || t("error"))}</div>`
+        ? `<div class="rel-res-row ok">${icon("file-pen-line")} Ouicare AppDate ${ad.skipped ? `${t("ya estaba en")} <b>${esc(ad.date)}</b>` : `→ <b>${esc(ad.date)}</b>`}</div>`
+        : `<div class="rel-res-row err">${icon("file-pen-line")} Ouicare AppDate: ${esc(ad.error || t("error"))}</div>`
       : "";
     const rowsHtml = r.results.results
       .map((res) =>
         res.ok
-          ? `<div class="rel-res-row ok">✓ ${esc(res.name)} <code>${esc(res.branch)}</code> ${res.webUrl ? `<a data-url="${esc(res.webUrl)}" href="#">${t("ver rama")}</a>` : ""}</div>`
-          : `<div class="rel-res-row err" title="${esc(res.error || "")}">✕ ${esc(res.name)} <code>${esc(res.branch)}</code>: ${esc(res.error || t("error"))}</div>`,
+          ? `<div class="rel-res-row ok">${icon("check")} ${esc(res.name)} <code>${esc(res.branch)}</code> ${res.webUrl ? `<a data-url="${esc(res.webUrl)}" href="#">${t("ver rama")}</a>` : ""}</div>`
+          : `<div class="rel-res-row err" title="${esc(res.error || "")}">${icon("x")} ${esc(res.name)} <code>${esc(res.branch)}</code>: ${esc(res.error || t("error"))}</div>`,
       )
       .join("");
     const branchesLabel = (r.results.branches || []).map((b) => `<code>${esc(b)}</code>`).join(" · ");
@@ -273,7 +273,7 @@ function confirmAndGenerateReleases() {
   const appDateOn = Boolean(ouicarePath && r.selected.has(ouicarePath) && r.appDateEnabled);
   const appDateStr = isoToAppDate(r.appDate);
   const noteHtml = appDateOn
-    ? `<div class="rel-confirm-notes"><div class="rel-confirm-note">📝 <b>Ouicare</b>: AppDate → <b>${esc(appDateStr)}</b> ${t("en")} <code>${esc(source)}</code> (${t("commit a")} <code>${esc(r.defaults.ouicare.webConfigPath)}</code>) ${t("antes de ramificar.")}</div></div>`
+    ? `<div class="rel-confirm-notes"><div class="rel-confirm-note">${icon("file-pen-line")} <b>Ouicare</b>: AppDate → <b>${esc(appDateStr)}</b> ${t("en")} <code>${esc(source)}</code> (${t("commit a")} <code>${esc(r.defaults.ouicare.webConfigPath)}</code>) ${t("antes de ramificar.")}</div></div>`
     : "";
   const root = $("#modal-root");
   root.innerHTML = `

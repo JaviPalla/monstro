@@ -31,7 +31,7 @@ let updating = false;
 async function startUpdate(info) {
   if (updating) return; // el toast vive 9s: clicks de más no lanzan otra descarga
   updating = true;
-  const label = (extra = "") => t("⬇️ Descargando v{v}…{extra}", { v: info.latest, extra });
+  const label = (extra = "") => t("Descargando v{v}…{extra}", { v: info.latest, extra });
   const el = toast(label(), "", null, true);
   const off = window.monstro.onUpdateProgress((p) => {
     el.textContent = label(` ${p}%`);
@@ -40,8 +40,8 @@ async function startUpdate(info) {
     const r = await window.monstro.installUpdate();
     if (!r?.ok) throw new Error(r.error || t("error desconocido"));
     el.remove();
-    if (r.mode === "restart") toast(t("✅ Actualizada — reiniciando…"), "ok");
-    else if (r.mode === "dmg") toast(t("✅ v{v} descargada — cerrando Monstro, arrástrala a Aplicaciones", { v: info.latest }), "ok");
+    if (r.mode === "restart") toast(t("Actualizada — reiniciando…"), "ok");
+    else if (r.mode === "dmg") toast(t("v{v} descargada — cerrando Monstro, arrástrala a Aplicaciones", { v: info.latest }), "ok");
   } catch (err) {
     el.remove();
     // Con enlace a la release: si la descarga falla, al menos que pueda bajarla a mano.
@@ -158,7 +158,7 @@ async function boot() {
   // Aviso de versión nueva al arrancar. Click en el toast → actualiza (ver startUpdate).
   if (!IS_SELFTEST && state.config.checkUpdates) {
     window.monstro.checkUpdates().then((r) => {
-      if (r?.newer) toast(t("✨ Versión nueva disponible: v{v} — pulsa para actualizar", { v: r.latest }), "ok", () => startUpdate(r));
+      if (r?.newer) toast(t("Versión nueva disponible: v{v} — pulsa para actualizar", { v: r.latest }), "ok", () => startUpdate(r));
     }).catch(() => {});
   }
   if (IS_SELFTEST && SELFTEST_ROUTE === "history") enterHistory();
@@ -524,7 +524,7 @@ function openCheatsheet() {
   root.innerHTML = `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>⌨️ ${esc(t("Atajos de teclado"))}</h3>
+        <h3>${icon("keyboard")} ${esc(t("Atajos de teclado"))}</h3>
         <table class="cheatsheet">${rows.map(([key, what]) => `<tr><td><kbd>${key}</kbd></td><td>${esc(what)}</td></tr>`).join("")}</table>
         <div class="modal-actions"><button class="btn" id="modal-cancel">${esc(t("Cerrar"))}</button></div>
       </div>

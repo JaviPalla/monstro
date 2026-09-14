@@ -5,16 +5,16 @@ const RUN_STATUS = {
   done: { label: "Hecho", cls: "st-done" }, failed: { label: "Falló", cls: "st-fail" }, stopped: { label: "Parado", cls: "st-stop" }, idle: { label: "—", cls: "st-stop" },
 };
 const runStatusBadge = (s) => { const m = RUN_STATUS[s] || RUN_STATUS.idle; return `<span class="lr-status ${m.cls}">${m.label}</span>`; };
-const TL_ICON = { say: "💬", tool: "▸", blocked: "⛔", result: "✓" };
-const tlEntryHtml = (e) => `<li class="tl-${esc(e.kind)}"><span class="tl-ic">${e.kind === "result" ? (e.ok ? "✓" : "✗") : TL_ICON[e.kind] || "·"}</span><span class="tl-tx">${esc(e.text || "")}</span></li>`;
+const TL_ICON = { say: icon("message-square"), tool: icon("wrench"), blocked: icon("ban"), result: icon("check") };
+const tlEntryHtml = (e) => `<li class="tl-${esc(e.kind)}"><span class="tl-ic">${e.kind === "result" ? (e.ok ? icon("check") : icon("x")) : TL_ICON[e.kind] || icon("circle-dot")}</span><span class="tl-tx">${esc(e.text || "")}</span></li>`;
 
 function runRowHtml(run) {
   const pend = (run.projects || []).reduce((n, p) => n + (p.pending || 0), 0);
   return `<div class="lr-run-row" data-run="${esc(run.id)}">
     ${runStatusBadge(run.status)}
     <span class="lr-run-title">${esc(run.title)}</span>
-    <span class="muted lr-run-meta">${(run.projects || []).length} proyecto${(run.projects || []).length === 1 ? "" : "s"}${pend ? ` · ⛔ ${pend} pendiente${pend === 1 ? "" : "s"}` : ""}</span>
-    <span class="ls-go">Ver →</span>
+    <span class="muted lr-run-meta">${(run.projects || []).length} proyecto${(run.projects || []).length === 1 ? "" : "s"}${pend ? ` · ${icon("ban")} ${pend} pendiente${pend === 1 ? "" : "s"}` : ""}</span>
+    <span class="ls-go">Ver ${icon("arrow-right")}</span>
   </div>`;
 }
 
@@ -37,10 +37,10 @@ function renderLocalRun() {
       <div class="lr-proj" data-dir="${esc(p.dir)}">
         <div class="lr-proj-head">
           ${projectIconHtml(p.gitlabPath || p.name)}<span class="lr-proj-name">${esc(projectMeta(p.gitlabPath || p.name).name || p.name)}</span>
-          ${runStatusBadge(p.status)} ${modelChip} ${p.pending ? `<span class="lr-pend" title="Comandos peligrosos bloqueados">⛔ ${p.pending}</span>` : ""}
+          ${runStatusBadge(p.status)} ${modelChip} ${p.pending ? `<span class="lr-pend" title="Comandos peligrosos bloqueados">${icon("ban")} ${p.pending}</span>` : ""}
         </div>
-        ${p.branch ? `<div class="lr-proj-sub">⎇ ${esc(p.branch)}${p.worktree ? ` · <span class="muted" title="${esc(p.worktree)}">.worktrees/${esc(p.worktree.split("/").pop())}</span>` : ""}</div>` : ""}
-        ${p.error ? `<div class="local-err">⚠ ${esc(p.error)}</div>` : ""}
+        ${p.branch ? `<div class="lr-proj-sub">${icon("git-branch")} ${esc(p.branch)}${p.worktree ? ` · <span class="muted" title="${esc(p.worktree)}">.worktrees/${esc(p.worktree.split("/").pop())}</span>` : ""}</div>` : ""}
+        ${p.error ? `<div class="local-err">${icon("triangle-alert")} ${esc(p.error)}</div>` : ""}
         <ul class="lr-timeline">${timeline}</ul>
         ${p.mr ? `<div class="lr-mr"><a href="${esc(p.mr.url)}" data-ext class="lh-pill lh-pill-mr">MR !${esc(String(p.mr.number))}</a>${mrMerged ? `<span class="lh-badge merged">merged</span>` : ""}</div>` : ""}
         <div class="lr-proj-actions">
@@ -48,23 +48,23 @@ function renderLocalRun() {
           ${p.worktree && !p.worktreeRemoved ? `<button class="btn lr-diff" data-dir="${esc(p.dir)}" data-wt="${esc(p.worktree)}" data-base="${esc(p.sourceBranch || "development")}" data-branch="${esc(p.branch || "")}">Ver cambios</button>` : ""}
           ${running
             ? `<button class="btn lr-stop" data-dir="${esc(p.dir)}">Parar</button>`
-            : `${(p.status === "failed" || p.status === "stopped") && p.worktree ? `<button class="btn lr-retry" data-dir="${esc(p.dir)}" title="Vuelve a lanzar el agente en este worktree">↻ Reintentar</button>` : ""}<button class="btn lr-resume" data-dir="${esc(p.dir)}">Comentar y reanudar</button>`}
+            : `${(p.status === "failed" || p.status === "stopped") && p.worktree ? `<button class="btn lr-retry" data-dir="${esc(p.dir)}" title="Vuelve a lanzar el agente en este worktree">${icon("refresh-cw")} Reintentar</button>` : ""}<button class="btn lr-resume" data-dir="${esc(p.dir)}">Comentar y reanudar</button>`}
           ${!running && p.worktree && !p.finalized && p.gitlabPath ? `<button class="btn btn-primary lr-finalize" data-dir="${esc(p.dir)}">Finalizar (commit · push · MR)</button>` : ""}
-          ${p.finalized && mrMerged && !p.worktreeRemoved ? `<button class="btn lr-clean" data-dir="${esc(p.dir)}" title="La MR está fusionada: limpia el worktree">🧹 Limpiar worktree</button>` : ""}
-          ${p.worktreeRemoved ? `<span class="muted lr-cleaned">✓ worktree limpiado</span>` : ""}
+          ${p.finalized && mrMerged && !p.worktreeRemoved ? `<button class="btn lr-clean" data-dir="${esc(p.dir)}" title="La MR está fusionada: limpia el worktree">${icon("brush-cleaning")} Limpiar worktree</button>` : ""}
+          ${p.worktreeRemoved ? `<span class="muted lr-cleaned">${icon("check")} worktree limpiado</span>` : ""}
         </div>
       </div>`;
   };
   list.innerHTML = `
     <div class="local-head">
       <h2>${esc(run.title)} ${runStatusBadge(run.status)}</h2>
-      <p class="local-desc">Un agente autónomo trabaja en cada proyecto, en su worktree. Sigue su línea de tiempo en directo; los comandos peligrosos se bloquean (⛔) y requieren tu permiso.</p>
+      <p class="local-desc">Un agente autónomo trabaja en cada proyecto, en su worktree. Sigue su línea de tiempo en directo; los comandos peligrosos se bloquean (${icon("ban")}) y requieren tu permiso.</p>
     </div>
     <div class="lr-grid">${(run.projects || []).map(projCard).join("")}</div>
     <div class="lf-actions" style="margin:0 20px 28px">
-      <button class="btn" id="lr-back">← Volver</button>
+      <button class="btn" id="lr-back">${icon("arrow-left")} Volver</button>
       ${run.url ? `<a class="btn" href="${esc(run.url)}" data-ext>Ver la tarea en GitLab</a>` : ""}
-      ${(run.projects || []).some((p) => (p.status === "failed" || p.status === "stopped") && p.worktree) ? `<button class="btn btn-primary" id="lr-retry-all">↻ Reintentar los que fallaron</button>` : ""}
+      ${(run.projects || []).some((p) => (p.status === "failed" || p.status === "stopped") && p.worktree) ? `<button class="btn btn-primary" id="lr-retry-all">${icon("refresh-cw")} Reintentar los que fallaron</button>` : ""}
     </div>`;
   list.querySelectorAll("a[data-ext]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); window.monstro.openExternal(a.getAttribute("href")); }));
   $("#lr-back")?.addEventListener("click", () => { l.runView = null; loadLocalStart(); });
@@ -85,7 +85,7 @@ function renderLocalRun() {
   list.querySelectorAll(".lr-finalize").forEach((b) => b.addEventListener("click", () => finalizeProject(b.dataset.dir, b)));
   list.querySelectorAll(".lr-clean").forEach((b) => b.addEventListener("click", async () => {
     b.disabled = true;
-    try { await window.monstro.agentsCleanupWorktree(run.id, b.dataset.dir); const p = run.projects.find((x) => x.dir === b.dataset.dir); if (p) p.worktreeRemoved = true; renderLocal(); toast("Worktree limpiado ✓", "ok"); }
+    try { await window.monstro.agentsCleanupWorktree(run.id, b.dataset.dir); const p = run.projects.find((x) => x.dir === b.dataset.dir); if (p) p.worktreeRemoved = true; renderLocal(); toast("Worktree limpiado", "ok"); }
     catch (err) { b.disabled = false; toast(String(err.message || err), "err"); }
   }));
   // Autoscroll de cada timeline al final.

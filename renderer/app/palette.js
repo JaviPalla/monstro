@@ -102,7 +102,7 @@ function paletteEntriesRepos() {
   const group = t("Repositorio");
   const repos = state.config?.repos || [];
   const entries = repos.length > 1
-    ? [{ group, label: t("Repo: ⭐ Todos los repos"), hint: t("vista agregada"), run: () => switchRepo(ALL_REPOS) }]
+    ? [{ group, label: t("Repo: Todos los repos"), hint: t("vista agregada"), run: () => switchRepo(ALL_REPOS) }]
     : [];
   return entries.concat(
     repos.map((repo) => ({ group, label: t("Repo: {repo}", { repo }), hint: t("cambiar repositorio"), run: () => switchRepo(repo) })),
@@ -129,7 +129,7 @@ function paletteEntriesApp() {
   const add = (label, hint, run) => entries.push({ group, label, hint, run });
   add(t("Refrescar"), "R", refresh);
   add(t("Filtrar la lista"), t("foco en el buscador"), () => $("#search").focus());
-  add(t("Ajustes"), "⚙", openSettings);
+  add(t("Ajustes"), t("configuración de la app"), openSettings);
   add(t("Atajos de teclado"), "?", openCheatsheet);
   add(t("Buscar actualizaciones"), t("comprueba si hay versión nueva"), paletteCheckUpdates);
 

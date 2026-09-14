@@ -11,6 +11,10 @@ const SESSIONS_IDLE_TICKS = 3;
 const SESSIONS_MAX_LINKS = 6;
 const SESSIONS_MAX_WAITING = 4;
 const LINK_LABEL = { mr: "!{n}", pr: "PR #{n}", issue: "#{n}", epic: "Epic #{n}" };
+// Icono de cada badge: el de siempre en GitHub/GitLab según su estado (sin estado conocido, el de abierta).
+const CHANGE_ICON = { OPEN: "git-pull-request", MERGED: "git-merge", CLOSED: "git-pull-request-closed" };
+const LINK_ICON = { mr: CHANGE_ICON, pr: CHANGE_ICON, issue: { OPEN: "circle-dot", CLOSED: "circle-check" }, epic: { OPEN: "layers" } };
+const linkIcon = (l) => icon(LINK_ICON[l.kind][l.state] || LINK_ICON[l.kind].OPEN);
 const ORIGIN_LABEL = { "claude-vscode": "VS Code", cli: "CLI" };
 const HOST_LABEL = { ghostty: "Ghostty", rider: "Rider", vscode: "VS Code · terminal", "vscode-ext": "VS Code", terminal: "Terminal", iterm: "iTerm" };
 // Host → app a la que lleva "Abrir" (clave de sessions:appIcons); extensión y terminal de VS Code son la misma.
@@ -153,8 +157,8 @@ function linkBadge(link) {
   const tip = link.manual ? `${link.project} · ${t("fijado a mano")}` : link.project;
   const done = link.state && link.state !== "OPEN" ? " done" : "";
   return `<span class="ss-badge ss-${link.kind}${link.manual ? " manual" : ""}${done}" title="${esc(tip)}">`
-    + `<button class="ss-link" data-ss="link" data-key="${esc(link.key)}">${esc(LINK_LABEL[link.kind].replace("{n}", link.iid))}</button>`
-    + `<button class="ss-x" data-ss="hide" data-key="${esc(link.key)}" title="${esc(t("Quitar"))}">×</button></span>`;
+    + `<button class="ss-link" data-ss="link" data-key="${esc(link.key)}">${linkIcon(link)}${esc(LINK_LABEL[link.kind].replace("{n}", link.iid))}</button>`
+    + `<button class="ss-x" data-ss="hide" data-key="${esc(link.key)}" title="${esc(t("Quitar"))}">${icon("x")}</button></span>`;
 }
 
 function linkBadges(s) {
@@ -224,7 +228,7 @@ function sessionCard(s) {
       ${linkBadges(s)}
       <div class="ss-actions">
         ${openButton(s)}
-        <button class="mini-btn" data-ss="add" title="${esc(t("Asociar MR, issue o epic"))}">+</button>
+        <button class="mini-btn" data-ss="add" title="${esc(t("Asociar MR, issue o epic"))}">${icon("plus")}</button>
       </div>
       ${tagForm}
     </div>`;
@@ -235,7 +239,7 @@ function sessionCard(s) {
 function closeButton(s) {
   if (s.state === "working") return "";
   const tip = s.live ? t("Cerrar la sesión y quitarla del panel") : t("Quitar del panel");
-  return `<button class="ss-x" data-ss="close-session" title="${esc(tip)}" aria-label="${esc(tip)}">✕</button>`;
+  return `<button class="ss-x" data-ss="close-session" title="${esc(tip)}" aria-label="${esc(tip)}">${icon("x")}</button>`;
 }
 
 // Terminada = nadie trabaja ya en sus worktrees de agente: es el momento de quitarlos (sus ramas se quedan).
@@ -272,7 +276,7 @@ function finishedRow(s) {
 }
 
 function sectionHead(kind, label, count, toggle = "", open = true) {
-  const chevron = toggle ? `<span class="ss-chevron">${open ? "▾" : "▸"}</span>` : "";
+  const chevron = toggle ? `<span class="ss-chevron">${icon(open ? "chevron-down" : "chevron-right")}</span>` : "";
   const tag = toggle ? "button" : "div";
   return `<${tag} class="ss-sec ss-sec-${kind}" ${toggle ? `data-ss="${toggle}"` : ""}>${chevron}<span class="ss-dot"></span>${esc(label)} · ${count}</${tag}>`;
 }
@@ -334,7 +338,7 @@ function renderSessions(force = false) {
     <div class="ss-head">
       <strong>${t("Sesiones de Claude")}</strong>
       <span class="ss-sub">${t("{n} vivas", { n: all.filter((s) => s.live).length })}</span>
-      <button class="icon-btn ss-close" data-ss="close" title="${esc(t("Cerrar el panel"))}">✕</button>
+      <button class="icon-btn ss-close" data-ss="close" title="${esc(t("Cerrar el panel"))}">${icon("x")}</button>
     </div>
     ${launcherHtml()}
     ${filter}

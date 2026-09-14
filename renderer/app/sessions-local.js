@@ -9,6 +9,7 @@
 // Todo va por IPC, así que si el backend no está el panel enseña su error y la ficha sigue funcionando igual.
 const LR_POLL_MS = 3000;
 const LR_KIND_LABEL = { api: "API", front: "Front" };
+const LR_KIND_ICON = { api: "server", front: "app-window" };
 // A qué apunta un proyecto levantado (pointsTo); las claves son las del contrato, el texto se traduce al pintar.
 const LR_POINTS_LABEL = { api: "API", notifications: "Notificaciones" };
 // Estado de un proyecto → [clase del punto, texto]. El texto se traduce al pintar (como LINK_STATE).
@@ -146,7 +147,7 @@ function lrPointsHtml(points) {
 const lrShortUrl = (url) => String(url || "").replace(/^https?:\/\//, "");
 
 function lrKindHtml(item) {
-  return item?.kind ? `<span class="svl-kind svl-k-${esc(item.kind)}">${esc(LR_KIND_LABEL[item.kind] || item.kind)}</span>` : "";
+  return item?.kind ? `<span class="svl-kind svl-k-${esc(item.kind)}">${icon(LR_KIND_ICON[item.kind])}${esc(LR_KIND_LABEL[item.kind] || item.kind)}</span>` : "";
 }
 
 // URL local: la de la API marcada en este plan, o la que ya está levantada (si la desmarcas, esa). Sin
@@ -165,7 +166,7 @@ function lrTargetsHtml(item, entry) {
     const already = target.running || (url && url === target.fallback);
     const local = url ? `${url}${already ? ` · ${t("ya levantada")}` : ""}` : t("no levantada");
     const option = (value, label, text, disabled) => `<option value="${value}"${choice === value ? " selected" : ""}${disabled ? " disabled" : ""}>${esc(label)} · ${esc(text)}</option>`;
-    return `<span class="svl-target">${esc(t(LR_POINTS_LABEL[target.key] || target.key))} →`
+    return `<span class="svl-target">${esc(t(LR_POINTS_LABEL[target.key] || target.key))} ${icon("arrow-right")}`
       + `<select data-project="${esc(item.project)}" data-key="${esc(target.key)}">${option("local", t("Local"), local, !url)}${target.dev ? option("dev", t("Dev"), target.dev, false) : ""}</select></span>`;
   });
   return `<span class="svl-targets">${rows.join("")}</span>`;
@@ -259,7 +260,7 @@ function localRunBlock(s) {
   const open = Boolean(entry?.open);
   const head = `<div class="svl-head">
       <button class="mini-btn svl-toggle${open ? " active" : ""}" data-ss="local-run" title="${esc(t("Levanta en tu Mac los proyectos que tocan sus MRs"))}">${esc(t("Probar en local"))}</button>
-      ${open ? `<button class="svl-x" data-ss="local-close" title="${esc(t("Cerrar"))}">✕</button>` : ""}
+      ${open ? `<button class="svl-x" data-ss="local-close" title="${esc(t("Cerrar"))}">${icon("x")}</button>` : ""}
     </div>`;
   return `<section class="svl">${head}${open ? `<div class="svl-body">${lrPanel(entry)}</div>` : ""}</section>`;
 }

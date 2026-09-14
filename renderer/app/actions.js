@@ -22,7 +22,7 @@ async function toggleDraftState(pr) {
   if (btn) btn.disabled = true;
   try {
     const result = await window.monstro.setPrDraft(pr.id, !pr.isDraft);
-    toast(result.isDraft ? t("#{n} convertida a borrador", { n: pr.number }) : t("#{n} lista para review 🚀", { n: pr.number }), "ok");
+    toast(result.isDraft ? t("#{n} convertida a borrador", { n: pr.number }) : t("#{n} lista para review", { n: pr.number }), "ok");
     await refresh();
     openDetail(pr.number, state.detailTab);
   } catch (err) {
@@ -180,8 +180,8 @@ async function offerCherryPick(pr) {
         const ok = c.ok;
         const id = `cp-b-${i}`;
         const status = ok
-          ? `<span class="checks-success">✓ ${t("aplica limpio")}</span>`
-          : `<span class="checks-failure">✗ ${esc(c.error || t("conflicto"))}</span>`;
+          ? `<span class="checks-success">${icon("check")} ${t("aplica limpio")}</span>`
+          : `<span class="checks-failure">${icon("x")} ${esc(c.error || t("conflicto"))}</span>`;
         return `<label class="cp-row"><input type="checkbox" id="${id}" data-branch="${esc(c.branch)}" ${ok ? "checked" : ""} /> <b>${esc(c.branch)}</b> — ${status}</label>`;
       })
       .join("");

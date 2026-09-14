@@ -64,15 +64,17 @@
 .msfh-state { display: flex; flex-direction: column; align-items: center; gap: 6px; animation: msfhPulse 3s ease-in-out infinite; }
 .msfh-state.st2 { animation-delay: 1s; }
 .msfh-state.st3 { animation-delay: 2s; }
-.msfh-arr { color: var(--text-muted); font-size: 13px; }
+.msfh-arr { display: inline-flex; color: var(--text-muted); font-size: 13px; }
 .msfh-cap { font-size: 10px; color: var(--text-muted); }
 .msfh-chip { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 2px 9px; border: 1px solid var(--accent); white-space: nowrap; }
 .msfh-chip.neutral { color: var(--text); background: transparent; }
 .msfh-chip.inc { color: #fff; background: var(--accent); }
 .msfh-chip.exc { color: var(--text); background: transparent; }
 .msfh-chip.exc .lbl { text-decoration: line-through; }
-.msfh-chip .chk { color: var(--green); font-weight: 800; }
-.msfh-chip .ex { color: var(--red); font-weight: 800; }
+.msfh-chip .chk { color: var(--green); }
+.msfh-chip .ex { color: var(--red); }
+/* El ✓/✕ de los chips iba en negrita 800: el trazo grueso lo mantiene legible a 11px. */
+.msfh-chip .lucide, .ms-status-chip .lucide { stroke-width: 3; }
 @keyframes msfhPulse {
   0%, 100% { transform: scale(1); }
   12% { transform: scale(1.14); }
@@ -106,7 +108,7 @@
 .ms-sum-rel.high { color: #fff; background: var(--accent); }
 .ms-sum-rel.medium { color: var(--text); border: 1px solid var(--border); }
 .ms-sum-rel.low { color: var(--text-muted); border: 1px solid var(--border); }
-.ms-sum-grip { cursor: grab; color: var(--text-muted); flex-shrink: 0; user-select: none; font-size: 14px; line-height: 1; }
+.ms-sum-grip { display: inline-flex; cursor: grab; color: var(--text-muted); flex-shrink: 0; user-select: none; font-size: 14px; line-height: 1; }
 .ms-sum-grip:active { cursor: grabbing; }
 .ms-sum-row.dragging { opacity: 0.4; }
 .ms-sum-row.drag-over { border-color: var(--accent); box-shadow: inset 0 2px 0 0 var(--accent); }
@@ -151,8 +153,8 @@
   padding: 3px 10px; cursor: pointer; font-weight: 600;
 }
 .ms-status-chip.off .lbl { text-decoration: line-through; }
-.ms-status-chip .chk { color: var(--green); font-weight: 800; }
-.ms-status-chip .ex { color: var(--red); font-weight: 800; }
+.ms-status-chip .chk { color: var(--green); }
+.ms-status-chip .ex { color: var(--red); }
 .ms-chip-n { font-weight: 400; opacity: 0.85; }
 .ms-board {
   /* `1fr` (no un máximo fijo) para que las columnas RELLENEN todo el ancho sin dejar hueco muerto:
@@ -189,6 +191,7 @@
 .ms-group-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
 .ms-group-chips { margin-left: auto; flex-shrink: 0; display: flex; gap: 5px; }
 .ms-chip {
+  display: inline-flex; align-items: center; gap: 3px;
   font-size: 11px; font-weight: 700; line-height: 1.6; border-radius: 999px;
   padding: 1px 8px; white-space: nowrap;
 }
