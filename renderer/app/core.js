@@ -114,19 +114,20 @@ const repoPlaceholder = () => (isGitlab() ? "group/subgroup/project" : "owner/re
 const BRANCH_RE = /^[\w./-]{1,200}$/;
 
 /* ============ apartados del menú (configurables: onboarding + Ajustes) ============ */
-// Única fuente de verdad de las secciones del sidebar: clave → cabecera + sus buckets + si es solo
-// GitLab. El onboarding pregunta cuáles incluir; config.sections (array) las habilita. null = todas.
-// prs no tiene cabecera: su navId ya es el propio bucket "Merge requests", así que no lleva buckets aparte.
+// Única fuente de verdad de las secciones del sidebar, en orden de menú: clave → navId (el <div> que
+// envuelve sus buckets en index.html) + si es solo GitLab. El onboarding pregunta cuáles incluir;
+// config.sections (array) las habilita. null = todas. prs no lleva envoltorio: su navId es el propio
+// bucket "Merge requests". Los grupos visuales (.nav-group) no son secciones: no se configuran.
 const MENU_SECTIONS = {
-  prs:        { label: "Merge requests",     icon: "git-pull-request", navId: "nav-prs-section",        buckets: [], gitlabOnly: false },
-  historial:  { label: "Historial",          icon: "history",          navId: "nav-historial-section",  buckets: ['[data-bucket="merged"]', '[data-bucket="closed"]'], gitlabOnly: false },
-  historico:  { label: "Histórico (grafo)",  icon: "git-graph",        navId: "nav-repo-section",       buckets: ["#bucket-history"], gitlabOnly: false },
-  milestones: { label: "Tareas por persona", icon: "signpost",         navId: "nav-milestones-section", buckets: ["#bucket-milestones", "#bucket-milestones-summary"], gitlabOnly: true },
-  soporte:    { label: "Soporte",            icon: "activity",         navId: "nav-support-section",    buckets: ["#bucket-support", "#bucket-ops"], gitlabOnly: true },
-  releases:   { label: "Releases",           icon: "git-branch",       navId: "nav-releases-section",   buckets: ["#bucket-releases", "#bucket-releases-publish", "#bucket-releases-pipelines"], gitlabOnly: true },
-  entornos:   { label: "Entornos",           icon: "thermometer",      navId: "nav-entornos-section",   buckets: ["#bucket-entornos"], gitlabOnly: true },
-  local:      { label: "Trabajo local",      icon: "chart-bar",        navId: "nav-local-section",      buckets: ["#bucket-local-empezar", "#bucket-local-crear", "#bucket-local-vincular", "#bucket-local-historico"], gitlabOnly: true },
-  propuestas: { label: "Propuestas",         icon: "inbox",            navId: "nav-propuestas-section", buckets: ["#bucket-propuestas"], gitlabOnly: true },
+  prs:        { label: "Merge requests",     icon: "git-pull-request", navId: "nav-prs-section",        gitlabOnly: false },
+  historial:  { label: "Historial",          icon: "history",          navId: "nav-historial-section",  gitlabOnly: false },
+  historico:  { label: "Histórico (grafo)",  icon: "git-graph",        navId: "nav-repo-section",       gitlabOnly: false },
+  local:      { label: "Trabajo local",      icon: "chart-bar",        navId: "nav-local-section",      gitlabOnly: true },
+  milestones: { label: "Tareas por persona", icon: "signpost",         navId: "nav-milestones-section", gitlabOnly: true },
+  propuestas: { label: "Propuestas",         icon: "inbox",            navId: "nav-propuestas-section", gitlabOnly: true },
+  releases:   { label: "Releases",           icon: "git-branch",       navId: "nav-releases-section",   gitlabOnly: true },
+  entornos:   { label: "Entornos",           icon: "thermometer",      navId: "nav-entornos-section",   gitlabOnly: true },
+  soporte:    { label: "Soporte",            icon: "activity",         navId: "nav-support-section",    gitlabOnly: true },
 };
 
 // Claves de sección válidas para el proveedor actual, en orden de menú (las GitLab-only se caen en GitHub).
@@ -145,10 +146,12 @@ function sectionEnabled(key) {
 // Aplica la visibilidad de TODO el menú a la vez: por proveedor (GitLab-only) + por elección del usuario.
 function applyMenuVisibility() {
   for (const [key, sec] of Object.entries(MENU_SECTIONS)) {
-    const show = sectionEnabled(key);
-    const els = [document.getElementById(sec.navId), ...sec.buckets.map((s) => document.querySelector(s))];
-    els.forEach((el) => el && el.classList.toggle("hidden", !show));
+    document.getElementById(sec.navId)?.classList.toggle("hidden", !sectionEnabled(key));
   }
+  // La cabecera de un grupo (Código, Entrega…) solo se ve si le queda alguna sección visible dentro.
+  document.querySelectorAll(".nav-group").forEach((group) =>
+    group.classList.toggle("hidden", !group.querySelector(':scope > [id$="-section"]:not(.hidden)')),
+  );
 }
 
 function timeAgo(iso) {

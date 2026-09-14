@@ -70,10 +70,10 @@ function paletteEntriesSections() {
   const add = (section, label, hint, run) => {
     if (sectionEnabled(section)) entries.push({ group, label: t("Ir a: {label}", { label }), hint, run });
   };
-  add("historico", t("Histórico"), t("grafo de ramas"), enterHistory);
+  add("historico", t("Grafo"), t("grafo de ramas"), enterHistory);
   add("milestones", t("Milestones"), t("tareas por persona"), () => enterMilestones("tasks"));
   add("milestones", t("Milestones · Resumen"), t("resumen del milestone"), () => enterMilestones("summary"));
-  add("soporte", t("Support"), t("incidencias del proyecto"), () => enterSupport("incidencias"));
+  add("soporte", t("Incidencias"), t("incidencias del proyecto"), () => enterSupport("incidencias"));
   add("soporte", t("Ops"), t("operaciones del proyecto"), () => enterSupport("operaciones"));
   add("releases", t("Releases · Ramas"), t("generar release branches"), () => enterReleases("branches"));
   add("releases", t("Releases · Publicar"), t("crear tag + release"), () => enterReleases("publish"));

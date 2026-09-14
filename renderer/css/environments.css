@@ -2,8 +2,6 @@
 /* ── Vista de Entornos (solo GitLab): matriz proyecto × entorno ────────────────────────────────
    Cada celda combina las dos señales: el recuadro = último despliegue (capa 1, GitLab), el punto
    de la derecha = sonda HTTP del external_url (capa 2). El punto solo aparece si hay URL. */
-.sec-entornos { color: var(--green); }
-
 .env-filters { flex-direction: column; align-items: stretch; gap: 10px; }
 .env-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .env-legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); }
