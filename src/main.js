@@ -162,6 +162,7 @@ function wireIpc() {
   require("./ipc/mail").register(ctx);
   require("./ipc/system").register(ctx);
   require("./ipc/sessions").register(ctx);
+  require("./ipc/local-run").register(ctx);
 }
 
 function wireSelftest() {

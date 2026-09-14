@@ -4,7 +4,7 @@
 // Parte de la implementación del proveedor GitLab — ver src/gitlab.js para la interfaz pública.
 
 const config = require("../config");
-const { api, apiAll, chunk, fetchAvatarDataUri, graphql, mapLimit, mdToSafeHtml, proj, viewer } = require("./core");
+const { api, apiAll, chunk, fetchAvatarDataUri, graphql, mapLimit, mapUser, mdToSafeHtml, proj, viewer } = require("./core");
 
 function milestonesGroup() {
   const cfg = config.load();
@@ -371,6 +371,12 @@ async function issueStatus(projectPath, iid) {
   return { state: it.state, closed: it.state === "closed", labels: it.labels || [] };
 }
 
+// Una issue (o epic: issue del proyecto …/epics) para la ficha del panel Agents, con el enum de GitHub.
+async function issueDetail(projectPath, iid) {
+  const it = await api("GET", `/projects/${proj(projectPath)}/issues/${iid}`);
+  return { number: it.iid, title: it.title, url: it.web_url, state: it.state === "closed" ? "CLOSED" : "OPEN", author: mapUser(it.author), updatedAt: it.updated_at };
+}
+
 // Crea una Merge Request sourceBranch -> targetBranch. squash:false y remove_source_branch:false
 // por decisión de producto (merge = merge commit, nunca squash). Devuelve forma mínima para que el
 // renderer pueda enlazar a la vista de MRs (projectPath + number) y abrir el web_url.
@@ -585,6 +591,7 @@ module.exports = {
   groupLabels,
   groupProjects,
   isEpicUrl,
+  issueDetail,
   issueMRs,
   issueStatus,
   listMilestones,

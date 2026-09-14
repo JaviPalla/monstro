@@ -96,10 +96,12 @@ const detailPane = $("#detail-pane");
 const detailContent = $("#detail-content");
 
 /* ============ utilidades ============ */
+// También las comillas: casi todo acaba en atributos (title="…", data-key="…") y una " de un transcript o de
+// GitLab los cerraría. innerHTML de un nodo de texto solo escapa & < >.
 function esc(text) {
   const div = document.createElement("div");
   div.textContent = text ?? "";
-  return div.innerHTML;
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 /* ============ proveedor (GitHub | GitLab) ============ */
@@ -114,8 +116,9 @@ const BRANCH_RE = /^[\w./-]{1,200}$/;
 /* ============ apartados del menú (configurables: onboarding + Ajustes) ============ */
 // Única fuente de verdad de las secciones del sidebar: clave → cabecera + sus buckets + si es solo
 // GitLab. El onboarding pregunta cuáles incluir; config.sections (array) las habilita. null = todas.
+// prs no tiene cabecera: su navId ya es el propio bucket "Merge requests", así que no lleva buckets aparte.
 const MENU_SECTIONS = {
-  prs:        { label: "Pull requests",      icon: "🔀", navId: "nav-prs-section",        buckets: ['[data-bucket="open"]', '[data-bucket="mine"]', '[data-bucket="review"]', '[data-bucket="draft"]'], gitlabOnly: false },
+  prs:        { label: "Merge requests",     icon: "🔀", navId: "nav-prs-section",        buckets: [], gitlabOnly: false },
   historial:  { label: "Historial",          icon: "🗂️", navId: "nav-historial-section",  buckets: ['[data-bucket="merged"]', '[data-bucket="closed"]'], gitlabOnly: false },
   historico:  { label: "Histórico (grafo)",  icon: "🕸️", navId: "nav-repo-section",       buckets: ["#bucket-history"], gitlabOnly: false },
   milestones: { label: "Tareas por persona", icon: "👥", navId: "nav-milestones-section", buckets: ["#bucket-milestones", "#bucket-milestones-summary"], gitlabOnly: true },
@@ -176,9 +179,19 @@ function toast(message, kind = "", onClick = null, sticky = false) {
   return el;
 }
 
-function copyText(text) {
+// Badge del dock = lo que pide tu atención: PRs que esperan tu review (poll.js) + agentes que te esperan
+// (sessions.js). Cada parte pone su número y el badge enseña la suma.
+const dockBadgeParts = { reviews: 0, agents: 0 };
+function setDockBadge(part, count) {
+  dockBadgeParts[part] = count;
+  const total = dockBadgeParts.reviews + dockBadgeParts.agents;
+  window.monstro.dockBadge(total ? String(total) : "");
+}
+
+// `message`: el toast de confirmación, si hace falta decir algo más que "Copiado".
+function copyText(text, message = t("Copiado")) {
   navigator.clipboard?.writeText(text).then(
-    () => toast(t("Copiado"), "ok"),
+    () => toast(message, "ok"),
     () => {
       const ta = document.createElement("textarea");
       ta.value = text;
@@ -186,7 +199,7 @@ function copyText(text) {
       ta.select();
       document.execCommand("copy");
       ta.remove();
-      toast(t("Copiado"), "ok");
+      toast(message, "ok");
     },
   );
 }

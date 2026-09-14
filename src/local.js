@@ -213,13 +213,30 @@ async function branchWorktree(dir, branch) {
   return wtPath;
 }
 
+// Worktrees que YA existen en un repo, sin tocar nada: "Probar en local" mira si la rama de la MR ya
+// tiene uno antes de proponer crearlo (el plan es solo lectura).
+async function listWorktrees(dir) {
+  try {
+    return parseWorktrees(await git(dir, ["worktree", "list", "--porcelain"]));
+  } catch {
+    return [];
+  }
+}
+
 // Quita un worktree (para "limpiar stale" tras fusionar la MR). --force porque puede tener cambios.
 async function removeWorktree(dir, wtPath) {
   await git(dir, ["worktree", "remove", "--force", wtPath]);
   return { ok: true };
 }
 
-module.exports = { scanRepos, repoInfo, remotePath, parseWorktrees, parseBranches, pushBranch, branchDiff, createLocalBranch, commitAll, workingDiff, isDirty, addWorktree, removeWorktree, reviewWorktree, branchWorktree };
+// "Limpiar worktrees" de Agents: SIN --force, así git se niega si hay cambios o ficheros sin seguimiento
+// y ese se queda. La rama no se toca: lo commiteado sigue en ella. Se lanza desde el clon principal.
+async function removeCleanWorktree(wtPath) {
+  const common = path.resolve(wtPath, (await git(wtPath, ["rev-parse", "--git-common-dir"])).trim());
+  await git(path.dirname(common), ["worktree", "remove", wtPath]);
+}
+
+module.exports = { scanRepos, repoInfo, remotePath, parseWorktrees, parseBranches, pushBranch, branchDiff, createLocalBranch, commitAll, workingDiff, isDirty, addWorktree, removeWorktree, removeCleanWorktree, reviewWorktree, branchWorktree, listWorktrees };
 
 // Auto-verificación: `node src/local.js [dir]` (dir por defecto = el padre de este repo).
 if (require.main === module) {
@@ -254,6 +271,13 @@ if (require.main === module) {
     assert.strictEqual(await branchWorktree(clon, "feat/x"), wt);
     assert.strictEqual((await git(wt, ["rev-parse", "HEAD"])).trim(), next);
     await assert.rejects(branchWorktree(clon, "--upload-pack"), /no válido/);
+    // removeCleanWorktree: con un fichero sin seguimiento git se niega y el worktree se queda; limpio, se va.
+    fs.writeFileSync(path.join(wt, "sucio.txt"), "x");
+    await assert.rejects(removeCleanWorktree(wt));
+    assert.ok(fs.existsSync(wt));
+    fs.rmSync(path.join(wt, "sucio.txt"));
+    await removeCleanWorktree(wt);
+    assert.ok(!fs.existsSync(wt));
     fs.rmSync(tmp, { recursive: true, force: true });
     console.log("self-check OK");
 

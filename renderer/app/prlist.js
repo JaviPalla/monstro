@@ -70,17 +70,6 @@ function labelPills(pr) {
 }
 
 /* ============ lista de PRs ============ */
-function bucketFilter(prs) {
-  const login = state.me?.login;
-  switch (state.bucket) {
-    case "mine": return prs.filter((p) => p.author?.login === login);
-    case "review":
-      return prs.filter((p) => (p.reviewRequests?.nodes || []).some((n) => n.requestedReviewer?.login === login));
-    case "draft": return prs.filter((p) => p.isDraft);
-    default: return prs;
-  }
-}
-
 function searchFilter(prs) {
   const q = state.search.trim().toLowerCase();
   if (!q) return prs;
@@ -90,18 +79,12 @@ function searchFilter(prs) {
 }
 
 function renderCounts() {
-  const open = state.openPrs;
-  const login = state.me?.login;
-  $("#count-open").textContent = open.length || "";
-  $("#count-mine").textContent = open.filter((p) => p.author?.login === login).length || "";
-  $("#count-review").textContent =
-    open.filter((p) => (p.reviewRequests?.nodes || []).some((n) => n.requestedReviewer?.login === login)).length || "";
-  $("#count-draft").textContent = open.filter((p) => p.isDraft).length || "";
+  $("#count-open").textContent = state.openPrs.length || "";
 }
 
 function renderList() {
   if (state.view !== "prs") return;
-  const prs = searchFilter(bucketFilter(state.prs));
+  const prs = searchFilter(state.prs);
   if (state.loading) {
     list.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>`;
     return;

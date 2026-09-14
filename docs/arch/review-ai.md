@@ -19,4 +19,4 @@ Note: on GitLab `submitReview` is **not atomic** — see `docs/arch/provider.md`
 ## Notifications
 
 `detectAndNotify`: first poll never notifies; only state *changes* do. Dock badge = PRs awaiting
-my review.
+my review **+ Agents sessions waiting for you** (`setDockBadge(part, n)` in core.js sums both parts; see docs/arch/sessions.md).

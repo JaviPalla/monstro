@@ -31,8 +31,8 @@ No configurables. A propósito.
 
 - **Listado de PRs estilo Bitbucket** — estado (Abierta/Borrador/Fusionada/Cerrada),
   `rama-origen → rama-destino`, decisión de review, checks del CI (✓/✗/●), rama atrasada o con
-  conflictos, labels, autor, comentarios y antigüedad. Buckets: *Abiertas · Mías · Para revisar ·
-  Borradores · Fusionadas · Cerradas* con contadores, y búsqueda instantánea.
+  conflictos, labels, autor, comentarios y antigüedad. Buckets: *Merge requests* (las abiertas,
+  con contador) · *Fusionadas · Cerradas*, y búsqueda instantánea.
 - **Diffs nativos** — pestaña *Cambios* con el diff completo (hunks, numeración old/new,
   colapsable por fichero) y flechas ↑↓ para saltar de comentario en comentario desplegando su
   fichero. Sin saltar al navegador.
@@ -69,7 +69,7 @@ No configurables. A propósito.
   piden cambios, y cuando sus checks se ponen en rojo. El Dock muestra cuántas PRs esperan tu
   review.
 - **Multi-repo** — varios repositorios y una vista agregada *⭐ Todos los repos*.
-- **Teclado** — `⌘K` paleta de comandos · `j/k` + `Enter` navegar y abrir · `1–6` buckets ·
+- **Teclado** — `⌘K` paleta de comandos · `j/k` + `Enter` navegar y abrir · `1–3` buckets ·
   `h` histórico · `R` refrescar · `Esc` cerrar.
 - Modo claro/oscuro según el sistema. UI en español.
 

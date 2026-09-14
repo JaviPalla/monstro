@@ -63,6 +63,7 @@ module.exports = {
   createIssueLink: all.createIssueLink,
   mrStatus: all.mrStatus,
   issueStatus: all.issueStatus,
+  issueDetail: all.issueDetail,
   searchGroupIssues: all.searchGroupIssues,
   listMyTasks: all.listMyTasks,
   collapseMilestoneEpics: all.collapseMilestoneEpics,

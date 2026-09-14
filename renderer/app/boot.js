@@ -106,7 +106,9 @@ async function boot() {
     (state.config.repos.includes(remembered) && remembered) ||
     (state.config.repos.length > 1 ? ALL_REPOS : state.config.repos[0]) ||
     null;
-  if (state.config.lastBucket && !IS_SELFTEST) state.bucket = state.config.lastBucket;
+  // Instalaciones antiguas pueden recordar un bucket ya eliminado (mine/review/draft): esos caen en "open".
+  const lastBucket = state.config.lastBucket;
+  if (lastBucket && !IS_SELFTEST) state.bucket = ["merged", "closed"].includes(lastBucket) ? lastBucket : "open";
   document.querySelectorAll(".bucket").forEach((b) => b.classList.remove("active"));
   document.querySelector(`[data-bucket="${state.bucket}"]`)?.classList.add("active");
   state.draftKeys = new Set(await window.monstro.draftsKeys().catch(() => []));
@@ -196,9 +198,12 @@ async function boot() {
   if (IS_SELFTEST && (SELFTEST_ROUTE === "local-historico" || SELFTEST_ROUTE === "local-historico-detail")) runLocalHistorySelftest();
   if (IS_SELFTEST && SELFTEST_ROUTE === "local-list") runLocalListSelftest();
   if (IS_SELFTEST && SELFTEST_ROUTE === "sessions") runSessionsSelftest();
+  if (IS_SELFTEST && SELFTEST_ROUTE.startsWith("sessions-q:")) runSessionsSelftest(SELFTEST_ROUTE.slice("sessions-q:".length));
   if (IS_SELFTEST && SELFTEST_ROUTE === "sessions-mr") runSessionsMrSelftest();
-  if (IS_SELFTEST && SELFTEST_ROUTE === "sessions-view") runSessionsViewSelftest();
+  // `sessions-view[:<texto>][#summary|plan|changes]`
+  if (IS_SELFTEST && /^sessions-view([:#]|$)/.test(SELFTEST_ROUTE)) runSessionsViewSelftest(SELFTEST_ROUTE.slice("sessions-view".length));
   if (IS_SELFTEST && SELFTEST_ROUTE === "sessions-launch") runSessionsLaunchSelftest();
+  if (IS_SELFTEST && SELFTEST_ROUTE === "sessions-implement") runSessionsImplementSelftest();
   if (IS_SELFTEST && (SELFTEST_ROUTE === "local-empezar" || SELFTEST_ROUTE === "local-plan")) runLocalStartSelftest();
   if (IS_SELFTEST && SELFTEST_ROUTE === "local-agents") runLocalAgentsSelftest();
 }
@@ -509,7 +514,7 @@ function openCheatsheet() {
     ["⌘P", t("Paleta de comandos: todas las acciones de la app")],
     ["j / k", t("Moverse por la lista")],
     ["Enter", t("Abrir la PR seleccionada")],
-    ["1 – 6", t("Abiertas · Mías · Para revisar · Borradores · Fusionadas · Cerradas")],
+    ["1 – 3", t("Merge requests · Fusionadas · Cerradas")],
     ["h", t("Histórico (grafo de ramas)")],
     ["m", t("Milestones (tareas por persona · GitLab)")],
     ["r", t("Refrescar")],
@@ -552,7 +557,7 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "h" && sectionEnabled("historico")) return enterHistory();
   if (event.key === "m" && sectionEnabled("milestones")) return enterMilestones();
-  const bucketByDigit = { 1: "open", 2: "mine", 3: "review", 4: "draft", 5: "merged", 6: "closed" };
+  const bucketByDigit = { 1: "open", 2: "merged", 3: "closed" };
   const digitBucket = bucketByDigit[event.key];
   if (digitBucket && sectionEnabled(["merged", "closed"].includes(digitBucket) ? "historial" : "prs")) switchBucket(digitBucket);
 });

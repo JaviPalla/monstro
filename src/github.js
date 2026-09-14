@@ -502,6 +502,10 @@ async function mrStatus() {
 async function issueStatus() {
   throw new Error("El estado del histórico solo está disponible en GitLab.");
 }
+// Ficha del panel Agents: las PRs van por prDetail; una issue de GitHub sale sin título (el link no rompe).
+async function issueDetail() {
+  throw new Error("El detalle de issues solo está disponible en GitLab.");
+}
 
 async function revertPullRequest(prNodeId) {
   const data = await gql(
@@ -605,4 +609,5 @@ module.exports = {
   createIssueLink,
   mrStatus,
   issueStatus,
+  issueDetail,
 };

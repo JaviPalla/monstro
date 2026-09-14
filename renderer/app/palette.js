@@ -87,12 +87,9 @@ function paletteEntriesSections() {
 
   const bucketSection = (b) => (["merged", "closed"].includes(b) ? "historial" : "prs");
   const buckets = [
-    ["open", t("Abiertas"), "1"],
-    ["mine", t("Mías"), "2"],
-    ["review", t("Para revisar"), "3"],
-    ["draft", t("Borradores"), "4"],
-    ["merged", t("Fusionadas"), "5"],
-    ["closed", t("Cerradas"), "6"],
+    ["open", t("Merge requests"), "1"],
+    ["merged", t("Fusionadas"), "2"],
+    ["closed", t("Cerradas"), "3"],
   ];
   for (const [bucket, label, key] of buckets) {
     add(bucketSection(bucket), label, key, () => switchBucket(bucket));
