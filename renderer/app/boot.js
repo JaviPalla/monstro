@@ -3,6 +3,7 @@
 function renderRepoSelect() {
   const select = $("#repo-select");
   const repos = state.config?.repos || [];
+  select.hidden = repos.length < 2; // con un solo repo no hay nada que elegir
   const allOption = repos.length > 1
     ? `<option value="${ALL_REPOS}" ${state.repo === ALL_REPOS ? "selected" : ""}>${t("Todos los repos")}</option>`
     : "";
