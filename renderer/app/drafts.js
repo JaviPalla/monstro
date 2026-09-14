@@ -301,7 +301,7 @@ function wireDraftCards(container) {
     btn.addEventListener("click", async (event) => {
       event.stopPropagation();
       await removeDraft(btn.closest(".draft-card").dataset.draft);
-      renderDetail();
+      renderDetailInPlace();
     }),
   );
   container.querySelectorAll(".draft-card .draft-pub").forEach((btn) =>
@@ -315,15 +315,15 @@ function wireDraftCards(container) {
     btn.addEventListener("click", (event) => {
       event.stopPropagation();
       state.editingDraftId = btn.closest(".draft-card").dataset.draft;
-      renderDetail();
-      detailContent.querySelector(".draft-editor")?.focus();
+      renderDetailInPlace();
+      detailContent.querySelector(".draft-card.editing .draft-editor")?.focus({ preventScroll: true });
     }),
   );
   container.querySelectorAll(".draft-card.editing").forEach((card) => {
     const id = card.dataset.draft;
     card.querySelector(".draft-edit-cancel").addEventListener("click", () => {
       state.editingDraftId = null;
-      renderDetail();
+      renderDetailInPlace();
     });
     card.querySelector(".draft-edit-save").addEventListener("click", async () => {
       const body = card.querySelector(".draft-editor").value.trim();
@@ -335,7 +335,7 @@ function wireDraftCards(container) {
         toast(t("Borrador actualizado"), "ok");
       }
       state.editingDraftId = null;
-      renderDetail();
+      renderDetailInPlace();
     });
   });
 }

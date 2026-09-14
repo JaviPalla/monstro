@@ -15,7 +15,7 @@ Selftest routes: `--selftest-route=onboarding-token` / `onboarding-sections`.
 
 ## Menu sections (`config.sections`)
 
-Which sidebar sections are visible. **Single source of truth = `MENU_SECTIONS` in `core.js`** (key → label/icon/`navId`/bucket selectors/`gitlabOnly`); `applyMenuVisibility()` (called in `boot()`) hides each section's nav header + buckets when it's GitLab-only-on-GitHub OR not in `config.sections`.
+Which sidebar sections are visible. **Single source of truth = `MENU_SECTIONS` in `core.js`** (key → label/icon/`navId`/bucket selectors/`gitlabOnly`); `applyMenuVisibility()` (called in `boot()`) hides each section's nav header + buckets when it's GitLab-only-on-GitHub OR not in `config.sections`. Exception: `prs` has no header — its `navId` (`#nav-prs-section`) is the lone "Merge requests" bucket itself (`data-bucket="open"`, all open MRs + count), so its `buckets` list is empty. The old Mías/Para revisar/Borradores buckets are gone; a stale `config.lastBucket` from them falls back to `open` in `boot()`. Digit shortcuts: `1` MRs · `2` Fusionadas · `3` Cerradas.
 
 `sectionEnabled(key)` is the gate (null/undefined sections = all enabled, retrocompat). The command palette, digit/letter shortcuts and the boot landing (`firstAvailableLanding`, for profiles without PRs) all route through `sectionEnabled`. Editable later in Settings ("Apartados del menú", min 1).
 

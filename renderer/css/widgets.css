@@ -8,7 +8,7 @@
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.draft-card.flash, .comment.flash {
+.draft-card.flash, .comment.flash, .thread.flash {
   animation: flash-outline 1.6s ease;
 }
 @keyframes flash-outline {

@@ -130,6 +130,7 @@ const PAYLOAD = {
   name: "n",
   repo: "grupo/proyecto",
   number: 1,
+  draftNoteId: 1,
   url: "https://example.invalid/x",
   path: "grupo/proyecto",
   body: "b",

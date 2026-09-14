@@ -19,8 +19,8 @@ const path = require("path");
 const pexec = promisify(execFile);
 const BRANCH_RE = /^[\w./-]{1,200}$/;
 
-async function git(cwd, args) {
-  const { stdout } = await pexec("git", args, { cwd, timeout: 10000, maxBuffer: 4 * 1024 * 1024 });
+async function git(cwd, args, timeout = 10000) {
+  const { stdout } = await pexec("git", args, { cwd, timeout, maxBuffer: 4 * 1024 * 1024 });
   return stdout;
 }
 
@@ -194,13 +194,49 @@ async function reviewWorktree(dir, sourceBranch) {
   return wtPath;
 }
 
+// Worktree con la rama de una MR, para abrirla en el editor. git no deja sacar la misma rama en dos
+// sitios, así que si ya está en algún worktree (o en el propio clon) se reutiliza ese. Después se
+// avanza a lo último de origin solo si es fast-forward: nunca pisa commits ni cambios locales.
+async function branchWorktree(dir, branch) {
+  if (!BRANCH_RE.test(branch || "") || branch.startsWith("-") || branch.includes("..")) throw new Error(`Nombre de rama no válido: ${branch}`);
+  // Refspec explícito: en un clon --single-branch, `fetch origin <rama>` no crea origin/<rama>.
+  await git(dir, ["fetch", "--quiet", "origin", `+refs/heads/${branch}:refs/remotes/origin/${branch}`], 180000);
+  await git(dir, ["worktree", "prune"]); // olvida los worktrees cuya carpeta se borró a mano
+  let wtPath = parseWorktrees(await git(dir, ["worktree", "list", "--porcelain"])).find((w) => w.branch === branch)?.dir;
+  if (!wtPath) {
+    wtPath = path.join(dir, ".worktrees", branch.replaceAll("/", "-"));
+    const hasLocal = await git(dir, ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`]).then(() => true, () => false);
+    fs.mkdirSync(path.join(dir, ".worktrees"), { recursive: true });
+    await git(dir, ["worktree", "add", ...(hasLocal ? [wtPath, branch] : ["--track", "-b", branch, wtPath, `origin/${branch}`])], 120000);
+  }
+  try { await git(wtPath, ["merge", "--ff-only", "--quiet", `origin/${branch}`]); } catch { /* divergida o choca con cambios sin commitear: se queda como está */ }
+  return wtPath;
+}
+
+// Worktrees que YA existen en un repo, sin tocar nada: "Probar en local" mira si la rama de la MR ya
+// tiene uno antes de proponer crearlo (el plan es solo lectura).
+async function listWorktrees(dir) {
+  try {
+    return parseWorktrees(await git(dir, ["worktree", "list", "--porcelain"]));
+  } catch {
+    return [];
+  }
+}
+
 // Quita un worktree (para "limpiar stale" tras fusionar la MR). --force porque puede tener cambios.
 async function removeWorktree(dir, wtPath) {
   await git(dir, ["worktree", "remove", "--force", wtPath]);
   return { ok: true };
 }
 
-module.exports = { scanRepos, repoInfo, remotePath, parseWorktrees, parseBranches, pushBranch, branchDiff, createLocalBranch, commitAll, workingDiff, isDirty, addWorktree, removeWorktree, reviewWorktree };
+// "Limpiar worktrees" de Agents: SIN --force, así git se niega si hay cambios o ficheros sin seguimiento
+// y ese se queda. La rama no se toca: lo commiteado sigue en ella. Se lanza desde el clon principal.
+async function removeCleanWorktree(wtPath) {
+  const common = path.resolve(wtPath, (await git(wtPath, ["rev-parse", "--git-common-dir"])).trim());
+  await git(path.dirname(common), ["worktree", "remove", wtPath]);
+}
+
+module.exports = { scanRepos, repoInfo, remotePath, parseWorktrees, parseBranches, pushBranch, branchDiff, createLocalBranch, commitAll, workingDiff, isDirty, addWorktree, removeWorktree, removeCleanWorktree, reviewWorktree, branchWorktree, listWorktrees };
 
 // Auto-verificación: `node src/local.js [dir]` (dir por defecto = el padre de este repo).
 if (require.main === module) {
@@ -218,6 +254,31 @@ if (require.main === module) {
         { dir: "/b", branch: null, head: "def" },
       ],
     );
+    // branchWorktree: rama solo en origin → worktree nuevo; segunda vez → el mismo, avanzado por ff.
+    // realpath: en macOS tmpdir es un symlink y `worktree list` devuelve la ruta real.
+    const tmp = fs.mkdtempSync(path.join(fs.realpathSync(require("os").tmpdir()), "monstro-wt-"));
+    const clon = path.join(tmp, "clon");
+    const author = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"];
+    await git(tmp, ["init", "--quiet", "--bare", "origin.git"]);
+    await git(tmp, ["clone", "--quiet", "origin.git", "clon"]);
+    await git(clon, [...author, "commit", "--quiet", "--allow-empty", "-m", "base"]);
+    await git(clon, ["push", "--quiet", "origin", "HEAD:refs/heads/feat/x"]);
+    const wt = await branchWorktree(clon, "feat/x");
+    assert.strictEqual(wt, path.join(clon, ".worktrees", "feat-x"));
+    assert.strictEqual((await git(wt, ["rev-parse", "--abbrev-ref", "HEAD"])).trim(), "feat/x");
+    const next = (await git(clon, [...author, "commit-tree", "origin/feat/x^{tree}", "-p", "origin/feat/x", "-m", "next"])).trim();
+    await git(clon, ["push", "--quiet", "origin", `${next}:refs/heads/feat/x`]);
+    assert.strictEqual(await branchWorktree(clon, "feat/x"), wt);
+    assert.strictEqual((await git(wt, ["rev-parse", "HEAD"])).trim(), next);
+    await assert.rejects(branchWorktree(clon, "--upload-pack"), /no válido/);
+    // removeCleanWorktree: con un fichero sin seguimiento git se niega y el worktree se queda; limpio, se va.
+    fs.writeFileSync(path.join(wt, "sucio.txt"), "x");
+    await assert.rejects(removeCleanWorktree(wt));
+    assert.ok(fs.existsSync(wt));
+    fs.rmSync(path.join(wt, "sucio.txt"));
+    await removeCleanWorktree(wt);
+    assert.ok(!fs.existsSync(wt));
+    fs.rmSync(tmp, { recursive: true, force: true });
     console.log("self-check OK");
 
     const dir = process.argv[2] || path.dirname(path.dirname(__dirname));

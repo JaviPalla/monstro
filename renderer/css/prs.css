@@ -350,11 +350,12 @@
 .hl-punct { color: var(--hl-punct); }
 
 [data-syntax-theme="one-dark"] {
-  --hl-bg: #282c34; --hl-fg: #abb2bf; --hl-gutter: #5c6370; --hl-border: #3a3f4b;
-  --hl-add: rgba(152, 195, 121, 0.14); --hl-del: rgba(224, 108, 117, 0.14);
+  /* One Dark más oscuro y con el texto más claro que el original: se lee mejor */
+  --hl-bg: #1a1d23; --hl-fg: #d7dae0; --hl-gutter: #6f7683; --hl-border: #2c313a;
+  --hl-add: rgba(152, 195, 121, 0.16); --hl-del: rgba(224, 108, 117, 0.16);
   --hl-add-sign: #98c379; --hl-del-sign: #e06c75;
-  --hl-com: #7f848e; --hl-str: #98c379; --hl-num: #d19a66; --hl-kw: #c678dd;
-  --hl-type: #e5c07b; --hl-fn: #61afef; --hl-op: #56b6c2; --hl-punct: #abb2bf;
+  --hl-com: #8c929d; --hl-str: #a5d17f; --hl-num: #e0a872; --hl-kw: #d38aeb;
+  --hl-type: #f0cb85; --hl-fn: #6fbaf7; --hl-op: #62c4d0; --hl-punct: #c8ccd4;
 }
 [data-syntax-theme="dracula"] {
   --hl-bg: #282a36; --hl-fg: #f8f8f2; --hl-gutter: #6272a4; --hl-border: #3b3e52;
@@ -393,5 +394,18 @@
 /* Borradores de review en GitLab (draft notes): pendientes de publicar, solo los ves tú. */
 .thread.pending-draft { border-left-color: var(--yellow); background: var(--yellow-bg); }
 .comment.pending-draft { border-style: dashed; border-color: var(--yellow); }
+.pending-editor { padding: 0 12px 10px; }
+.comment-head .pending-del { margin-left: 6px; }
 .gl-drafts-bar { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--yellow); border-radius: 10px; background: var(--yellow-bg); font-weight: 600; }
+/* Flechas ↑↓ de comentario en comentario: pegadas abajo a la derecha mientras bajas por el diff */
+.comment-nav {
+  position: sticky; bottom: 12px; z-index: 6;
+  display: flex; align-items: center; gap: 6px;
+  width: fit-content; margin: 10px 0 0 auto; padding: 4px 6px;
+  background: var(--bg-raised); border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow);
+}
+.comment-nav .btn { padding: 3px 10px; }
+.comment-nav-count { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
+/* con la barra de borradores locales (también pegada abajo) se sube para no taparla */
+.detail-inner:has(.drafts-bar) .comment-nav { bottom: 78px; }
 

@@ -48,9 +48,7 @@ function mapReviews(mr, approvals) {
   const approvedBy = approvals?.approved_by || [];
   const approvedLogins = new Set(approvedBy.map((a) => a.user?.username));
   const latestReviews = {
-    // databaseId (id de usuario) sólo para que el renderer sepa que la review es "desaprobable";
-    // dismissReview en GitLab no lo usa (unapprove actúa sobre la MR, no sobre una review).
-    nodes: approvedBy.map((a) => ({ databaseId: a.user?.id || null, author: mapUser(a.user), state: "APPROVED" })),
+    nodes: approvedBy.map((a) => ({ author: mapUser(a.user), state: "APPROVED" })),
   };
   // Reviewers asignados que aún no han aprobado = revisión pendiente.
   const reviewRequests = {
@@ -179,14 +177,6 @@ async function mergePR(repoFullName, number, { deleteBranch, isCrossRepository }
   return { merged: result.state === "merged", sha: result.merge_commit_sha, branchDeleted: removeSource };
 }
 
-/** Update branch SIEMPRE con rebase. */
-
-async function updateBranchRebase(encodedId) {
-  const { repo, iid } = decodeId(encodedId);
-  await api("PUT", `/projects/${proj(repo)}/merge_requests/${iid}/rebase`);
-  return { number: iid };
-}
-
 /* ---------- histórico (grafo de commits) ---------- */
 
 async function defaultBranch(repoFullName) {
@@ -292,7 +282,8 @@ async function prConversation(repoFullName, number) {
   // isPendingDraft: el renderer los pinta aparte y sin responder/resolver. Sin fichero (position_type
   // "text", el resumen de la review) = comentario general.
   for (const dn of draftNotes) {
-    const comment = { databaseId: null, author: null, bodyHTML: mdToSafeHtml(dn.note), createdAt: null, isPendingDraft: true };
+    // draftNoteId + body (markdown crudo) para editarlo desde el detalle.
+    const comment = { databaseId: null, author: null, bodyHTML: mdToSafeHtml(dn.note), createdAt: null, isPendingDraft: true, draftNoteId: dn.id, body: dn.note };
     const pos = dn.position;
     if (!pos?.new_path && !pos?.old_path) {
       comments.push(comment);
@@ -331,10 +322,29 @@ async function setThreadResolved(threadId, resolved) {
   return api("PUT", `/projects/${m[1]}/merge_requests/${m[2]}/discussions/${m[3]}`, { resolved });
 }
 
-/** "Quitar aprobación": GitLab no tiene dismissal de reviews; equivale a unapprove de la MR. */
+/** Cambia el texto de un borrador de review (draft note). Sigue sin publicarse. */
 
-async function dismissReview(repoFullName, number) {
-  return api("POST", `/projects/${proj(repoFullName)}/merge_requests/${number}/unapprove`);
+async function updateDraftNote(repoFullName, number, draftNoteId, body) {
+  const path = `/projects/${proj(repoFullName)}/merge_requests/${number}/draft_notes/${draftNoteId}`;
+  // El PUT hace `update!(note:, position: params[:position])`: sin position, GitLab la BORRA y el
+  // borrador se sale de su línea (pasa a comentario general). Se reenvía la que tiene, sin nulos.
+  const { position } = await api("GET", path);
+  const anchored = position?.new_path || position?.old_path;
+  const keys = ["base_sha", "start_sha", "head_sha", "position_type", "new_path", "new_line", "old_path", "old_line", "line_range"];
+  const kept = anchored ? Object.fromEntries(keys.filter((k) => position[k] != null).map((k) => [k, position[k]])) : undefined;
+  return api("PUT", path, { note: body, position: kept });
+}
+
+/** Borra un borrador de review (draft note). GitLab no tiene papelera: no se puede deshacer. */
+
+async function deleteDraftNote(repoFullName, number, draftNoteId) {
+  return api("DELETE", `/projects/${proj(repoFullName)}/merge_requests/${number}/draft_notes/${draftNoteId}`);
+}
+
+/** Publica de golpe TODOS tus borradores de review de la MR (bulk_publish). Irreversible: el equipo los ve. */
+
+async function publishDraftNotes(repoFullName, number) {
+  return api("POST", `/projects/${proj(repoFullName)}/merge_requests/${number}/draft_notes/bulk_publish`);
 }
 
 async function diffRefs(repoFullName, number) {
@@ -512,8 +522,8 @@ module.exports = {
   createBranch,
   createMergeRequest,
   defaultBranch,
+  deleteDraftNote,
   diffRefs,
-  dismissReview,
   forceUpdateBranch,
   listPRs,
   mapLabels,
@@ -529,11 +539,12 @@ module.exports = {
   prFiles,
   prNodeId,
   projectPathFromRefs,
+  publishDraftNotes,
   replyToThread,
   revertPullRequest,
   searchPRs,
   setPrDraft,
   setThreadResolved,
   submitReview,
-  updateBranchRebase,
+  updateDraftNote,
 };

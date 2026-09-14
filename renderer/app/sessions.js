@@ -3,23 +3,25 @@
 /* ============ panel de sesiones de Claude Code (src/sessions.js), a la izquierda ============ */
 // Diseño "Actividad": primero las que te esperan (con lo último que dijo o pidió Claude), luego las que
 // trabajan (con la herramienta en curso) y las terminadas de hoy. Click en una tarjeta → su ficha grande
-// (resumen, tus peticiones, ficheros y métricas) en el panel de detalle. Al abrirlo el menú se pliega a
-// iconos para dejar sitio. Abierto/cerrado se recuerda en localStorage (preferencia de este equipo, no config).
-// Poll cada 10 s con el panel abierto y cada minuto cerrado (solo para el contador del botón).
-const SESSIONS_STORE_KEY = "monstro:sessionsPane";
+// (resumen, tus peticiones, ficheros y métricas) en el panel de detalle.
+// Poll cada 10 s con el panel abierto; cerrado o con la ventana oculta, cada 30 s: de ahí salen el contador,
+// el badge del dock y los avisos de macOS.
 const SESSIONS_TICK_MS = 10000;
-const SESSIONS_IDLE_TICKS = 6;
+const SESSIONS_IDLE_TICKS = 3;
 const SESSIONS_MAX_LINKS = 6;
 const SESSIONS_MAX_WAITING = 4;
-const EDITOR_LABEL = { dotnet: "Rider", vue: "VS Code", node: "VS Code" };
 const LINK_LABEL = { mr: "!{n}", pr: "PR #{n}", issue: "#{n}", epic: "Epic #{n}" };
 const ORIGIN_LABEL = { "claude-vscode": "VS Code", cli: "CLI" };
 const HOST_LABEL = { ghostty: "Ghostty", rider: "Rider", vscode: "VS Code · terminal", "vscode-ext": "VS Code", terminal: "Terminal", iterm: "iTerm" };
-const HOST_APP_LABEL = { ghostty: "Ghostty", rider: "Rider", vscode: "VS Code", "vscode-ext": "VS Code", terminal: "Terminal", iterm: "iTerm" };
+// Host → app a la que lleva "Abrir" (clave de sessions:appIcons); extensión y terminal de VS Code son la misma.
+const HOST_APP_KEY = { ghostty: "ghostty", rider: "rider", vscode: "vscode", "vscode-ext": "vscode", terminal: "terminal", iterm: "iterm" };
+const APP_LABEL = { ghostty: "Ghostty", rider: "Rider", vscode: "VS Code", terminal: "Terminal", iterm: "iTerm" };
 const sessionsPane = $("#sessions-pane");
 // Estado del lanzador ("¿Qué quieres hacer?"): vive aquí para sobrevivir a los repintados del poll.
-const LAUNCH_EMPTY = { action: null, url: "", prompt: "", dir: null, repo: null, targets: null, busy: false };
-const sessionsUi = { data: null, pending: null, tagOpen: new Set(), expanded: new Set(), allWaiting: false, idleOpen: true, finishedOpen: true, ticks: 0, launch: { ...LAUNCH_EMPTY } };
+const LAUNCH_EMPTY = { action: null, url: "", prompt: "", dir: null, repo: null, clones: null, root: null, targets: null, busy: false };
+// viewTab / viewOpen: pestaña activa y diffs desplegados de cada ficha (sessions-view.js), en memoria.
+// localRun: el panel "Probar en local" de cada ficha (sessions-local.js), también en memoria.
+const sessionsUi = { data: null, pending: null, tagOpen: new Set(), expanded: new Set(), allWaiting: false, idleOpen: true, finishedOpen: true, ticks: 0, filter: "", launch: { ...LAUNCH_EMPTY }, viewTab: new Map(), viewOpen: new Map(), localRun: new Map() };
 
 const sessionsOpen = () => !sessionsPane.classList.contains("hidden");
 // Electron envuelve los throw del main: "Error invoking remote method 'x': Error: <mensaje>".
@@ -29,22 +31,10 @@ const ipcMessage = (err) => String(err?.message || err).replace(/^Error invoking
 const viewingId = () => (detailPane.classList.contains("hidden") ? null : detailContent.querySelector(".sv")?.dataset.id || null);
 const selectedClass = (s) => (s.sessionId === viewingId() ? " selected" : "");
 
-// Plegado, el menú solo enseña iconos: cada entrada lleva su nombre como tooltip.
-function labelCollapsedNav() {
-  document.querySelectorAll("#sidebar .bucket, #sidebar .nav-section").forEach((el) => {
-    el.title ||= [...el.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim())?.textContent.trim() || "";
-  });
-}
-
 function toggleSessionsPane(open = !sessionsOpen()) {
   sessionsPane.classList.toggle("hidden", !open);
   // "open" y no "active": las vistas limpian .active de todos los .bucket al navegar.
   $("#sessions-btn").classList.toggle("open", open);
-  document.body.classList.toggle("nav-collapsed", open);
-  if (open) labelCollapsedNav();
-  if (!IS_SELFTEST) {
-    try { localStorage.setItem(SESSIONS_STORE_KEY, open ? "1" : "0"); } catch { /* sin storage: no se recuerda */ }
-  }
   if (open) {
     if (!detailPane.classList.contains("hidden")) hideDetail(); // el tablero va a pantalla completa
     loadSessions();
@@ -55,7 +45,10 @@ function toggleSessionsPane(open = !sessionsOpen()) {
 
 function loadSessions() {
   sessionsUi.pending ??= window.monstro.sessionsList()
-    .then((data) => { sessionsUi.data = data; })
+    .then((data) => {
+      notifySessionChanges(sessionsUi.data, data);
+      sessionsUi.data = data;
+    })
     .catch((err) => console.error("[sessions]", err))
     .finally(() => {
       sessionsUi.pending = null;
@@ -65,20 +58,43 @@ function loadSessions() {
   return sessionsUi.pending;
 }
 
+// Lo que te pregunta una sesión que te espera: la pregunta (con opciones o abierta), el permiso o su último párrafo.
+function questionText(s) {
+  if (s.question?.kind === "choice") return s.question.items[0]?.question || "";
+  return s.question?.text || (s.waitingFor ? t("Necesita tu respuesta") : s.excerpt || "");
+}
+
+// Aviso de macOS cuando una sesión pasa a esperarte o acaba su turno y queda lista para más trabajo. Como las
+// PRs (poll.js): el primer poll no avisa, solo los cambios. Click en el aviso → su ficha (onNotifySession).
+function notifySessionChanges(before, after) {
+  if (!before || IS_SELFTEST) return;
+  const was = new Map(before.map((s) => [s.sessionId, s.state]));
+  for (const s of after) {
+    const prev = was.get(s.sessionId);
+    if (s.state === "waiting" && prev !== "waiting") {
+      window.monstro.notify(t("Claude te espera · {title}", { title: s.title }), questionText(s), s.sessionId);
+    } else if (s.state === "done" && prev === "working") {
+      window.monstro.notify(t("Claude ha terminado · {title}", { title: s.title }), s.excerpt || t("Listo para seguir con más trabajo"), s.sessionId);
+    }
+  }
+}
+
+// La app arranca siempre en el tablero de Agents. El selftest no: sus rutas parten de la lista.
 function initSessions() {
-  let open = false;
-  try { open = !IS_SELFTEST && localStorage.getItem(SESSIONS_STORE_KEY) === "1"; } catch { /* idem */ }
+  const open = !IS_SELFTEST;
   toggleSessionsPane(open);
   if (!open) loadSessions();
   setInterval(() => {
-    if (document.hidden) return;
-    if (!sessionsOpen() && ++sessionsUi.ticks % SESSIONS_IDLE_TICKS) return;
+    // Cerrado u oculto va más despacio, pero no para: sin poll no habría avisos justo cuando no miras.
+    if ((document.hidden || !sessionsOpen()) && ++sessionsUi.ticks % SESSIONS_IDLE_TICKS) return;
     loadSessions();
   }, SESSIONS_TICK_MS);
 }
 
-async function runSessionsSelftest() {
+// Selftest `sessions` y `sessions-q:<texto>` (el tablero ya filtrado).
+async function runSessionsSelftest(filter = "") {
   state.selftestNotified = true;
+  sessionsUi.filter = filter;
   try {
     toggleSessionsPane(true);
     await loadSessions();
@@ -115,14 +131,18 @@ async function runSessionsLaunchSelftest() {
   }
 }
 
-// Selftest `sessions-view`: la ficha de la sesión con más peticiones, como un click en su tarjeta.
-async function runSessionsViewSelftest() {
+// Selftest `sessions-implement`: el formulario de "Implementar tarea" con "Todos los repos" elegido en el desplegable.
+async function runSessionsImplementSelftest() {
   state.selftestNotified = true;
   try {
     toggleSessionsPane(true);
     await loadSessions();
-    const session = [...(sessionsUi.data || [])].sort((a, b) => b.prompts.length - a.prompts.length)[0];
-    if (session) openSessionView(session.sessionId);
+    await pickLaunchAction("implement");
+    const select = sessionsPane.querySelector('[name="clone"]');
+    if (select && sessionsUi.launch.root) {
+      select.value = sessionsUi.launch.root;
+      pickClone(select);
+    }
   } finally {
     state.selftestNotified = false;
     notifySelftestOnce();
@@ -148,14 +168,36 @@ function sessionHeader(s) {
   return `<div class="ss-top" title="${esc(s.title)}"><span class="ss-dot"></span><span class="ss-title">${esc(s.title)}</span><span class="ss-time">${esc(timeAgo(s.updatedAt))}</span></div>`;
 }
 
-// "Ir a Ghostty / VS Code…" solo si se sabe dónde corre.
-function goButton(s) {
-  return HOST_APP_LABEL[s.host] ? `<button class="ss-go-btn" data-ss="focus">${esc(t("Ir a {app}", { app: HOST_APP_LABEL[s.host] }))}</button>` : "";
+// Iconos reales de las apps (sessions:appIcons, dataURL): se piden la primera vez que hacen falta y se
+// repinta al llegar. Hasta entonces, o si la app no está en este Mac, el botón va solo con el texto.
+let sessionsIcons = null;
+
+function sessionsAppIcon(app) {
+  if (!sessionsIcons) {
+    sessionsIcons = {};
+    window.monstro.sessionsAppIcons()
+      .then((icons) => {
+        sessionsIcons = icons || {};
+        renderSessions();
+        renderSessionView(true);
+      })
+      .catch((err) => console.error("[sessions]", err));
+  }
+  return sessionsIcons[app] || "";
 }
 
-function editorButton(s) {
-  const editor = EDITOR_LABEL[s.stack] || "VS Code";
-  return `<button class="mini-btn" data-ss="open" data-dir="${esc(s.dir || "")}" title="${esc(t("Abrir {p} en {e}", { p: s.dir || "", e: editor }))}">${editor}</button>`;
+// App a la que lleva "Abrir" (clave de APP_LABEL / sessions:appIcons).
+const sessionApp = (s) => (s.live ? HOST_APP_KEY[s.host] : null) || (s.stack === "dotnet" ? "rider" : "vscode");
+
+// Un solo botón "Abrir" con el icono de la app: viva y con host conocido → trae esa app al frente (focus);
+// si no, abre su carpeta en el editor de su stack, como agents.openEditor (.NET → Rider, el resto → VS Code).
+function openButton(s) {
+  const host = s.live ? HOST_APP_KEY[s.host] : null;
+  const app = sessionApp(s);
+  const action = host ? `data-ss="focus"` : `data-ss="open" data-dir="${esc(s.dir || "")}"`;
+  const icon = sessionsAppIcon(app);
+  return `<button class="ss-open-btn" ${action} title="${esc(t("Abrir en {app}", { app: APP_LABEL[app] }))}">`
+    + `${icon ? `<img src="${esc(icon)}" alt="" />` : ""}${esc(t("Abrir"))}</button>`;
 }
 
 // Lo que se enseña bajo el título: si te espera, qué te pide o qué dijo; si trabaja, qué está haciendo.
@@ -163,7 +205,9 @@ function sessionLine(s) {
   if (s.state === "working") {
     return `<div class="ss-activity"><span class="ss-spin"></span><span class="ss-ellip">${esc(s.activity || t("Pensando…"))}</span></div>`;
   }
-  const quote = s.waitingFor ? `${t("Necesita tu respuesta")}${s.activity ? `: ${s.activity}` : ""}` : s.excerpt || s.activity;
+  // Una pregunta con opciones (AskUserQuestion) se enseña tal cual, no el párrafo genérico.
+  const choice = s.state === "waiting" && s.question?.kind === "choice" ? questionText(s) : "";
+  const quote = choice || (s.waitingFor ? `${t("Necesita tu respuesta")}${s.activity ? `: ${s.activity}` : ""}` : s.excerpt || s.activity);
   return quote ? `<div class="ss-quote"><span class="ss-clamp">${esc(quote)}</span></div>` : "";
 }
 
@@ -179,12 +223,36 @@ function sessionCard(s) {
       ${sessionLine(s)}
       ${linkBadges(s)}
       <div class="ss-actions">
-        ${goButton(s)}
-        ${editorButton(s)}
+        ${openButton(s)}
         <button class="mini-btn" data-ss="add" title="${esc(t("Asociar MR, issue o epic"))}">+</button>
+        ${closeButton(s)}
       </div>
       ${tagForm}
     </div>`;
+}
+
+// Viva: para su proceso (la extensión de VS Code deja vivos los de pestañas cerradas) y la saca del panel.
+// Terminada: solo la saca. Trabajando no se ofrece: se cortaría a medias.
+function closeButton(s) {
+  if (s.state === "working") return "";
+  const [label, tip] = s.live ? [t("Cerrar"), t("Cerrar la sesión y quitarla del panel")] : [t("Quitar"), t("Quitar del panel")];
+  return `<button class="mini-btn" data-ss="close-session" title="${esc(tip)}">${esc(label)}</button>`;
+}
+
+// Terminada = nadie trabaja ya en sus worktrees de agente: es el momento de quitarlos (sus ramas se quedan).
+function cleanButton(s) {
+  const n = s.worktrees?.length || 0;
+  return n ? `<button class="mini-btn ss-clean" data-ss="clean-wt" title="${esc(s.worktrees.join("\n"))}">${esc(t("Limpiar worktrees ({n})", { n }))}</button>` : "";
+}
+
+// Resultado por worktree (git puede negarse con uno y seguir con los demás): cuántos se quitaron y cuáles no, y por qué.
+function cleanSummary(results) {
+  const why = { dirty: t("cambios sin commitear"), busy: t("en uso por una sesión viva") };
+  const label = (dir) => dir.replace(/[\\/]\.(claude[\\/])?worktrees[\\/]/, "/").split("/").slice(-2).join("/");
+  const kept = results.filter((r) => !r.ok).map((r) => `${label(r.dir)} (${why[r.reason] || r.reason})`);
+  const removed = results.length - kept.length;
+  return [removed && t("{n} worktrees quitados", { n: removed }), kept.length && t("No se han quitado: {list}", { list: kept.join(", ") })]
+    .filter(Boolean).join(" · ") || t("Nada que limpiar");
 }
 
 // Terminadas = proceso cerrado: fila compacta con Reanudar y sus MRs/epics (una review cerrada puede
@@ -197,6 +265,8 @@ function finishedRow(s) {
         <span class="ss-dot"></span><span class="ss-ellip">${esc(s.title)}</span>
         <span class="ss-time">${esc(timeAgo(s.updatedAt))}</span>
         <button class="mini-btn" data-ss="resume">${t("Reanudar")}</button>
+        ${closeButton(s)}
+        ${cleanButton(s)}
       </div>
       ${links.length ? `<div class="ss-badges ss-done-links">${links.map(linkBadge).join("")}</div>` : ""}
     </div>`;
@@ -208,22 +278,47 @@ function sectionHead(kind, label, count, toggle = "", open = true) {
   return `<${tag} class="ss-sec ss-sec-${kind}" ${toggle ? `data-ss="${toggle}"` : ""}>${chevron}<span class="ss-dot"></span>${esc(label)} · ${count}</${tag}>`;
 }
 
-function renderSessions() {
+// Filtro del tablero: cada palabra tiene que salir en la sesión (título, lo último que dijo, tus peticiones,
+// repos y ramas o sus badges: "mr", "!123", "epic", el proyecto o la URL). Sin tildes ni mayúsculas.
+const foldText = (text) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+
+function sessionMatches(s, words) {
+  const hay = foldText([
+    s.title, s.excerpt, s.activity, s.summary?.text,
+    ...s.prompts.map((p) => p.text),
+    ...s.repos.flatMap((r) => [r.project, r.name, r.branch]),
+    ...s.links.flatMap((l) => [l.kind, LINK_LABEL[l.kind].replace("{n}", l.iid), l.project, l.url]),
+  ].filter(Boolean).join("\n"));
+  // Una URL copiada del navegador puede llevar /diffs detrás: vale si empieza por la de un badge.
+  return words.every((w) => hay.includes(w) || s.links.some((l) => l.url && w.startsWith(foldText(l.url))));
+}
+
+// `force`: repintar aunque haya un campo del panel con el foco (el filtro, mientras se teclea).
+function renderSessions(force = false) {
   const all = sessionsUi.data || [];
-  const waiting = all.filter((s) => s.state === "waiting");
-  const working = all.filter((s) => s.state === "working");
-  // Abiertas sin nada pendiente (terminal/IDE aún abierto) ≠ terminadas (proceso cerrado).
-  const idle = all.filter((s) => s.state === "done");
-  const finished = all.filter((s) => s.state === "finished");
-  // El contador del botón es lo que pide atención: las que te esperan.
-  $("#sessions-count").textContent = waiting.length ? String(waiting.length) : "";
+  // El contador del botón es lo que pide atención: las que te esperan (sin filtrar).
+  const waitingCount = all.filter((s) => s.state === "waiting").length;
+  $("#sessions-count").textContent = waitingCount ? String(waitingCount) : "";
+  setDockBadge("agents", waitingCount);
   if (!sessionsOpen()) return;
   // No repintar mientras se escribe una URL: el poll se llevaría el input por delante.
-  if (/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName) && sessionsPane.contains(document.activeElement)) return;
+  if (!force && /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName) && sessionsPane.contains(document.activeElement)) return;
+
+  const words = foldText(sessionsUi.filter).split(/\s+/).filter(Boolean);
+  const shown = words.length ? all.filter((s) => sessionMatches(s, words)) : all;
+  const waiting = shown.filter((s) => s.state === "waiting");
+  const working = shown.filter((s) => s.state === "working");
+  // Abiertas sin nada pendiente (terminal/IDE aún abierto) ≠ terminadas (proceso cerrado).
+  const idle = shown.filter((s) => s.state === "done");
+  const finished = shown.filter((s) => s.state === "finished");
+  const filter = all.length
+    ? `<input class="ss-filter" type="search" value="${esc(sessionsUi.filter)}" placeholder="${esc(t("Filtrar por palabra, proyecto, epic, issue o MR"))}" />`
+    : "";
 
   let body = `<div class="ss-empty">${t("Cargando…")}</div>`;
   if (sessionsUi.data && !all.length) body = `<div class="ss-empty">${t("No hay sesiones en las últimas 24 h")}</div>`;
-  if (all.length) {
+  else if (all.length && !shown.length) body = `<div class="ss-empty">${t("Ninguna sesión coincide con el filtro")}</div>`;
+  if (shown.length) {
     const shownWaiting = sessionsUi.allWaiting ? waiting : waiting.slice(0, SESSIONS_MAX_WAITING);
     const hiddenWaiting = waiting.length - shownWaiting.length;
     // En el tablero (pantalla completa) cada sección es una rejilla; en la columna, una lista.
@@ -243,7 +338,18 @@ function renderSessions() {
       <button class="icon-btn ss-close" data-ss="close" title="${esc(t("Cerrar el panel"))}">✕</button>
     </div>
     ${launcherHtml()}
+    ${filter}
     ${body}`;
+}
+
+// El foco en el filtro congela el repintado del poll: se repinta a mano al teclear y se le devuelve el foco.
+function filterSessions(input) {
+  const caret = input.selectionStart;
+  sessionsUi.filter = input.value;
+  renderSessions(true);
+  const fresh = sessionsPane.querySelector(".ss-filter");
+  fresh?.focus();
+  fresh?.setSelectionRange(caret, caret);
 }
 
 // MR/PR de un repo configurado → su pestaña de Cambios a pantalla completa (el panel se cierra para dejarle
@@ -261,104 +367,7 @@ function openSessionLink(link, session) {
   window.monstro.openExternal(isChange ? `${link.url}/${link.kind === "mr" ? "diffs" : "files"}` : link.url);
 }
 
-/* ---------- ficha de una sesión: click en su tarjeta → panel de detalle a lo ancho ---------- */
-
-function stateLabel(s) {
-  return { waiting: t("Esperándote"), working: t("Trabajando"), done: t("Sin pendientes"), finished: t("Terminada") }[s.state];
-}
-
-// Hora de una petición: HH:MM si es de hoy; si no, con el día delante.
-function clock(at) {
-  if (!at) return "";
-  const date = new Date(at);
-  const day = date.toDateString() === new Date().toDateString() ? {} : { day: "numeric", month: "short" };
-  return date.toLocaleString(LANG, { ...day, hour: "2-digit", minute: "2-digit", hour12: false });
-}
-
-function workTime(ms) {
-  const min = Math.max(1, Math.round(ms / 60000));
-  return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${min % 60} min`;
-}
-
-function fileRow(f, withRepo) {
-  const shown = withRepo && f.repo ? `${f.repo}/${f.rel}` : f.rel;
-  const cut = shown.lastIndexOf("/");
-  // Como el Quick Open de VS Code: el nombre delante y la carpeta detrás, que es lo que se recorta.
-  return `<li title="${esc(shown)}"><span class="sv-path"><b>${esc(shown.slice(cut + 1))}</b><span class="muted">${esc(shown.slice(0, Math.max(cut, 0)))}</span></span>`
-    + `<span class="checks-success">+${f.added}</span><span class="checks-failure">−${f.removed}</span></li>`;
-}
-
-// Lo destacado de la conversación: el recap del CLI (si lo hay), lo último de Claude, métricas, tus
-// peticiones y los ficheros con su diff. Todo sale del transcript (src/sessions.js), sin IA.
-function sessionView(s) {
-  const added = s.files.reduce((n, f) => n + f.added, 0);
-  const removed = s.files.reduce((n, f) => n + f.removed, 0);
-  // Los valores van sin escapar: son números o HTML hecho con números.
-  const stats = [
-    [s.prompts.length, t("peticiones")],
-    [s.files.length, t("ficheros")],
-    s.files.length && [`<span class="checks-success">+${added}</span> <span class="checks-failure">−${removed}</span>`, t("líneas")],
-    s.workMs && [workTime(s.workMs), t("de trabajo")],
-    typeof s.costUSD === "number" && [`$${s.costUSD.toFixed(2)}`, t("coste")],
-  ].filter(Boolean);
-  const where = [
-    HOST_LABEL[s.host] || ORIGIN_LABEL[s.entrypoint],
-    s.review && t("review de MR"),
-    ...s.repos.map((r) => [r.name, r.branch].filter(Boolean).join(" · ")),
-  ].filter(Boolean);
-  const summary = s.summary?.text
-    ? `<section class="sv-summary"><h3>${t("Resumen de Claude Code")} <span>· ${esc(timeAgo(s.summary.at))}</span></h3><p>${esc(s.summary.text)}</p></section>`
-    : "";
-  const withRepo = new Set(s.files.map((f) => f.repo)).size > 1;
-  const prompts = s.prompts.length
-    ? `<ol class="sv-prompts">${s.prompts.map((p) => `<li><time>${esc(clock(p.at))}</time><span>${esc(p.text)}</span></li>`).join("")}</ol>`
-    : `<p class="muted">${t("Sin peticiones")}</p>`;
-  const files = s.files.length
-    ? `<ul class="sv-files">${s.files.map((f) => fileRow(f, withRepo)).join("")}</ul>`
-    : `<p class="muted">${t("No ha editado ningún fichero")}</p>`;
-  return `
-    <div class="detail-inner sv ${s.state}" data-id="${esc(s.sessionId)}">
-      <button class="detail-close" data-ss="close-view" title="${esc(t("Cerrar (Esc)"))}">✕</button>
-      <div class="detail-title sv-title"><span class="ss-dot"></span>${esc(s.title)}</div>
-      <div class="detail-sub"><b class="sv-state">${esc(stateLabel(s))}</b>${where.map((w) => `<span>${esc(w)}</span>`).join("")}<span>${esc(timeAgo(s.updatedAt))}</span></div>
-      <div class="sv-actions">${s.live ? goButton(s) : `<button class="ss-go-btn" data-ss="resume">${t("Reanudar")}</button>`}${editorButton(s)}</div>
-      ${s.links.length ? `<div class="ss-badges">${s.links.map(linkBadge).join("")}</div>` : ""}
-      ${summary}
-      ${sessionLine(s)}
-      <div class="sv-stats">${stats.map(([value, label]) => `<div class="sv-stat"><b>${value}</b><span>${esc(label)}</span></div>`).join("")}</div>
-      <div class="sv-cols">
-        <section><h3>${t("Tus peticiones")} · ${s.prompts.length}</h3>${prompts}</section>
-        <section><h3>${t("Ficheros editados")} · ${s.files.length}</h3>${files}</section>
-      </div>
-    </div>`;
-}
-
-let sessionViewKey = "";
-
-// Repinta la ficha abierta con el último poll. Sin cambios no se toca: no te quita la selección ni el scroll.
-function renderSessionView(force = false) {
-  const s = (sessionsUi.data || []).find((x) => x.sessionId === viewingId());
-  const key = s ? JSON.stringify(s) : "";
-  if (!s || (key === sessionViewKey && !force)) return;
-  sessionViewKey = key;
-  detailContent.innerHTML = sessionView(s);
-}
-
-// Como una MR en Cambios: a lo ancho, y el tablero se encoge a la columna de al lado (CSS). ✕, Esc u otro
-// click en la tarjeta vuelven al tablero.
-function openSessionView(id) {
-  if (viewingId() === id) return void hideDetail();
-  state.selected = null;
-  state.detailPR = null;
-  detailPane.classList.remove("hidden");
-  detailPane.classList.add("wide");
-  detailPane.scrollTop = 0;
-  detailContent.innerHTML = `<div class="sv" data-id="${esc(id)}"></div>`;
-  renderSessionView(true);
-  renderSessions();
-  // Del tablero a la columna cambia todo de sitio: que la tarjeta pulsada siga a la vista.
-  sessionsPane.querySelector(".selected")?.scrollIntoView({ block: "nearest" });
-}
+/* La ficha de una sesión (click en su tarjeta) vive en sessions-view.js. */
 
 /* ---------- "¿Qué quieres hacer?": lanzador de agentes encima del tablero ---------- */
 
@@ -384,9 +393,12 @@ function launcherHtml() {
     </section>`;
 }
 
+// Por qué no se lanza una MR (lanzador y botones de la ficha); un motivo desconocido va tal cual.
+const skipReason = (code) => ({ "no-clone": t("sin clon local"), "no-branch": t("sin rama"), merged: t("fusionada"), closed: t("cerrada"), locked: t("cerrada") })[code] || code;
+
 // Una MR del link: las que no se lanzan salen en gris con el motivo (un estado inesperado, tal cual).
 function targetRow(x) {
-  const reason = x.skip && ({ "no-clone": t("sin clon local"), merged: t("fusionada"), closed: t("cerrada"), locked: t("cerrada") }[x.skip] || x.skip);
+  const reason = x.skip && skipReason(x.skip);
   return `<li class="${x.skip ? "missing" : ""}"><b>!${x.iid}</b><span class="ss-ellip">${esc(x.title || x.project)}</span><span class="muted">${esc(reason || x.project)}</span></li>`;
 }
 
@@ -407,15 +419,41 @@ function linkForm(l) {
 // Implementar: prompt + carpeta elegida SIEMPRE (el agente trabaja en un worktree de ese repo).
 function implementForm(l) {
   const where = l.dir ? `${l.repo} · ${l.dir}` : t("Elige dónde lanzarlo: trabajará en un worktree de ese repo");
+  // Uno de tus clones (carpeta raíz de Trabajo local) o, con el diálogo, cualquier otra carpeta.
+  const clones = l.clones?.length
+    ? `<select name="clone"><option value="">${esc(t("Elige uno de tus repos…"))}</option>`
+      + (l.root ? `<option value="${esc(l.root)}"${l.root === l.dir ? " selected" : ""}>${esc(t("Todos los repos (el agente elige)"))}</option>` : "")
+      + `${l.clones.map((c) => `<option value="${esc(c.dir)}"${c.dir === l.dir ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select>`
+    : "";
   return `
     <form class="ss-launch-form ss-implement" data-launch="implement">
       <textarea name="prompt" rows="4" required placeholder="${esc(t("¿Qué hay que hacer? Claude decidirá si es epic o tarea y te la propondrá antes de crearla."))}">${esc(l.prompt)}</textarea>
       <div class="ss-launch-row">
+        ${clones}
         <button type="button" class="mini-btn" data-ss="launch-dir">${esc(t("Elegir carpeta…"))}</button>
         <span class="ss-ellip${l.dir ? "" : " muted"}" title="${esc(l.dir || "")}">${esc(where)}</span>
         <button class="ss-go-btn" ${l.dir && !l.busy ? "" : "disabled"}>${esc(t("Lanzar en Ghostty"))}</button>
       </div>
     </form>`;
+}
+
+// Abre (o cierra, si ya estaba abierto) el formulario de una acción. Implementar trae antes tus clones
+// (local:repos, ~200 ms): después el foco del textarea congelaría el repintado que los enseña.
+async function pickLaunchAction(action) {
+  const next = sessionsUi.launch.action === action ? null : action;
+  const found = next === "implement" ? await window.monstro.localRepos().catch(() => null) : null;
+  sessionsUi.launch = { ...sessionsUi.launch, action: next, clones: found?.repos || null, root: found?.rootDir || null, targets: null };
+  renderSessions();
+  sessionsPane.querySelector(".ss-launch-form [name]")?.focus();
+}
+
+// Un clon del desplegable vale como una carpeta del diálogo (main lo vuelve a comprobar al lanzar).
+function pickClone(select) {
+  const l = sessionsUi.launch;
+  const clone = select.value === l.root ? { dir: l.root, name: t("todos los repos") } : l.clones?.find((c) => c.dir === select.value);
+  Object.assign(l, { dir: clone?.dir || null, repo: clone ? clone.gitlabPath || clone.name : null });
+  document.activeElement?.blur(); // con el foco en un campo no se repinta, y "Lanzar" tiene que activarse
+  renderSessions();
 }
 
 // El foco en un campo congela el repintado (renderSessions): se suelta antes de enseñar el resultado.
@@ -475,16 +513,33 @@ async function onSessionAction(action, id, el) {
       await window.monstro.sessionsResume(id);
       toast(t("Reanudando en Ghostty…"), "ok");
       break;
-    case "launch-pick": {
-      const { action } = el.dataset;
-      sessionsUi.launch = { ...sessionsUi.launch, action: sessionsUi.launch.action === action ? null : action, targets: null };
-      renderSessions();
-      sessionsPane.querySelector(".ss-launch-form [name]")?.focus();
+    case "clean-wt": {
+      if (!session?.worktrees?.length) break;
+      const ask = t("¿Quito estos worktrees? Sus ramas se quedan, así que no se pierde nada commiteado; si alguno tiene cambios sin commitear, no se toca.");
+      if (!confirm(`${ask}\n\n${session.worktrees.join("\n")}`)) break;
+      const results = await window.monstro.sessionsCleanWorktrees(id);
+      toast(cleanSummary(results), results.every((r) => r.ok) ? "ok" : "err");
+      await loadSessions();
       break;
     }
+    case "close-session": {
+      if (!session) break;
+      const ask = session.live
+        ? t("¿Cierro esta sesión? Se para su proceso de Claude (si aún la tienes abierta en una pestaña, esa pestaña deja de funcionar) y sale del panel. Podrás reanudarla con claude --resume.")
+        : t("¿Quito esta sesión del panel? No se borra nada: podrás reanudarla con claude --resume.");
+      if (!confirm(`${ask}\n\n${session.title}`)) break;
+      await window.monstro.sessionsClose(id);
+      if (viewingId() === id) hideDetail();
+      toast(session.live ? t("Sesión cerrada") : t("Sesión quitada del panel"), "ok");
+      await loadSessions();
+      break;
+    }
+    case "launch-pick":
+      await pickLaunchAction(el.dataset.action);
+      break;
     case "launch-dir": {
       const picked = await window.monstro.sessionsPickDir();
-      if (picked) Object.assign(sessionsUi.launch, { dir: picked.dir, repo: picked.project || picked.name });
+      if (picked) Object.assign(sessionsUi.launch, { dir: picked.dir, repo: picked.multi ? t("{name} (varios repos)", { name: picked.name }) : picked.project || picked.name });
       renderSessions();
       break;
     }
@@ -519,10 +574,18 @@ async function onSessionAction(action, id, el) {
       await window.monstro.sessionsUntag(id, el.dataset.key);
       await loadSessions();
       break;
+    default:
+      await onSessionViewAction(action, session, el); // botones propios de la ficha (sessions-view.js)
   }
 }
 
 $("#sessions-btn").addEventListener("click", () => toggleSessionsPane());
+
+// Click en el aviso de macOS de una sesión → Monstro al frente (lo hace main) con su ficha abierta.
+window.monstro.onNotifySession((id) => {
+  if (!sessionsOpen()) toggleSessionsPane(true);
+  if (viewingId() !== id) openSessionView(id);
+});
 
 // Botones del panel y de la ficha; el resto de una tarjeta (no su formulario) abre su ficha.
 async function onSessionsClick(event) {
@@ -559,7 +622,9 @@ sessionsPane.addEventListener("submit", async (event) => {
 
 // Los campos del lanzador se guardan al teclear: el poll repinta el panel y no deben perderse.
 sessionsPane.addEventListener("input", (event) => {
+  if (event.target.matches(".ss-filter")) return void filterSessions(event.target);
   if (!event.target.closest("[data-launch]")) return;
+  if (event.target.name === "clone") return void pickClone(event.target);
   sessionsUi.launch[event.target.name] = event.target.value;
   if (event.target.name !== "url") return;
   // Link nuevo → la lista de MRs de antes ya no vale ("Lanzar" resolvería el link nuevo).

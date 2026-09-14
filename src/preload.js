@@ -48,10 +48,20 @@ contextBridge.exposeInMainWorld("monstro", {
   sessionsOpenEditor: (sessionId, dir) => ipcRenderer.invoke("sessions:openEditor", { sessionId, dir }),
   sessionsResume: (sessionId) => ipcRenderer.invoke("sessions:resume", { sessionId }),
   sessionsFocus: (sessionId) => ipcRenderer.invoke("sessions:focus", { sessionId }),
+  sessionsAppIcons: () => ipcRenderer.invoke("sessions:appIcons"),
   sessionsLaunchTargets: (url, action) => ipcRenderer.invoke("sessions:launchTargets", { url, action }),
   sessionsLaunch: (url, action) => ipcRenderer.invoke("sessions:launch", { url, action }),
   sessionsPickDir: () => ipcRenderer.invoke("sessions:pickDir"),
   sessionsImplement: (prompt, dir) => ipcRenderer.invoke("sessions:implement", { prompt, dir }),
+  sessionsCleanWorktrees: (sessionId) => ipcRenderer.invoke("sessions:cleanWorktrees", { sessionId }),
+  sessionsClose: (sessionId) => ipcRenderer.invoke("sessions:close", { sessionId }),
+  sessionsDetail: (sessionId) => ipcRenderer.invoke("sessions:detail", { sessionId }),
+  sessionsLinkDetails: (sessionId) => ipcRenderer.invoke("sessions:linkDetails", { sessionId }),
+  sessionsLaunchOnLinks: (sessionId, action, keys) => ipcRenderer.invoke("sessions:launchOnLinks", { sessionId, action, keys: keys ?? null }),
+  // "Probar en local": plan de lo que se puede levantar de esa sesión, arranque y estado de lo arrancado.
+  localRunPlan: (sessionId) => ipcRenderer.invoke("localRun:plan", { sessionId }),
+  localRunStart: (sessionId, projects) => ipcRenderer.invoke("localRun:start", { sessionId, projects }),
+  localRunStatus: () => ipcRenderer.invoke("localRun:status"),
   // Eventos push de los agentes (timeline/estado/notificación). Devuelve un de-suscriptor.
   onAgentEvent: (channel, cb) => {
     const ok = ["agents:event", "agents:run", "agents:notify"];
@@ -64,7 +74,7 @@ contextBridge.exposeInMainWorld("monstro", {
   searchPRs: (repos, states) => ipcRenderer.invoke("prs:search", { repos, states }),
   prDetail: (repo, number) => ipcRenderer.invoke("pr:detail", { repo, number }),
   mergePR: (args) => ipcRenderer.invoke("pr:merge", args),
-  updateBranch: (nodeId) => ipcRenderer.invoke("pr:updateBranch", { nodeId }),
+  prOpenEditor: (repo, branch) => ipcRenderer.invoke("pr:openEditor", { repo, branch }),
   prFiles: (repo, number) => ipcRenderer.invoke("pr:files", { repo, number }),
   prConversation: (repo, number) => ipcRenderer.invoke("pr:conversation", { repo, number }),
   commentIssue: (repo, number, body) => ipcRenderer.invoke("pr:commentIssue", { repo, number, body }),
@@ -73,8 +83,10 @@ contextBridge.exposeInMainWorld("monstro", {
     ipcRenderer.invoke("pr:replyThread", { repo, number, commentDatabaseId, body }),
   resolveThread: (threadId, resolved) => ipcRenderer.invoke("pr:resolveThread", { threadId, resolved }),
   submitReview: (repo, number, review) => ipcRenderer.invoke("pr:submitReview", { repo, number, review }),
-  dismissReview: (repo, number, reviewId, message) =>
-    ipcRenderer.invoke("pr:dismissReview", { repo, number, reviewId, message }),
+  updateDraftNote: (repo, number, draftNoteId, body) =>
+    ipcRenderer.invoke("pr:updateDraftNote", { repo, number, draftNoteId, body }),
+  deleteDraftNote: (repo, number, draftNoteId) => ipcRenderer.invoke("pr:deleteDraftNote", { repo, number, draftNoteId }),
+  publishDraftNotes: (repo, number) => ipcRenderer.invoke("pr:publishDraftNotes", { repo, number }),
   aiReview: (repo, pr, files, override) =>
     ipcRenderer.invoke("ai:review", {
       repo,
@@ -133,7 +145,13 @@ contextBridge.exposeInMainWorld("monstro", {
     ipcRenderer.on("ai:review-progress", listener);
     return () => ipcRenderer.removeListener("ai:review-progress", listener);
   },
-  notify: (title, body) => ipcRenderer.invoke("notify", { title, body }),
+  notify: (title, body, sessionId = null) => ipcRenderer.invoke("notify", { title, body, sessionId }),
+  // Click en el aviso de una sesión de Agents (src/ipc/system.js). Devuelve un de-suscriptor.
+  onNotifySession: (cb) => {
+    const listener = (_e, sessionId) => cb(sessionId);
+    ipcRenderer.on("notify:session", listener);
+    return () => ipcRenderer.removeListener("notify:session", listener);
+  },
   dockBadge: (text) => ipcRenderer.invoke("dock:badge", text),
   selftestRenderComplete: () => ipcRenderer.send("selftest:render-complete"),
 });

@@ -18,7 +18,6 @@ No configurables. A propósito.
 
 | Operación | Método |
 |---|---|
-| Update branch | **rebase** |
 | Merge | **merge commit** |
 | Squash | **jamás** — no existe en la UI ni en el código |
 
@@ -32,10 +31,11 @@ No configurables. A propósito.
 
 - **Listado de PRs estilo Bitbucket** — estado (Abierta/Borrador/Fusionada/Cerrada),
   `rama-origen → rama-destino`, decisión de review, checks del CI (✓/✗/●), rama atrasada o con
-  conflictos, labels, autor, comentarios y antigüedad. Buckets: *Abiertas · Mías · Para revisar ·
-  Borradores · Fusionadas · Cerradas* con contadores, y búsqueda instantánea.
+  conflictos, labels, autor, comentarios y antigüedad. Buckets: *Merge requests* (las abiertas,
+  con contador) · *Fusionadas · Cerradas*, y búsqueda instantánea.
 - **Diffs nativos** — pestaña *Cambios* con el diff completo (hunks, numeración old/new,
-  colapsable por fichero). Sin saltar al navegador.
+  colapsable por fichero) y flechas ↑↓ para saltar de comentario en comentario desplegando su
+  fichero. Sin saltar al navegador.
 - **Borradores de review** 📝 — los comentarios (inline en una línea o generales) se guardan
   **localmente** y no tocan GitHub hasta que pulsas *Publicar…*, que los envía todos en **una sola
   review** con veredicto: 💬 Comentar · ✅ Aprobar · ± Pedir cambios. Los hilos existentes aparecen
@@ -48,9 +48,10 @@ No configurables. A propósito.
   `develop`/`main` y las ramas de PR (activables). Acciones sobre cualquier commit: copiar SHA,
   crear rama, **mover una rama a ese commit** (force, con confirmación escrita) o **revertir una
   PR fusionada** (crea PR de revert).
-- **Acciones de PR** — *Update branch (rebase)* y *Merge (merge commit)* con confirmación y
-  borrado opcional de la rama. El merge se deshabilita solo (conflictos, checks, rama atrasada)
-  explicando el motivo.
+- **Acciones de PR** — *Merge (merge commit)* con confirmación y borrado opcional de la rama; se
+  deshabilita solo (conflictos, checks, rama atrasada) explicando el motivo. *Abrir en Rider /
+  VS Code* crea un worktree en la rama de la PR (o reutiliza el que ya la tenga), lo pone al día
+  con origin si es fast-forward y lo abre en su editor.
 - **Tablero de tareas por persona (Milestones)** 📋 *(solo GitLab)* — gestión de proyecto sobre un
   milestone de grupo: sus *issues* agrupados por **integrante**, una columna por persona (un issue
   con varios asignados aparece en cada uno). Pestañas arriba para cambiar de milestone. **Selección
@@ -68,7 +69,7 @@ No configurables. A propósito.
   piden cambios, y cuando sus checks se ponen en rojo. El Dock muestra cuántas PRs esperan tu
   review.
 - **Multi-repo** — varios repositorios y una vista agregada *⭐ Todos los repos*.
-- **Teclado** — `⌘K` paleta de comandos · `j/k` + `Enter` navegar y abrir · `1–6` buckets ·
+- **Teclado** — `⌘K` paleta de comandos · `j/k` + `Enter` navegar y abrir · `1–3` buckets ·
   `h` histórico · `R` refrescar · `Esc` cerrar.
 - Modo claro/oscuro según el sistema. UI en español.
 

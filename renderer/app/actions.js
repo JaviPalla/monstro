@@ -1,18 +1,18 @@
 "use strict";
 
-async function updateBranch(pr) {
-  const btn = $("#act-update");
-  btn.disabled = true;
-  btn.textContent = t("Rebasando…");
+// Abre la rama de la PR en Rider / VS Code, en un worktree suyo (lo prepara main): tu clon no se toca.
+async function openPrInEditor(pr) {
+  const btn = $("#act-editor");
+  if (btn) btn.disabled = true;
+  toast(t("Preparando el worktree de {branch}…", { branch: pr.headRefName }), "");
   try {
-    await window.monstro.updateBranch(pr.id);
-    toast(t("#{n}: rama actualizada con rebase", { n: pr.number }), "ok");
-    await refresh();
-    openDetail(pr.number, state.detailTab);
+    const res = await window.monstro.prOpenEditor(detailRepo(), pr.headRefName);
+    if (!res.ok) throw new Error(res.error);
+    toast(t("Abriendo {branch} en {editor}", { branch: pr.headRefName, editor: res.stack === "dotnet" ? "Rider" : "VS Code" }), "ok");
   } catch (err) {
-    toast(t("Update falló: {err}", { err: String(err.message || err) }), "err");
-    btn.disabled = false;
-    btn.textContent = t("⤴ Update branch (rebase)");
+    toast(t("No se pudo abrir: {err}", { err: String(err.message || err) }), "err");
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -29,81 +29,6 @@ async function toggleDraftState(pr) {
     toast(t("No se pudo cambiar el estado: {e}", { e: String(err.message || err) }), "err");
     if (btn) btn.disabled = false;
   }
-}
-
-/** Mi review APPROVED más reciente en la PR, si existe (para poder retirarla). */
-function myApprovedReview(pr) {
-  return (
-    (pr.latestReviews?.nodes || []).find(
-      (review) => review.author?.login === state.me?.login && review.state === "APPROVED",
-    ) || null
-  );
-}
-
-function confirmUnapprove(pr) {
-  const review = myApprovedReview(pr);
-  if (!review?.databaseId) return toast(t("No encuentro tu review aprobada (refresca e inténtalo)"), "err");
-  const root = $("#modal-root");
-  root.innerHTML = `
-    <div class="modal-backdrop" id="modal-backdrop">
-      <div class="modal">
-        <h3>↩︎ ${t("Quitar aprobación de #{n}", { n: pr.number })}</h3>
-        <p>${esc(pr.title)}</p>
-        <p class="muted">${t("Tu review aprobada se descarta: la PR deja de contar con tu ✓. GitHub lo registra en la conversación junto al motivo.")}</p>
-        <input type="text" id="dismiss-reason" placeholder="${t("Motivo (opcional)")}" style="width:100%;margin-top:8px" class="modal-input" />
-        <div class="modal-actions">
-          <button class="btn" id="modal-cancel">${t("Cancelar")}</button>
-          <button class="btn btn-primary" id="modal-confirm">${t("Quitar aprobación")}</button>
-        </div>
-      </div>
-    </div>`;
-  $("#modal-cancel").addEventListener("click", () => (root.innerHTML = ""));
-  $("#modal-backdrop").addEventListener("click", (event) => {
-    if (event.target.id === "modal-backdrop") root.innerHTML = "";
-  });
-  $("#modal-confirm").addEventListener("click", async () => {
-    const message = $("#dismiss-reason").value.trim() || "Aprobación retirada desde Monstro";
-    root.innerHTML = "";
-    try {
-      await window.monstro.dismissReview(detailRepo(), pr.number, review.databaseId, message);
-      toast(t("Aprobación retirada de #{n}", { n: pr.number }), "ok");
-      await refresh();
-      openDetail(pr.number, state.detailTab);
-    } catch (err) {
-      toast(t("No se pudo retirar: {err}", { err: String(err.message || err) }), "err");
-    }
-  });
-}
-
-function confirmApprove(pr) {
-  const root = $("#modal-root");
-  root.innerHTML = `
-    <div class="modal-backdrop" id="modal-backdrop">
-      <div class="modal">
-        <h3>✅ ${t("Aprobar #{n}", { n: pr.number })}</h3>
-        <p>${esc(pr.title)}</p>
-        <p class="muted">${t("Publica una review de aprobación sin comentarios. Si tienes borradores pendientes, no se tocan.")}</p>
-        <div class="modal-actions">
-          <button class="btn" id="modal-cancel">${t("Cancelar")}</button>
-          <button class="btn btn-primary" id="modal-confirm">${t("Aprobar")}</button>
-        </div>
-      </div>
-    </div>`;
-  $("#modal-cancel").addEventListener("click", () => (root.innerHTML = ""));
-  $("#modal-backdrop").addEventListener("click", (event) => {
-    if (event.target.id === "modal-backdrop") root.innerHTML = "";
-  });
-  $("#modal-confirm").addEventListener("click", async () => {
-    root.innerHTML = "";
-    try {
-      await window.monstro.submitReview(detailRepo(), pr.number, { event: "APPROVE" });
-      toast(t("#{n} aprobada ✅", { n: pr.number }), "ok");
-      await refresh();
-      openDetail(pr.number, state.detailTab);
-    } catch (err) {
-      toast(t("No se pudo aprobar: {err}", { err: String(err.message || err) }), "err");
-    }
-  });
 }
 
 function confirmMerge(pr) {

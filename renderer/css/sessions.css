@@ -32,6 +32,7 @@
 .ss-implement textarea { min-height: 84px; resize: vertical; }
 .ss-launch-row { display: flex; align-items: center; gap: 10px; }
 .ss-launch-row .ss-ellip { flex: 1; font-size: 12px; }
+.ss-launch-row select { max-width: 260px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 13px; color: var(--text); background: var(--bg); }
 .ss-targets { margin: 12px 0; padding: 0; list-style: none; }
 .ss-targets li { display: flex; align-items: baseline; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 13px; }
 .ss-targets li .ss-ellip { flex: 1; }
@@ -52,16 +53,11 @@
   color: #fff;
 }
 
-/* Menú plegado a iconos mientras el panel está abierto: sigue accesible, con el nombre como tooltip. */
-body.nav-collapsed #sidebar { width: 52px; padding: 12px 6px; }
-body.nav-collapsed #sidebar > #repo-select { display: none; }
-body.nav-collapsed #sidebar .nav-section { justify-content: center; padding: 10px 0 4px; font-size: 0; }
-body.nav-collapsed #sidebar .bucket { justify-content: center; padding: 8px 0; font-size: 0; }
-body.nav-collapsed #sidebar .bucket .ico { width: 16px; height: 16px; }
-body.nav-collapsed #sidebar .bucket .count { display: none; }
-body.nav-collapsed #sessions-btn .count:not(:empty) { display: block; position: absolute; top: 1px; right: 3px; padding: 0 4px; font-size: 9px; line-height: 14px; }
-
 .ss-head { display: flex; align-items: center; gap: 8px; margin: 2px 2px 4px; }
+/* Filtro por palabras encima de las secciones; en el tablero no hace falta que ocupe todo el ancho. */
+.ss-filter { display: block; width: 100%; margin: 6px 0 2px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 13px; color: var(--text); background: var(--bg-raised); }
+.ss-filter:focus { outline: none; border-color: var(--accent); }
+#layout:has(#detail-pane.hidden) .ss-filter { max-width: 480px; }
 .ss-sub { font-size: 12px; color: var(--text-muted); }
 .ss-close { margin-left: auto; font-size: 13px; }
 .ss-empty { padding: 18px 4px; font-size: 12px; text-align: center; color: var(--text-muted); }
@@ -186,6 +182,24 @@ button.ss-badge { cursor: pointer; }
   cursor: pointer;
 }
 .ss-go-btn:hover { filter: brightness(1.08); }
+/* "Abrir" (openButton) en tarjeta y ficha: neutro, el color lo pone el icono de la app */
+.ss-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--text);
+  background: var(--bg-raised);
+  cursor: pointer;
+}
+.ss-open-btn:hover { border-color: var(--accent); background: var(--bg-hover); }
+.ss-open-btn img { flex: none; width: 16px; height: 16px; margin-left: -4px; }
 .ss-more-link { display: block; margin: -2px 4px 4px; padding: 0; border: none; font: inherit; font-size: 12px; color: var(--accent); background: none; cursor: pointer; }
 .ss-tag-form { margin-top: 7px; }
 .ss-tag-form input {
@@ -204,7 +218,9 @@ button.ss-badge { cursor: pointer; }
 .ss-done-top { display: flex; align-items: center; gap: 7px; height: 26px; }
 .ss-done-top .ss-ellip { flex: 1; }
 .ss-done-links { margin: 0 0 4px 15px; }
-.ss-done .mini-btn { display: none; }
+.ss-done .mini-btn:not(.ss-clean) { display: none; }
+/* Worktrees pendientes de limpiar: siempre a la vista (Reanudar solo al pasar por encima). */
+.ss-clean { color: var(--yellow); }
 .ss-done:hover .mini-btn { display: inline-block; }
 .ss-done:hover .ss-time { display: none; }
 
@@ -217,7 +233,6 @@ button.ss-badge { cursor: pointer; }
 .sv.waiting .sv-state { color: var(--yellow); }
 .sv.working .sv-state { color: var(--green); }
 .sv-actions { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
-.sv > .ss-badges { margin-bottom: 16px; }
 .sv h3 { margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-muted); }
 .sv h3 span { font-weight: 400; letter-spacing: 0; text-transform: none; }
 .sv-summary { margin-bottom: 12px; padding: 12px 16px; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--bg); }
@@ -239,6 +254,127 @@ button.ss-badge { cursor: pointer; }
 .sv-path { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sv-path b { font-weight: 600; }
 .sv-path .muted { margin-left: 8px; }.sv-files .checks-success, .sv-files .checks-failure { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.sv-loading { display: flex; align-items: center; gap: 8px; }
+
+/* Ficha: la pregunta de Claude (opciones, o abierta con respuestas sugeridas por la IA). Click → copia y "Abrir". */
+.sv-question { margin-bottom: 16px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--yellow) 40%, var(--border)); border-left: 3px solid var(--yellow); border-radius: 10px; background: var(--bg); }
+.sv-q-item + .sv-q-item { margin-top: 14px; }
+.sv-q-text { margin: 0 0 8px; font-size: 14px; line-height: 1.5; }
+.sv-q-tag { display: inline-block; margin-right: 8px; padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 18px; vertical-align: 1px; background: var(--yellow-bg); color: var(--yellow); }
+.sv-q-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.sv-q-opt { display: flex; flex-direction: column; gap: 3px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px; font: inherit; text-align: left; color: var(--text); background: var(--bg-raised); cursor: pointer; }
+.sv-q-opt:hover { border-color: var(--accent); background: var(--bg-hover); }
+.sv-q-opt b { font-size: 13px; font-weight: 600; line-height: 1.4; }
+.sv-q-opt span { font-size: 12px; line-height: 1.4; color: var(--text-muted); }
+
+/* Ficha: MRs, tareas y epics de la sesión en tarjetas compactas (click → como su badge) */
+.sv-links-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.sv-links-head h3 { flex: 1; margin: 0; }
+.sv-link-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+.sv-link { display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 9px 11px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); cursor: pointer; }
+.sv-link:hover { border-color: var(--accent); }
+.sv-link.done { opacity: 0.7; }
+.sv-link-top { display: flex; align-items: center; gap: 6px; }
+.sv-link-top .chip { padding: 1px 8px; }
+.sv-pipe { font-size: 11px; font-weight: 600; white-space: nowrap; }
+.sv-link-x { margin-left: auto; padding: 0 4px; border: none; font: inherit; color: var(--text-muted); background: none; cursor: pointer; opacity: 0; }
+.sv-link:hover .sv-link-x { opacity: 0.8; }
+.sv-link-title { display: -webkit-box; overflow: hidden; font-size: 13px; line-height: 1.4; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.sv-link-title b { font-weight: 600; color: var(--text-muted); }
+.sv-link-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; font-size: 11.5px; color: var(--text-muted); }
+.sv-link-meta .branch { max-width: 180px; }
+.sv-link-project { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sv-link-actions { display: flex; gap: 6px; }
+.sv-links .mini-btn { font-family: inherit; }
+.sv-links .mini-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Ficha: "Probar en local" (app/sessions-local.js) — plan de arranque y, después, cómo va cada proyecto */
+.svl { margin: 14px 0 4px; }
+.svl-head { display: flex; align-items: center; gap: 6px; }
+.svl-toggle.active { border-color: var(--accent); color: var(--accent); }
+.svl-x { padding: 0 6px; border: none; font: inherit; color: var(--text-muted); background: none; cursor: pointer; }
+.svl-x:hover { color: var(--text); }
+.svl-body { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--bg); }
+.svl-body > .mini-btn, .svl-body > .ss-go-btn { margin-top: 12px; }
+.svl-note { margin: 0 0 10px; font-size: 12px; color: var(--text-muted); }
+.svl-hosts { margin-bottom: 12px; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--yellow) 40%, var(--border)); border-radius: 9px; background: var(--yellow-bg); }
+.svl-hosts p { margin: 0 0 6px; font-size: 12px; }
+.svl-hosts-line { display: flex; align-items: center; gap: 8px; }
+.svl-hosts code { flex: 1; min-width: 0; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; white-space: nowrap; overflow-x: auto; }
+.svl-rows { display: flex; flex-direction: column; }
+.svl-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); }
+.svl-rows > .svl-row:first-child { border-top: none; padding-top: 0; }
+.svl-row.off { opacity: 0.55; }
+.svl-row:not(.off):not(.svl-st) { cursor: pointer; }
+.svl-box { margin: 3px 0 0; accent-color: var(--accent); }
+.svl-box-off { width: 13px; text-align: center; font-size: 12px; color: var(--text-muted); }
+.svl-dot { flex-shrink: 0; width: 9px; height: 9px; margin-top: 5px; border-radius: 50%; background: var(--text-muted); }
+.svl-up { background: var(--green); }
+.svl-starting { background: var(--yellow); animation: loading-pulse 1.4s ease-in-out infinite; } /* prs.css */
+.svl-down { background: var(--red); }
+.svl-main { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
+.svl-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; font-size: 13px; }
+.svl-top b { font-weight: 600; }
+.svl-kind { padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; line-height: 17px; background: var(--bg-hover); color: var(--text-muted); }
+.svl-k-api { background: var(--green-bg); color: var(--green); }
+.svl-k-front { background: var(--yellow-bg); color: var(--yellow); }
+.svl-port { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; color: var(--text-muted); }
+.svl-state { font-size: 12px; font-weight: 600; }
+.svl-url, .svl-points, .svl-warn { min-width: 0; font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.svl-needs, .svl-blocked { font-size: 11.5px; }
+.svl-needs { color: var(--red); }
+.svl-blocked { color: var(--text-muted); }
+.svl-st .mini-btn { flex-shrink: 0; }
+
+/* Ficha: pestañas (el mismo .tabs de una MR) y Cambios: último mensaje, commits y ficheros con su diff (prs.css) */
+.sv-tabs { margin: 18px 0 16px; }
+.sv-tab-body > section + section { margin-top: 20px; }
+.sv-final { padding: 12px 16px; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--bg); }
+.sv-commits { margin: 0; padding: 0; list-style: none; }
+.sv-commits li { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.sv-commits code { flex-shrink: 0; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; color: var(--branch-text); }
+.sv-commit-subject { flex: 1; min-width: 0; }
+.sv-repo + .sv-repo { margin-top: 16px; }
+.sv-repo h4 { margin: 0 0 4px; font-size: 13px; }
+.sv-repo h4 .muted { margin: 0 6px; font-weight: 400; }
+.sv-dir { margin: 10px 0 -2px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; color: var(--text-muted); }
+.sv-diff { margin: 6px 0; }
+.sv-diff summary { padding: 7px 12px; font-weight: 500; }
+.sv-diff summary::before { content: "▸"; font-size: 10px; color: var(--text-muted); }
+.sv-diff[open] summary::before { content: "▾"; }
+.sv-diff .diff-path { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sv-trunc { padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; line-height: 17px; background: var(--yellow-bg); color: var(--yellow); }
+.sv-nodiff { padding: 8px 14px; }
+
+/* Markdown (renderer/app/markdown.js): el plan y el último mensaje de Claude, pensados para leer */
+.md { max-width: 860px; font-size: 14px; line-height: 1.6; color: var(--text); overflow-wrap: anywhere; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md p, .md ul, .md ol, .md blockquote, .md pre, .md .md-table { margin: 0 0 12px; }
+.sv .md h1, .sv .md h2, .sv .md h3, .sv .md h4, .sv .md h5, .sv .md h6 { margin: 22px 0 8px; font-weight: 600; line-height: 1.3; letter-spacing: 0; text-transform: none; color: var(--text); }
+.sv .md h1 { font-size: 21px; }
+.sv .md h2 { padding-bottom: 5px; border-bottom: 1px solid var(--border); font-size: 18px; }
+.sv .md h3 { font-size: 15.5px; }
+.sv .md h4, .sv .md h5, .sv .md h6 { font-size: 14px; }
+.md ul, .md ol { padding-left: 24px; }
+.md li { margin: 3px 0; }
+.md li > ul, .md li > ol { margin: 4px 0; }
+.md li.md-task { margin-left: -18px; list-style: none; }
+.md code { padding: 1px 5px; border-radius: 5px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.86em; background: var(--gray-bg); }
+/* Bloques de código con los colores del tema del diff ([data-syntax-theme] en el body, prs.css) */
+.md pre { padding: 12px 14px; border: 1px solid var(--hl-border, var(--border)); border-radius: 8px; overflow-x: auto; color: var(--hl-fg, var(--text)); background: var(--hl-bg, var(--bg)); }
+.md pre code { padding: 0; font-size: 12px; line-height: 1.55; color: inherit; background: none; }
+.md blockquote { padding: 2px 14px; border-left: 3px solid var(--border); color: var(--text-muted); }
+.md hr { margin: 18px 0; border: none; border-top: 1px solid var(--border); }
+.md a { color: var(--accent); text-decoration: none; }
+.md a:hover { text-decoration: underline; }
+.md-table { overflow-x: auto; }
+.md table { border-collapse: collapse; font-size: 13px; }
+.md th, .md td { padding: 6px 12px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+.md th { font-weight: 600; background: var(--bg-hover); }
+.md .md-right { text-align: right; }
+.md .md-center { text-align: center; }
+.sv-plan { padding: 2px 2px 12px; }
 
 /* Liquid Glass: el mismo cristal que el menú lateral (css/theme-glass.css) */
 body[data-ui-theme="liquid-glass"] #sessions-pane {
@@ -248,6 +384,14 @@ body[data-ui-theme="liquid-glass"] #sessions-pane {
   -webkit-backdrop-filter: blur(24px) saturate(180%);
 }
 body[data-ui-theme="liquid-glass"] .ss-card { background: rgba(255, 255, 255, 0.62); }
+/* Superficies de la ficha: solo el fondo (sus bordes de color, amarillo/azul a la izquierda, se quedan) */
+body[data-ui-theme="liquid-glass"] .sv-link,
+body[data-ui-theme="liquid-glass"] .sv-stat { background: rgba(255, 255, 255, 0.55); border-color: rgba(255, 255, 255, 0.72); }
+body[data-ui-theme="liquid-glass"] .sv-question,
+body[data-ui-theme="liquid-glass"] .sv-final,
+body[data-ui-theme="liquid-glass"] .svl-body,
+body[data-ui-theme="liquid-glass"] .sv-summary { background: rgba(255, 255, 255, 0.55); }
+body[data-ui-theme="liquid-glass"] .sv-q-opt { background: rgba(255, 255, 255, 0.72); }
 @media (prefers-color-scheme: dark) {
   body[data-ui-theme="liquid-glass"] #sessions-pane {
     border-right-color: rgba(255, 255, 255, 0.08);
@@ -255,4 +399,11 @@ body[data-ui-theme="liquid-glass"] .ss-card { background: rgba(255, 255, 255, 0.
   }
   body[data-ui-theme="liquid-glass"] .ss-card { background: rgba(25, 32, 58, 0.55); }
   body[data-ui-theme="liquid-glass"] .ss-quote { background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.07); }
+  body[data-ui-theme="liquid-glass"] .sv-link,
+  body[data-ui-theme="liquid-glass"] .sv-stat { background: rgba(25, 32, 58, 0.5); border-color: rgba(255, 255, 255, 0.09); }
+  body[data-ui-theme="liquid-glass"] .sv-question,
+  body[data-ui-theme="liquid-glass"] .sv-final,
+  body[data-ui-theme="liquid-glass"] .svl-body,
+  body[data-ui-theme="liquid-glass"] .sv-summary { background: rgba(25, 32, 58, 0.5); }
+  body[data-ui-theme="liquid-glass"] .sv-q-opt { background: rgba(35, 44, 74, 0.6); }
 }

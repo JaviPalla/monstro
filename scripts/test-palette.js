@@ -18,13 +18,14 @@ const assert = require("assert");
 const SOURCE = fs.readFileSync(path.join(__dirname, "..", "renderer", "app", "palette.js"), "utf8");
 
 /** Contexto con lo mínimo real; cualquier otra global es una función no-op. */
-function evaluatePalette({ pr = null, drafts = [], sections = () => true, repos = ["g/a"], approvedByMe = false, query = "", openPrs = null } = {}) {
+function evaluatePalette({ pr = null, drafts = [], sections = () => true, repos = ["g/a"], query = "", openPrs = null, pendingDrafts = 0 } = {}) {
   const noop = () => {};
   const globals = {
     state: {
       detailPR: pr,
       detailTab: "conv",
       drafts,
+      conversation: { pendingDrafts },
       openPrs: openPrs || [{ number: 7, title: "Algo", headRefName: "feat/x", baseRefName: "main" }],
       me: { login: "yo" },
       config: { repos, uiTheme: "default" },
@@ -33,7 +34,6 @@ function evaluatePalette({ pr = null, drafts = [], sections = () => true, repos 
     t: (es, params) => (params ? Object.keys(params).reduce((acc, k) => acc.split(`{${k}}`).join(params[k]), es) : es),
     sectionEnabled: sections,
     canMerge: (p) => p.state === "OPEN",
-    myApprovedReview: () => (approvedByMe ? { databaseId: 1 } : null),
     currentLang: () => "es",
     providerName: () => "GitLab",
     ALL_REPOS: "__all__",
@@ -66,34 +66,35 @@ for (const e of base) {
 // 2. Sin detalle abierto no hay acciones de PR (llamarlas explotaría con state.detailPR = null).
 assert.ok(!base.some((e) => e.group.startsWith("PR #")), "sin detalle abierto no debe haber grupo de PR");
 
-// 3. PR abierta de otra persona: se puede aprobar, mergear, rebasar y revisar con IA.
+// 3. PR abierta de otra persona: se puede mergear, abrir en el editor y revisar con IA.
 const other = labels(evaluatePalette({ pr: openPR }));
-for (const expected of ["Aprobar", "Merge (merge commit)", "Update branch (rebase)", "Review con IA", "Abrir en el navegador"]) {
+for (const expected of ["Merge (merge commit)", "Abrir en Rider / VS Code", "Review con IA", "Abrir en el navegador"]) {
   assert.ok(other.includes(expected), `falta "${expected}" en una PR abierta ajena`);
 }
-assert.ok(!other.includes("Quitar aprobación"), "sin review aprobada mía no se ofrece quitarla");
 assert.ok(!other.includes("Revertir"), "una PR abierta no se revierte");
 
-// 4. Ya aprobada por mí: se ofrece quitar la aprobación, no volver a aprobar.
-const approved = labels(evaluatePalette({ pr: openPR, approvedByMe: true }));
-assert.ok(approved.includes("Quitar aprobación"), "falta quitar aprobación");
-assert.ok(!approved.includes("Aprobar"), "no se puede aprobar dos veces");
+// 4. Aprobar, update branch y el comando de checkout se quitaron del detalle: tampoco en la paleta.
+for (const gone of ["Aprobar", "Quitar aprobación", "Update branch (rebase)", "Copiar comando de checkout"]) {
+  assert.ok(!other.includes(gone), `"${gone}" ya no existe en el detalle`);
+}
 
-// 5. PR propia: nunca aprobar la tuya (mismo guard que el botón), sí alternar borrador.
+// 5. PR propia: alternar borrador.
 const mine = labels(evaluatePalette({ pr: { ...openPR, author: { login: "yo" } } }));
-assert.ok(!mine.includes("Aprobar"), "no puedes aprobar tu propia PR");
 assert.ok(mine.includes("Convertir a borrador"), "falta el toggle de borrador en una PR propia");
 
-// 6. PR mergeada: se revierte, no se rebasa/mergea/aprueba.
+// 6. PR mergeada: se revierte; no se mergea, ni se abre la rama (puede estar borrada), ni se revisa.
 const merged = labels(evaluatePalette({ pr: { ...openPR, state: "MERGED" } }));
 assert.ok(merged.includes("Revertir"), "una PR mergeada debe poder revertirse");
-for (const forbidden of ["Update branch (rebase)", "Merge (merge commit)", "Aprobar", "Review con IA"]) {
+for (const forbidden of ["Abrir en Rider / VS Code", "Merge (merge commit)", "Review con IA"]) {
   assert.ok(!merged.includes(forbidden), `"${forbidden}" no aplica a una PR mergeada`);
 }
 
 // 7. Los borradores locales solo aparecen si los hay.
 assert.ok(!labels(evaluatePalette({ pr: openPR })).includes("Publicar borradores"), "sin borradores no se ofrece publicar");
 assert.ok(labels(evaluatePalette({ pr: openPR, drafts: [{ id: 1 }] })).includes("Publicar borradores"), "con borradores debe ofrecerse publicar");
+// …y los de GitLab (draft notes) igual: mismo guard que el botón de la barra de Cambios.
+assert.ok(!labels(evaluatePalette({ pr: openPR })).includes("Publicar en GitLab"), "sin draft notes no se ofrece publicar en GitLab");
+assert.ok(labels(evaluatePalette({ pr: openPR, pendingDrafts: 3 })).includes("Publicar en GitLab"), "con draft notes debe ofrecerse publicar en GitLab");
 
 // 8. Apartados deshabilitados en Ajustes: fuera de la paleta también (es el mismo whitelist).
 const hidden = evaluatePalette({ sections: () => false });

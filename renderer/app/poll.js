@@ -22,7 +22,7 @@ function detectAndNotify(openPrs) {
   }
   const previous = state.prSnapshot;
   state.prSnapshot = snapshot;
-  window.monstro.dockBadge(String([...snapshot.values()].filter((s) => s.reviewMe).length || ""));
+  setDockBadge("reviews", [...snapshot.values()].filter((s) => s.reviewMe).length);
   if (!previous) return; // primera carga: sin spam
 
   for (const [number, now] of snapshot) {

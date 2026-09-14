@@ -44,6 +44,9 @@ const TS_RE = /"timestamp":"([^"]+)"/;
 const FILE_RE = /"file_path":"(\/[^"]+)"/g;
 const META_RE = /^\{"type":"(ai-title|custom-title|agent-name|last-prompt|pr-link|cost-state)"/;
 const PROMPT_MAX = 500;
+// Pregunta abierta entera (la pinta la ficha) y descripción de cada opción de AskUserQuestion.
+const QUESTION_MAX = 600;
+const OPTION_MAX = 300;
 // Lo que el CLI / el IDE meten alrededor de tu mensaje: no es lo que escribiste.
 const CLI_TAG_RE = /<(system-reminder|ide_[a-z_]+|local-command-[a-z]+|command-message|bash-std(?:out|err)|task-notification)>[\s\S]*?<\/\1>/g;
 
@@ -70,7 +73,7 @@ function parseLink(url) {
 const freshAcc = () => ({
   offset: 0, seq: 0, lastAt: 0, entrypoint: null, aiTitle: null, customTitle: null, agentName: null, lastPrompt: null,
   firstCwd: null, lastCwd: null, dirs: new Map(), branches: new Map(), links: new Map(),
-  lastAssistant: null, lastAssistantSeq: 0, lastUserSeq: 0, turn: null, turnSeq: -1, review: false,
+  lastAssistant: null, lastAssistantSeq: 0, lastUserSeq: 0, turn: null, turnSeq: -1, review: false, hasPlan: false,
   // Para la ficha: tus peticiones, ficheros editados (ruta → líneas +/−), recap del CLI, tiempo de Claude y coste.
   prompts: [], files: new Map(), awaySummary: null, workMs: 0, costUSD: null,
 });
@@ -142,6 +145,8 @@ function scanLine(acc, line) {
   if (line.includes('"type":"assistant"')) {
     acc.lastAssistant = line;
     acc.lastAssistantSeq = acc.seq;
+    // Plan del modo plan (llamada a ExitPlanMode): aquí solo la marca; el markdown lo saca la ficha bajo demanda.
+    if (!acc.hasPlan && line.includes('"name":"ExitPlanMode"') && line.includes('"plan":"')) acc.hasPlan = true;
   } else if (line.includes('"type":"user"')) {
     acc.lastUserSeq = acc.seq;
     // Mismo truco que con cwd: dentro de un texto estas claves van escapadas, así que solo casan las reales.
@@ -249,23 +254,49 @@ async function processInfo(pids) {
   return info;
 }
 
-function liveSessions() {
+// ~/.claude/sessions/<pid>.json de procesos interactivos vivos (varios pueden compartir sessionId).
+function liveProcesses() {
   const dir = path.join(CLAUDE_DIR, "sessions");
   let files;
   try { files = fs.readdirSync(dir).filter((f) => f.endsWith(".json")); } catch { return []; }
-  // La extensión de VS Code relanza el proceso al reanudar y el viejo puede seguir vivo con el mismo
-  // sessionId: una fila por sesión, la del proceso más reciente.
-  const bySession = new Map();
+  const out = [];
   for (const f of files) {
     try {
       const s = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
       // ponytail: un PID reciclado por otro proceso daría la sesión por viva; comparar procStart si pasa.
-      if (!UUID_RE.test(s.sessionId || "") || !Number.isInteger(s.pid) || (s.kind && s.kind !== "interactive") || !isAlive(s.pid)) continue;
-      const prev = bySession.get(s.sessionId);
-      if (!prev || (s.startedAt || 0) > (prev.startedAt || 0)) bySession.set(s.sessionId, s);
+      if (UUID_RE.test(s.sessionId || "") && Number.isInteger(s.pid) && (!s.kind || s.kind === "interactive") && isAlive(s.pid)) out.push(s);
     } catch { /* fichero a medio escribir: saldrá en el siguiente poll */ }
   }
+  return out;
+}
+
+function liveSessions() {
+  // La extensión de VS Code relanza el proceso al reanudar y el viejo puede seguir vivo con el mismo
+  // sessionId: una fila por sesión, la del proceso más reciente.
+  const bySession = new Map();
+  for (const s of liveProcesses()) {
+    const prev = bySession.get(s.sessionId);
+    if (!prev || (s.startedAt || 0) > (prev.startedAt || 0)) bySession.set(s.sessionId, s);
+  }
   return [...bySession.values()];
+}
+
+// "Cerrar" del panel: SIGTERM a TODOS los procesos de la sesión (la extensión de VS Code deja vivos los de las
+// pestañas que cierras, a veces más de uno por sesión). Solo si el PID sigue siendo un `claude`: los PID se reciclan.
+async function closeSession(sessionId) {
+  const pids = liveProcesses().filter((s) => s.sessionId === sessionId).map((s) => s.pid);
+  const killed = [];
+  for (const pid of pids) {
+    const comm = await pexec("ps", ["-o", "comm=", "-p", String(pid)], { timeout: 5000 }).then(({ stdout }) => path.basename(stdout.trim()), () => "");
+    if (comm !== "claude") continue;
+    try {
+      process.kill(pid, "SIGTERM");
+      killed.push(pid);
+    } catch { /* murió entre medias */ }
+  }
+  // Hasta 2 s a que salgan: así el refresco de después ya no la ve viva.
+  for (let i = 0; i < 10 && killed.some(isAlive); i++) await new Promise((r) => setTimeout(r, 200));
+  return killed.length;
 }
 
 // sessionId → transcript más reciente (se indexa por nombre de fichero, sin adivinar cómo codifica el cwd).
@@ -325,6 +356,12 @@ const clip = (text, max = 90) => {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat || null;
 };
 
+// Como clip, pero respetando los saltos de línea (párrafos, markdown).
+const clipText = (text, max) => {
+  const trimmed = String(text || "").trim();
+  return trimmed.length > max ? `${trimmed.slice(0, max - 1)}…` : trimmed || null;
+};
+
 // Repos de la sesión, el más reciente primero. `dir` es el que se abre en el editor: el último cwd
 // dentro de ese repo (p.ej. su worktree), con la rama que tenía ahí.
 async function sessionRepos(acc, dirs) {
@@ -344,14 +381,29 @@ async function sessionRepos(acc, dirs) {
   return [...byRepo.values()].reverse().map((r) => ({ ...r, stack: editorStack(r.dir) }));
 }
 
-// Ficheros editados, relativos a su repo (con ~ si no están en ninguno), ordenados como un `git diff --stat`.
+// Worktree de agente aún en disco: `<clon>/.worktrees/<slug>` (Monstro, Implementar en varios repos) o
+// `<clon>/.claude/worktrees/<nombre>` (`claude -w`). Los que te hagas a mano en otro sitio no se tocan.
+const AGENT_WORKTREE_RE = /[\\/]\.(claude[\\/])?worktrees[\\/][^\\/]+$/;
+const agentWorktree = (dir) => AGENT_WORKTREE_RE.test(dir) && Boolean(fs.statSync(path.join(dir, ".git"), { throwIfNoEntry: false })?.isFile());
+
+// Los worktrees de agente que tocó la sesión (lo que "Limpiar worktrees" puede quitar). Aparte de
+// sessionRepos porque allí un worktree y su clon comparten origin y se funden en una sola entrada.
+async function sessionWorktrees(dirs) {
+  const roots = await Promise.all([...dirs.keys()].map(async (dir) => (await repoOf(dir))?.root));
+  return [...new Set(roots.filter((root) => root && agentWorktree(root)))];
+}
+
+// Fichero → { repo, rel }: relativo a su repo, o con ~ si no está en ninguno.
+async function relOf(file) {
+  const repo = await repoOf(path.dirname(file));
+  const rel = repo ? path.relative(repo.root, file) : file.startsWith(HOME) ? `~${file.slice(HOME.length)}` : file;
+  return { repo: repo?.name || null, rel };
+}
+
+// Ficheros editados, ordenados como un `git diff --stat`.
 async function sessionFiles(acc) {
   const out = [];
-  for (const [file, lines] of acc.files) {
-    const repo = await repoOf(path.dirname(file));
-    const rel = repo ? path.relative(repo.root, file) : file.startsWith(HOME) ? `~${file.slice(HOME.length)}` : file;
-    out.push({ repo: repo?.name || null, rel, ...lines });
-  }
+  for (const [file, lines] of acc.files) out.push({ ...(await relOf(file)), ...lines });
   return out.sort((a, b) => `${a.repo}/${a.rel}`.localeCompare(`${b.repo}/${b.rel}`));
 }
 
@@ -395,14 +447,28 @@ const ENDS_WITH_QUESTION_RE = /\?[)"'»\s]*$/;
 // Cómo cierra Claude el turno, en plano. Si uno de los dos últimos párrafos acaba preguntando, te está
 // esperando y el extracto es esa pregunta; si no, es un informe de trabajo hecho y el extracto su último párrafo.
 function closing(text) {
-  if (!text) return { asks: false, excerpt: null };
+  if (!text) return { asks: false, excerpt: null, questionText: null };
   const plain = text.replace(/```[\s\S]*?```/g, " ").replace(/\*\*|__|`/g, "").replace(/^\s*(#+|>|[-*+]|\d+\.)\s+/gm, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
   const tail = plain.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean).slice(-2);
   const question = tail.findLast((p) => ENDS_WITH_QUESTION_RE.test(p));
-  return { asks: !!question, excerpt: clip(question || tail.at(-1), 240) };
+  // Para la ficha, la pregunta entera: los párrafos del final que preguntan, sin el recorte del extracto.
+  const questionText = question ? clipText(tail.filter((p) => ENDS_WITH_QUESTION_RE.test(p)).join("\n\n"), QUESTION_MAX) : null;
+  return { asks: !!question, excerpt: clip(question || tail.at(-1), 240), questionText };
 }
 
-// Cómo acabó lo último que hizo Claude: si cerró el turno, su último texto y su última herramienta.
+// Preguntas de un AskUserQuestion, sin `preview` (maquetas largas que la ficha no pinta).
+function choiceItems(input) {
+  const questions = Array.isArray(input?.questions) ? input.questions : [];
+  return questions.map((q) => ({
+    header: String(q.header || ""),
+    question: clip(q.question, QUESTION_MAX) || "",
+    multiSelect: q.multiSelect === true,
+    options: (Array.isArray(q.options) ? q.options : []).map((o) => ({ label: String(o.label || ""), description: clip(o.description, OPTION_MAX) || "" })),
+  }));
+}
+
+// Cómo acabó lo último que hizo Claude: si cerró el turno, su último texto, su última herramienta y, si esa
+// es un AskUserQuestion que aún no has contestado, sus preguntas.
 function lastTurn(acc) {
   if (acc.turnSeq === acc.seq) return acc.turn;
   let entry = null;
@@ -410,10 +476,12 @@ function lastTurn(acc) {
   const blocks = entry?.type === "assistant" && Array.isArray(entry.message?.content) ? entry.message.content : [];
   const text = blocks.findLast((b) => b.type === "text" && b.text?.trim())?.text;
   const tool = blocks.findLast((b) => b.type === "tool_use");
+  const unanswered = acc.lastAssistantSeq > acc.lastUserSeq; // no hay nada tuyo (ni resultado de herramienta) detrás
   acc.turn = {
-    ended: acc.lastAssistantSeq > acc.lastUserSeq && entry?.message?.stop_reason === "end_turn",
+    ended: unanswered && entry?.message?.stop_reason === "end_turn",
     ...closing(text),
     activity: tool ? toolSummary(tool) : null,
+    choice: unanswered && tool?.name === "AskUserQuestion" ? choiceItems(tool.input) : null,
   };
   acc.turnSeq = acc.seq;
   return acc.turn;
@@ -429,12 +497,20 @@ function sessionActivity(live, acc) {
   const settled = turn.asks ? "waiting" : "done";
   let state = "finished";
   if (live?.status === "waiting") state = "waiting";
+  // AskUserQuestion sin contestar: te espera diga lo que diga el status (y sin status, sin esperar los 2 min).
+  else if (live && turn.choice) state = "waiting";
   else if (live?.status === "busy") state = "working";
   else if (live?.status === "idle") state = settled;
   else if (live && turn.ended) state = settled;
   // Sin status y con el turno a medias: trabajando, salvo que lleve un rato quieto (permiso pendiente).
   else if (live) state = Date.now() - acc.lastAt > WORKING_STALE_MS ? "waiting" : "working";
-  return { state, waitingFor: live?.waitingFor || null, excerpt: turn.excerpt, activity: turn.activity };
+  const waitingFor = live?.waitingFor || null;
+  // Lo que te pregunta: las opciones de un AskUserQuestion, o el texto con el que cerró el turno. Un permiso
+  // (waitingFor, o una herramienta a medias sin status) no es pregunta, y una sesión terminada ya no se contesta.
+  let question = null;
+  if (live && turn.choice) question = { kind: "choice", items: turn.choice };
+  else if (state === "waiting" && !waitingFor && turn.asks && !turn.activity) question = { kind: "open", text: turn.questionText };
+  return { state, waitingFor, excerpt: turn.excerpt, activity: turn.activity, question };
 }
 
 async function buildSession({ id, live, transcript }, opts) {
@@ -446,6 +522,8 @@ async function buildSession({ id, live, transcript }, opts) {
   if (!live && !title) return null; // abierta y cerrada sin llegar a escribir nada
   const updatedAt = acc.lastAt || live?.updatedAt || live?.startedAt || transcript?.mtimeMs || 0;
   if (!live && updatedAt < opts.cutoff) return null; // mtime reciente pero sin actividad en 24h
+  // Quitada del panel; vuelve si la reanudas y habla después de quitarla.
+  if (!live && opts.tags[id]?.dismissedAt >= updatedAt) return null;
   const dirs = new Map(acc.dirs);
   if (live && !dirs.has(live.cwd)) dirs.set(live.cwd, 0);
   const repos = await sessionRepos(acc, dirs);
@@ -465,7 +543,9 @@ async function buildSession({ id, live, transcript }, opts) {
     host: live?.host || null,
     tty: live?.tty || null,
     review: acc.review,
+    hasPlan: acc.hasPlan,
     repos,
+    worktrees: await sessionWorktrees(dirs),
     links: await sessionLinks(id, acc, repos, opts),
     summary: acc.awaySummary,
     prompts: acc.prompts,
@@ -474,6 +554,10 @@ async function buildSession({ id, live, transcript }, opts) {
     costUSD: acc.costUSD,
   };
 }
+
+// Transcript de cada sesión de la última lista: la ficha lo relee bajo demanda (src/sessions-detail.js).
+let lastIndex = new Map();
+const transcriptFor = (sessionId) => lastIndex.get(sessionId)?.path || null;
 
 /**
  * Sesiones para el panel: vivas primero, luego por actividad. `host`/`groups` acotan los links
@@ -484,7 +568,8 @@ async function list({ host, groups, branchMr }) {
   const procs = await processInfo(live.map((s) => s.pid));
   for (const s of live) Object.assign(s, procs.get(s.pid) || { host: null, tty: null });
   const index = transcriptIndex();
-  const rows = live.map((s) => ({ id: s.sessionId, live: s, transcript: index.get(s.sessionId) }));
+  lastIndex = index;
+  const rows =live.map((s) => ({ id: s.sessionId, live: s, transcript: index.get(s.sessionId) }));
   const liveIds = new Set(rows.map((r) => r.id));
   const cutoff = Date.now() - FINISHED_WINDOW_MS;
   for (const [id, transcript] of index) {
@@ -554,4 +639,11 @@ function untag(sessionId, key) {
   fs.writeFileSync(tagsPath(), JSON.stringify(tags, null, 2));
 }
 
-module.exports = { list, tag, untag, parseLink, scanTranscript, hostFromChain, lastTurn, sessionActivity, repoOf, shellQuote, claudeCommand, launchSlug };
+// Saca una sesión terminada del panel. Nada se borra: el transcript sigue ahí para `claude --resume`.
+function dismiss(sessionId) {
+  const tags = loadTags();
+  tagEntry(tags, sessionId).dismissedAt = Date.now();
+  fs.writeFileSync(tagsPath(), JSON.stringify(tags, null, 2));
+}
+
+module.exports = { list, tag, untag, dismiss, closeSession, parseLink, scanTranscript, hostFromChain, lastTurn, sessionActivity, repoOf, relOf, clipText, transcriptFor, agentWorktree, shellQuote, claudeCommand, launchSlug };
