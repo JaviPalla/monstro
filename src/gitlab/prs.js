@@ -162,7 +162,7 @@ async function prDetail(repoFullName, number) {
   ).catch(() => null);
   const pr = mapMr(mr, approvals);
   pr.body = mr.description || "";
-  pr.bodyHTML = mdToSafeHtml(mr.description);
+  pr.bodyHTML = await mdToSafeHtml(mr.description, repoFullName);
   return pr;
 }
 
@@ -265,17 +265,17 @@ async function prConversation(repoFullName, number) {
         isOutdated: false,
         // databaseId = id de la DISCUSSION (lo que necesita el reply de GitLab).
         comments: {
-          nodes: notes.map((n) => ({
+          nodes: await Promise.all(notes.map(async (n) => ({
             databaseId: d.id,
             author: mapUser(n.author),
-            bodyHTML: mdToSafeHtml(n.body),
+            bodyHTML: await mdToSafeHtml(n.body, repoFullName),
             createdAt: n.created_at,
-          })),
+          }))),
         },
       });
     } else {
       for (const n of notes) {
-        comments.push({ author: mapUser(n.author), bodyHTML: mdToSafeHtml(n.body), createdAt: n.created_at });
+        comments.push({ author: mapUser(n.author), bodyHTML: await mdToSafeHtml(n.body, repoFullName), createdAt: n.created_at });
       }
     }
   }
@@ -283,7 +283,7 @@ async function prConversation(repoFullName, number) {
   // "text", el resumen de la review) = comentario general.
   for (const dn of draftNotes) {
     // draftNoteId + body (markdown crudo) para editarlo desde el detalle.
-    const comment = { databaseId: null, author: null, bodyHTML: mdToSafeHtml(dn.note), createdAt: null, isPendingDraft: true, draftNoteId: dn.id, body: dn.note };
+    const comment = { databaseId: null, author: null, bodyHTML: await mdToSafeHtml(dn.note, repoFullName), createdAt: null, isPendingDraft: true, draftNoteId: dn.id, body: dn.note };
     const pos = dn.position;
     if (!pos?.new_path && !pos?.old_path) {
       comments.push(comment);

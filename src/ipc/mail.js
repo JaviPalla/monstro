@@ -22,6 +22,7 @@ function register() {
     return mail.status();
   });
   ipcMain.handle("mail:list", () => mail.listProposals({}));
+  ipcMain.handle("mail:folders", () => mail.listFolders());
 
   // Correo → borrador de Epic. Los proyectos elegibles salen del grupo configurado, así el modelo
   // solo puede repartir tareas entre paths que existen de verdad.

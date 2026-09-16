@@ -16,6 +16,21 @@ async function openPrInEditor(pr) {
   }
 }
 
+/** Lanza /mr-review-gitlab sobre esta MR en una pestaña de Ghostty: el mismo lanzador que usa
+ * Agents (sessions:launch), no la review in-app. Extraída porque la paleta (⌘P) la reusa. */
+async function launchAiReview(pr) {
+  const btn = $("#act-ai");
+  if (btn) btn.disabled = true;
+  try {
+    const { launched } = await window.monstro.sessionsLaunch(pr.url, "review");
+    toast(launched ? t("Agente abierto en Ghostty") : t("No se pudo lanzar el agente"), launched ? "ok" : "err");
+  } catch (err) {
+    toast(t("No se pudo lanzar la review: {err}", { err: String(err.message || err) }), "err");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 /** Alterna borrador ⇄ lista para review. Extraída del botón del detalle porque la paleta (⌘P) la reusa. */
 async function toggleDraftState(pr) {
   const btn = $("#act-draft-toggle");

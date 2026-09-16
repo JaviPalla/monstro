@@ -8,8 +8,6 @@
   margin: 8px 0;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
 }
-.draft-card.ai { border-color: var(--purple); background: var(--purple-bg); }
-.draft-card.ai .draft-head { color: var(--purple); }
 .btn-ai { border-color: var(--purple); color: var(--purple); }
 .btn-ai:hover:not(:disabled) { background: var(--purple-bg); }
 

@@ -170,8 +170,16 @@ function scanLine(acc, line) {
     if (branch) acc.branches.set(cwd, branch === "HEAD" || branch.startsWith(".") ? null : branch);
   }
   for (const m of line.matchAll(FILE_RE)) acc.dirs.set(path.dirname(m[1]), acc.seq);
+  // Lo que meten los hooks (el contexto de engram) no vincula la sesión, y de lo que vuelca una herramienta solo
+  // cuentan MRs/PRs (ahí deja `glab mr create` la suya): un `glab api` de una MR trae la descripción de su
+  // milestone, con el Resumen de Monstro y todos los epics de la release.
+  if (line.includes('"type":"attachment"')) return;
+  const toolOutput = line.includes('"tool_use_id"');
   for (const re of [GL_URL_RE, GH_URL_RE]) {
-    for (const m of line.matchAll(re)) addLink(acc, linkFrom(m[1], m[2], m[3], m[4]), false);
+    for (const m of line.matchAll(re)) {
+      const link = linkFrom(m[1], m[2], m[3], m[4]);
+      if (!toolOutput || link.kind === "mr" || link.kind === "pr") addLink(acc, link, false);
+    }
   }
 }
 

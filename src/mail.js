@@ -36,6 +36,14 @@ function saveMail(patch) {
   config.save({ mail: { ...mailCfg(), ...patch } });
 }
 
+// Errores de configuración de la app de Azure cuyo texto original no dice cómo arreglarlos.
+const AZURE_HINTS = [
+  // Tenant "common" con una app de un solo inquilino, o un Client ID que no es el de la app.
+  [/AADSTS50(059|194)/, "Azure no encuentra la app: en Ajustes → Bandeja de propuestas, el Client ID es el «Id. de aplicación (cliente)» y el Tenant el «Id. de directorio (inquilino)»."],
+  // App no marcada como cliente público: /devicecode funciona, pero el canje en /token pide un secreto.
+  [/AADSTS7000218/, "La app de Azure no admite el código de dispositivo: en el portal, tu app → Autenticación → «Permitir flujos de cliente público» = Sí, y guarda."],
+];
+
 async function postForm(url, params) {
   const res = await fetch(url, {
     method: "POST",
@@ -44,7 +52,9 @@ async function postForm(url, params) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = new Error(data.error_description || data.error || `HTTP ${res.status}`);
+    const desc = data.error_description || "";
+    const hint = AZURE_HINTS.find(([re]) => re.test(desc))?.[1];
+    const err = new Error(hint || desc || data.error || `HTTP ${res.status}`);
     err.code = data.error;
     throw err;
   }
@@ -134,17 +144,31 @@ async function graph(path, { method = "GET", body, headers = {} } = {}) {
 }
 
 /**
- * Resuelve el nombre de carpeta configurado a un id de Graph. Los well-known names ("inbox",
- * "archive"…) valen tal cual, así que solo hace falta buscar cuando es un nombre visible.
- * ponytail: solo carpetas de primer nivel; si hiciera falta una subcarpeta, recorrer /childFolders.
+ * Carpetas del buzón como rutas "Padre/Hija": primer nivel y un nivel de subcarpetas, que es donde
+ * se suelen crear (p.ej. "Inbox/Propuestas"). Alimenta el desplegable de Ajustes y folderId().
+ * ponytail: $expand no anida; para subcarpetas más hondas, recorrer /childFolders.
+ */
+async function mailFolders() {
+  const data = await graph("/me/mailFolders?$top=100&$select=id,displayName&$expand=childFolders($select=id,displayName;$top=100)");
+  return (data.value || []).flatMap((f) => [
+    { id: f.id, path: f.displayName },
+    ...(f.childFolders || []).map((c) => ({ id: c.id, path: `${f.displayName}/${c.displayName}` })),
+  ]);
+}
+
+const listFolders = async () => (await mailFolders()).map((f) => f.path);
+
+/**
+ * Resuelve la carpeta configurada a un id de Graph. Primero por ruta; si no hay ninguna, se prueba
+ * como well-known name ("inbox", "archive"…), que Graph acepta tal cual: así "inbox" vale aunque el
+ * buzón esté en español, y una carpeta propia en minúsculas no se confunde con una well-known.
  */
 async function folderId() {
-  const name = (mailCfg().folder || "inbox").trim();
-  if (!name || /^[a-z]+$/.test(name)) return name || "inbox";
-  const data = await graph(`/me/mailFolders?$top=100&$select=id,displayName`);
-  const hit = (data.value || []).find((f) => f.displayName.toLowerCase() === name.toLowerCase());
-  if (!hit) throw new Error(`No existe la carpeta "${name}" en el buzón.`);
-  return hit.id;
+  const name = (mailCfg().folder || "").trim() || "inbox";
+  const hit = (await mailFolders()).find((f) => f.path.toLowerCase() === name.toLowerCase());
+  if (hit) return hit.id;
+  if (/^[a-z]+$/.test(name)) return name;
+  throw new Error(`No existe la carpeta "${name}" en el buzón.`);
 }
 
 /**
@@ -169,4 +193,4 @@ async function listProposals({ limit = 25 } = {}) {
 /** Marca el correo como leído: es el "ya convertido en Epic" que se ve desde el propio Outlook. */
 const markProcessed = (messageId) => graph(`/me/messages/${encodeURIComponent(messageId)}`, { method: "PATCH", body: { isRead: true } });
 
-module.exports = { startLogin, pollLogin, logout, status, listProposals, markProcessed };
+module.exports = { startLogin, pollLogin, logout, status, listProposals, listFolders, markProcessed };

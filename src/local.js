@@ -179,21 +179,6 @@ async function addWorktree(dir, { branch, slug, sourceBranch }) {
   return { worktree: wtPath, branch, base };
 }
 
-// Worktree efímero, detached, en la punta de `sourceBranch` en origin. La review profunda tiene que
-// leer EL CÓDIGO DE ESA RAMA: el clon del usuario está en la rama que él dejara, con sus cambios sin
-// commitear, y el agente (sin Bash, solo Read/Grep/Glob) no tiene forma de saltar a otra rama.
-// Fetch aparte de git() porque 10s no bastan para un repo grande.
-async function reviewWorktree(dir, sourceBranch) {
-  if (!BRANCH_RE.test(sourceBranch || "")) throw new Error(`Nombre de rama no válido: ${sourceBranch}`);
-  const wtPath = path.join(dir, ".worktrees", "__review");
-  // Si quedó colgado de una review anterior que petó, se recrea limpio.
-  try { await git(dir, ["worktree", "remove", "--force", wtPath]); } catch { /* no existía */ }
-  await pexec("git", ["fetch", "--quiet", "origin", sourceBranch], { cwd: dir, timeout: 180000 });
-  fs.mkdirSync(path.join(dir, ".worktrees"), { recursive: true });
-  await git(dir, ["worktree", "add", "--detach", wtPath, "FETCH_HEAD"]);
-  return wtPath;
-}
-
 // Worktree con la rama de una MR, para abrirla en el editor. git no deja sacar la misma rama en dos
 // sitios, así que si ya está en algún worktree (o en el propio clon) se reutiliza ese. Después se
 // avanza a lo último de origin solo si es fast-forward: nunca pisa commits ni cambios locales.
@@ -236,7 +221,7 @@ async function removeCleanWorktree(wtPath) {
   await git(path.dirname(common), ["worktree", "remove", wtPath]);
 }
 
-module.exports = { scanRepos, repoInfo, remotePath, parseWorktrees, parseBranches, pushBranch, branchDiff, createLocalBranch, commitAll, workingDiff, isDirty, addWorktree, removeWorktree, removeCleanWorktree, reviewWorktree, branchWorktree, listWorktrees };
+module.exports = { scanRepos, repoInfo, remotePath, parseWorktrees, parseBranches, pushBranch, branchDiff, createLocalBranch, commitAll, workingDiff, isDirty, addWorktree, removeWorktree, removeCleanWorktree, branchWorktree, listWorktrees };
 
 // Auto-verificación: `node src/local.js [dir]` (dir por defecto = el padre de este repo).
 if (require.main === module) {

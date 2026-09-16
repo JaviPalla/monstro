@@ -29,7 +29,6 @@ function evaluatePalette({ pr = null, drafts = [], sections = () => true, repos 
       openPrs: openPrs || [{ number: 7, title: "Algo", headRefName: "feat/x", baseRefName: "main" }],
       me: { login: "yo" },
       config: { repos, uiTheme: "default" },
-      aiGenerating: null,
     },
     t: (es, params) => (params ? Object.keys(params).reduce((acc, k) => acc.split(`{${k}}`).join(params[k]), es) : es),
     sectionEnabled: sections,

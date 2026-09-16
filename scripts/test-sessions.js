@@ -79,6 +79,14 @@ fs.writeFileSync(
   assert.strictEqual(acc.links.get(MR_KEY).count, 2);
   assert.strictEqual(acc.links.get("epic:gitlab.example.com/Grupo/epics#45").kind, "epic");
 
+  // Un resultado de herramienta (el milestone que trae `glab api` de una MR) solo aporta MRs/PRs; un hook, nada.
+  fs.appendFileSync(file, line({ type: "user", message: { content: [{ tool_use_id: "t0", type: "tool_result", content: `${GL}/Grupo/api/-/merge_requests/790 ${GL}/Grupo/epics/-/issues/46` }] } })
+    + line({ type: "attachment", attachment: { type: "hook_success", stdout: `${GL}/Grupo/api/-/merge_requests/791` } }));
+  acc = await scanTranscript(file);
+  assert.ok(acc.links.has("mr:gitlab.example.com/Grupo/api#790"));
+  assert.ok(!acc.links.has("epic:gitlab.example.com/Grupo/epics#46"));
+  assert.ok(!acc.links.has("mr:gitlab.example.com/Grupo/api#791"));
+
   // La llamada real a la skill de review sí la marca.
   assert.strictEqual(acc.review, false);
   fs.appendFileSync(file, line({ type: "assistant", message: { stop_reason: "tool_use", content: [{ type: "tool_use", name: "Skill", input: { skill: "mr-review-gitlab" } }] } }));

@@ -25,10 +25,10 @@ async function openDetail(number, tab = "conv", repoOverride = null) {
     if (IS_SELFTEST && (new URLSearchParams(location.search).get("seed_draft") === "1" || SELFTEST_ROUTE.startsWith("review")) && !state.drafts.length) {
       const seed = (over) => ({ createdAt: new Date().toISOString(), kind: "general", ...over });
       state.drafts.push(seed({ id: "seed", body: "Esto es un borrador local: no está en GitHub." }));
-      state.drafts.push(seed({ id: "seed-ai-1", ai: true, aiModel: "claude-opus-4-8", aiEffort: "high", severity: "blocker", kind: "inline", path: "src/pedidos.js", side: "RIGHT", line: 42, body: "Si el pedido no tiene cliente, esto revienta.\n\n1. El cliente se da de baja → 2. su pedido se queda sin dueño → 3. alguien abre la lista de pedidos → 4. pantalla en blanco.\n\nComprueba el cliente antes de leer su nombre." }));
-      state.drafts.push(seed({ id: "seed-ai-2", ai: true, aiModel: "claude-opus-4-8", aiEffort: "high", severity: "important", kind: "inline", path: "src/pedidos.js", side: "RIGHT", line: 88, body: "Guardas dentro del bucle: si falla el tercer pedido, los dos primeros ya se han guardado y no hay vuelta atrás. Guarda una sola vez al final." }));
-      state.drafts.push(seed({ id: "seed-ai-3", ai: true, aiModel: "claude-opus-4-8", aiEffort: "high", severity: "minor", kind: "inline", path: "src/util.js", side: "RIGHT", line: 12, body: "El nombre dice que solo trae los activos, pero también devuelve los borrados. Renómbralo o filtra." }));
-      state.drafts.push(seed({ id: "seed-ai-4", ai: true, aiModel: "claude-opus-4-8", aiEffort: "high", severity: "nit", body: "Bien resuelto el cálculo del total: el redondeo ya no se pierde.\n\nBloqueante: el pedido sin cliente (línea 42).\n\nPruebas: la lógica nueva no tiene ninguna que corra sola en CI." }));
+      state.drafts.push(seed({ id: "seed-2", severity: "blocker", kind: "inline", path: "src/pedidos.js", side: "RIGHT", line: 42, body: "Si el pedido no tiene cliente, esto revienta.\n\n1. El cliente se da de baja → 2. su pedido se queda sin dueño → 3. alguien abre la lista de pedidos → 4. pantalla en blanco.\n\nComprueba el cliente antes de leer su nombre." }));
+      state.drafts.push(seed({ id: "seed-3", severity: "important", kind: "inline", path: "src/pedidos.js", side: "RIGHT", line: 88, body: "Guardas dentro del bucle: si falla el tercer pedido, los dos primeros ya se han guardado y no hay vuelta atrás. Guarda una sola vez al final." }));
+      state.drafts.push(seed({ id: "seed-4", severity: "minor", kind: "inline", path: "src/util.js", side: "RIGHT", line: 12, body: "El nombre dice que solo trae los activos, pero también devuelve los borrados. Renómbralo o filtra." }));
+      state.drafts.push(seed({ id: "seed-5", severity: "nit", body: "Bien resuelto el cálculo del total: el redondeo ya no se pierde.\n\nBloqueante: el pedido sin cliente (línea 42).\n\nPruebas: la lógica nueva no tiene ninguna que corra sola en CI." }));
     }
   } catch (err) {
     detailContent.innerHTML = `<div class="detail-inner"><div class="error-box">${esc(String(err.message || err))}</div></div>`;
@@ -37,18 +37,7 @@ async function openDetail(number, tab = "conv", repoOverride = null) {
   }
   renderDetail();
   if (IS_SELFTEST && SELFTEST_ROUTE.startsWith("review")) {
-    if (SELFTEST_ROUTE === "review-model") return void openAiReviewModal(state.detailPR);
-    if (SELFTEST_ROUTE === "review-progress") {
-      state.aiGenerating = state.detailPR.number;
-      state.aiRunLabel = `claude-opus-4-8 · ${t("esfuerzo {level}", { level: "high" })}`;
-      state.aiSteps = [
-        "Leyendo src/pedidos.js", 'Buscando "GuardarPedido"', "Leyendo src/pedidos/repo.js",
-        "Leyendo src/clientes/servicio.js", 'Buscando "ClienteId"', "Listando tests/pedidos/*",
-        "Leyendo tests/pedidos/guardar.test.js", "Leyendo src/util.js",
-      ];
-      return void renderAiProgressModal(state.detailPR);
-    }
-    if (SELFTEST_ROUTE === "review-edit") state.editingDraftId = "seed-ai-1";
+    if (SELFTEST_ROUTE === "review-edit") state.editingDraftId = "seed-2";
     openDraftsViewer();
   }
 }
@@ -80,10 +69,8 @@ function renderDetail() {
                 title="${t("Crea un worktree en la rama de la PR y lo abre en su editor: Rider si es .NET, VS Code si no")}">${icon("code")} ${t("Abrir en Rider / VS Code")}</button>
         <button class="btn btn-primary" id="act-merge" ${canMerge(pr) ? "" : "disabled"}
                 title="${esc(blockReason || t("Merge con merge commit"))}">${icon("git-merge")} ${t("Merge (merge commit)")}</button>
-        ${state.aiGenerating === pr.number
-          ? `<button class="btn btn-ai" id="act-ai" title="${t("Ver por dónde va la review")}"><span class="spinner"></span> <span id="act-ai-step">${esc(state.aiStep || t("Generando review…"))}</span></button>`
-          : `<button class="btn btn-ai" id="act-ai" ${pr.state === "OPEN" ? "" : "disabled"}
-                title="${t("Revisa la MR y deja los comentarios como borradores para que los repases: nada se publica hasta que tú lo digas")}">${icon("bot")} ${t("Review con IA")}</button>`}
+        <button class="btn btn-ai" id="act-ai" ${pr.state === "OPEN" ? "" : "disabled"}
+                title="${t("Lanza /mr-review-gitlab sobre esta MR en Ghostty")}">${icon("bot")} ${t("Review con IA")}</button>
         ${pr.state === "OPEN" && pr.author?.login === state.me?.login
           ? `<button class="btn" id="act-draft-toggle" title="${pr.isDraft ? t("Marca la PR como lista: notifica a los reviewers") : t("Convierte la PR en borrador: deja de pedir reviews")}">${pr.isDraft ? `${icon("rocket")} ${t("Marcar lista para review")}` : `${icon("undo-2")} ${t("Convertir a borrador")}`}</button>`
           : ""}
@@ -91,6 +78,7 @@ function renderDetail() {
       <div class="copy-row">
         <button class="mini-btn" id="copy-branch" title="${t("Copiar nombre de la rama")}">${icon("copy")} ${esc(pr.headRefName)}</button>
         <button class="mini-btn" id="copy-url" title="${t("Copiar URL de la PR")}">${icon("link")} URL</button>
+        <button class="mini-btn" id="open-external" title="${t("Abrir en el navegador")}">${icon("external-link")} ${providerName()}</button>
       </div>
       ${blockReason && pr.state === "OPEN" ? `<p class="muted">${icon("triangle-alert")} ${esc(blockReason)}</p>` : ""}
 
@@ -110,10 +98,11 @@ function renderDetail() {
   $("#detail-close").addEventListener("click", closeDetail);
   $("#act-editor").addEventListener("click", () => openPrInEditor(pr));
   $("#act-merge").addEventListener("click", () => confirmMerge(pr));
-  $("#act-ai").addEventListener("click", () => openAiReviewModal(pr));
+  $("#act-ai").addEventListener("click", () => launchAiReview(pr));
   $("#act-draft-toggle")?.addEventListener("click", () => toggleDraftState(pr));
   $("#copy-branch").addEventListener("click", () => copyText(pr.headRefName));
   $("#copy-url").addEventListener("click", () => copyText(pr.url));
+  $("#open-external").addEventListener("click", () => window.monstro.openExternal(pr.url));
   wireDraftsBar();
   detailContent.querySelectorAll(".tab").forEach((tabBtn) =>
     tabBtn.addEventListener("click", () => {

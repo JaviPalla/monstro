@@ -26,7 +26,7 @@ async function localRepoDir(repoFullName) {
   }
 }
 
-function register(ctx) {
+function register() {
   ipcMain.handle("prs:list", async (_event, { repo, states }) => gh().listPRs(repo, states));
   ipcMain.handle("prs:search", async (_event, { repos, states }) => gh().searchPRs(repos, states));
   ipcMain.handle("pr:detail", async (_event, { repo, number }) => gh().prDetail(repo, number));
@@ -75,30 +75,6 @@ function register(ctx) {
     return gh().publishDraftNotes(repo, Number(number));
   });
 
-  // La review profunda corre en un worktree detached en la punta de la rama de la MR: así el agente
-  // lee EL código que se va a fusionar, no lo que el usuario tenga en su clon. Si no se puede crear
-  // (sin red, rama borrada), degrada al clon tal cual y el prompt avisa de que el diff manda.
-  ipcMain.handle("ai:review", async (_event, { repo, title, body, sourceBranch, targetBranch, files, model, effort }) => {
-    const dir = await localRepoDir(repo);
-    let repoDir = dir;
-    let worktree = null;
-    if (dir && sourceBranch) {
-      try {
-        worktree = await local.reviewWorktree(dir, sourceBranch);
-        repoDir = worktree;
-      } catch { /* nos quedamos con el clon */ }
-    }
-    const onProgress = (step) => ctx.win?.webContents.send("ai:review-progress", step);
-    try {
-      return await ai.generateReview({
-        title, body, files, sourceBranch, targetBranch,
-        repoDir, exact: Boolean(worktree), onProgress,
-        override: model ? { model, effort } : null,
-      });
-    } finally {
-      if (worktree) local.removeWorktree(dir, worktree).catch(() => {});
-    }
-  });
   ipcMain.handle("ai:status", () => ai.backendStatus());
   ipcMain.handle("ai:ping", async () => ai.ping());
 

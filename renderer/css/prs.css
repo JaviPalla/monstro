@@ -147,7 +147,7 @@
 .pr-body code { background: var(--gray-bg); border-radius: 4px; padding: 1px 5px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; }
 .pr-body pre { background: var(--gray-bg); border-radius: 8px; padding: 10px 12px; overflow-x: auto; }
 .pr-body pre code { background: none; padding: 0; }
-.pr-body img { max-width: 100%; }
+.pr-body img { max-width: 100%; display: block; margin: 6px 0; border-radius: 6px; border: 1px solid var(--border); }
 .pr-body a { color: var(--accent); }
 .pr-body blockquote { border-left: 3px solid var(--border); margin: 8px 0; padding: 2px 12px; color: var(--text-muted); }
 .pr-body table { border-collapse: collapse; }

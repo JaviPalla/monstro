@@ -34,20 +34,22 @@ function mapAssignee(u) {
 
 // Con with_labels_details=true, `labels` llega como objetos {name,color,text_color}.
 
-function mapIssue(issue) {
+async function mapIssue(issue) {
   const labels = (issue.labels || []).map((l) =>
     typeof l === "string" ? { name: l, color: null, textColor: null } : { name: l.name, color: l.color, textColor: l.text_color },
   );
   const description = issue.description || "";
+  // references.full = "group/project#iid"; nos quedamos con el path del proyecto (también resuelve
+  // las capturas de pantalla pegadas en la descripción).
+  const projectPath = (issue.references?.full || "").replace(/#\d+$/, "");
   return {
     id: issue.id, // id global (= WorkItem id en GraphQL), para resolver la jerarquía padre
     iid: issue.iid,
     projectId: issue.project_id,
     issueType: issue.issue_type, // "issue" | "task" (work item) | ...
-    // references.full = "group/project#iid"; nos quedamos con el path del proyecto.
-    projectPath: (issue.references?.full || "").replace(/#\d+$/, ""),
+    projectPath,
     title: issue.title,
-    descriptionHtml: mdToSafeHtml(description), // markdown crudo -> HTML seguro (no inyectar sin escapar)
+    descriptionHtml: await mdToSafeHtml(description, projectPath), // markdown crudo -> HTML seguro (no inyectar sin escapar)
     hasDescription: Boolean(description.trim()),
     state: issue.state, // "opened" | "closed"
     webUrl: issue.web_url,
@@ -77,7 +79,7 @@ async function milestoneIssues(milestoneTitle, { includeClosed = false } = {}) {
   const mt = encodeURIComponent(milestoneTitle);
   const state = includeClosed ? "all" : "opened";
   const issues = await apiAll(`/groups/${enc}/issues?milestone=${mt}&state=${state}&with_labels_details=true`);
-  const mapped = issues.map(mapIssue);
+  const mapped = await Promise.all(issues.map(mapIssue));
   for (const iss of mapped) iss.isEpic = isEpicUrl(iss.webUrl);
   // Botones de MR (solo de cierre, batch rápido) para las issues normales ABIERTAS. Las cerradas
   // se saltan en la carga (rendimiento) y se piden bajo demanda al activar "Mostrar cerradas"
@@ -110,7 +112,7 @@ async function milestoneIssues(milestoneTitle, { includeClosed = false } = {}) {
 async function projectIssues(projectPath) {
   const enc = proj(projectPath);
   const issues = await apiAll(`/projects/${enc}/issues?state=all&with_labels_details=true&scope=all`);
-  return issues.map(mapIssue);
+  return Promise.all(issues.map(mapIssue));
 }
 
 // MRs (cierre + referenciadas) de un conjunto de work items por id, bajo demanda. Para las issues
@@ -336,7 +338,7 @@ async function updateIssue(projectId, iid, patch) {
   if (patch.assigneeIds) body.assignee_ids = patch.assigneeIds.length ? patch.assigneeIds : [0];
   if (patch.stateEvent) body.state_event = patch.stateEvent; // "close" / "reopen"
   const updated = await api("PUT", `/projects/${projectId}/issues/${iid}`, body);
-  return mapIssue(updated);
+  return await mapIssue(updated);
 }
 
 // Crea una issue en un proyecto. Devuelve {iid, projectPath, url, title} (forma mínima que consume

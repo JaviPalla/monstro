@@ -29,7 +29,7 @@ Regexes over the raw line — **a JSON embedded in a tool_result is escaped (`\"
 
 - Title: `custom-title` > `ai-title` > `agent-name` > clipped `last-prompt` > session `name`.
 - Repos: every `cwd` + the dir of every `"file_path"` → walk up to `.git` (file or dir, so worktrees work) → `origin` → `remotePath()`. `$HOME` and `~/.claude` never count. Branch = last `gitBranch` seen in that cwd.
-- Links: GitLab `…/-/merge_requests|issues|work_items/N` and GitHub `…/pull|issues/N` anywhere, plus `pr-link` entries. **Epic = issue whose project ends in `/epics`** (same rule as `isEpicUrl`). Kept only if host = configured provider host AND top-level group ∈ groups of `config.repos` (drops docs URLs); `pr-link` always kept.
+- Links: GitLab `…/-/merge_requests|issues|work_items/N` and GitHub `…/pull|issues/N` in your prompts, Claude's text and tool-call inputs, plus `pr-link` entries. **Tool results (`tool_use_id`) only contribute MRs/PRs** (where `glab mr create` leaves the new one): a `glab api` of an MR embeds its milestone, whose description carries the Resumen mirror with every epic of the release. **Hook output (`attachment` lines, e.g. engram's context) contributes nothing.** **Epic = issue whose project ends in `/epics`** (same rule as `isEpicUrl`). Kept only if host = configured provider host AND top-level group ∈ groups of `config.repos` (drops docs URLs); `pr-link` always kept.
 - Branch → MR: `mrForBranch(project, branch)` (GitLab only; GitHub stub returns null because `pr-link` covers it), cached 5 min in the IPC, skipping trunk (`development|main|master|HEAD|rb/*`).
 
 ## Launcher ("¿Qué quieres hacer?" — board mode only, GitLab only)

@@ -34,8 +34,7 @@ function paletteEntriesCurrentPR() {
 
   if (open) add(t("Abrir en Rider / VS Code"), t("worktree en la rama de la PR"), () => openPrInEditor(pr));
   if (canMerge(pr)) add(t("Merge (merge commit)"), t("pide confirmación"), () => confirmMerge(pr));
-  if (open && !state.aiGenerating) add(t("Review con IA"), t("elige modelo; genera borradores, no publica"), () => openAiReviewModal(pr));
-  if (state.aiGenerating === pr.number) add(t("Ver por dónde va la review"), t("qué está mirando el agente ahora mismo"), () => openAiReviewModal(pr));
+  if (open) add(t("Review con IA"), t("lanza /mr-review-gitlab en Ghostty, como en Agents"), () => launchAiReview(pr));
   if (open && mine) {
     add(
       pr.isDraft ? t("Marcar lista para review") : t("Convertir a borrador"),

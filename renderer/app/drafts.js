@@ -60,7 +60,7 @@ function draftCard(draft) {
     : t("comentario general");
   if (state.editingDraftId === draft.id) {
     return `
-      <div class="draft-card ${draft.ai ? "ai" : ""} editing" data-draft="${draft.id}">
+      <div class="draft-card editing" data-draft="${draft.id}">
         <div class="draft-head">${icon("pencil")} ${t("EDITANDO")} <span class="muted">· ${where}</span></div>
         <textarea class="draft-editor" rows="5">${esc(draft.body)}</textarea>
         <div class="composer-actions">
@@ -71,229 +71,15 @@ function draftCard(draft) {
         </div>
       </div>`;
   }
-  const aiMeta = draft.ai && draft.aiModel
-    ? ` · ${esc(draft.aiModel)}${draft.aiEffort ? ` · ${t("esfuerzo")} ${esc(draft.aiEffort)}` : ""}`
-    : "";
   return `
-    <div class="draft-card ${draft.ai ? "ai" : ""}" data-draft="${draft.id}">
-      <div class="draft-head">${severityBubble(draft)} ${draft.ai ? `${icon("bot")} ${t("BORRADOR (IA)")}` : `${icon("file-pen-line")} ${t("BORRADOR")}`} <span class="muted">· ${where}${aiMeta}</span>
+    <div class="draft-card" data-draft="${draft.id}">
+      <div class="draft-head">${severityBubble(draft)} ${icon("file-pen-line")} ${t("BORRADOR")} <span class="muted">· ${where}</span>
         <button class="draft-edit" title="${t("Editar borrador")}">${icon("pencil")}</button>
         <button class="draft-pub" title="${t("Publicar solo este borrador en GitHub")}">${icon("send")} ${t("Publicar")}</button>
         <button class="draft-del" title="${t("Eliminar borrador")}">${icon("trash-2")}</button>
       </div>
       <div class="draft-body">${esc(draft.body)}</div>
     </div>`;
-}
-
-/* ============ review con IA ============ */
-
-// La review profunda tarda minutos abriendo ficheros: en vez de un spinner mudo, el botón dice
-// qué está mirando el agente ahora mismo. main manda {tool, target}; el verbo se traduce aquí.
-const REVIEW_TOOL_VERBS = { Read: "Leyendo", Grep: "Buscando", Glob: "Listando" };
-
-function reviewStepLabel(step) {
-  const verb = REVIEW_TOOL_VERBS[step && step.tool];
-  if (!verb) return t("Pensando…");
-  return `${t(verb)} ${step.target || ""}`.trim();
-}
-
-const AI_MODELS_FALLBACK = [
-  { id: "claude-opus-4-8", label: "Claude Opus 4.8", efforts: ["low", "medium", "high", "xhigh", "max"] },
-  { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", efforts: ["low", "medium", "high", "max"] },
-  { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", efforts: [] },
-];
-
-const MAX_AI_STEPS = 300;
-const stepLi = (text) => `<li class="tl-tool"><span class="tl-ic">·</span><span class="tl-tx">${esc(text)}</span></li>`;
-
-// Punto de entrada del botón: si ya hay una review en curso enseña por dónde va; si no, deja
-// elegir modelo y esfuerzo antes de lanzarla (los de Ajustes vienen preseleccionados).
-async function openAiReviewModal(pr) {
-  if (state.aiGenerating) return renderAiProgressModal(pr);
-  let status = { models: AI_MODELS_FALLBACK, model: "claude-opus-4-8", effort: "high" };
-  if (!IS_SELFTEST) {
-    try {
-      const s = await window.monstro.aiStatus();
-      if (Array.isArray(s.models) && s.models.length) status = s;
-    } catch { /* nos quedamos con el catálogo por defecto */ }
-  }
-  const root = $("#modal-root");
-  const modelOf = (id) => status.models.find((m) => m.id === id) || status.models[0];
-  let model = modelOf(status.model).id;
-  let effort = modelOf(model).efforts.includes(status.effort) ? status.effort : modelOf(model).efforts.slice(-1)[0] || null;
-
-  const effortSelect = () => {
-    const efforts = modelOf(model).efforts;
-    return efforts.length
-      ? `<select id="air-effort">${efforts.map((e) => `<option value="${e}" ${e === effort ? "selected" : ""}>${t("esfuerzo: {level}", { level: e })}</option>`).join("")}</select>`
-      : `<select id="air-effort" disabled><option>${t("esfuerzo: no aplicable")}</option></select>`;
-  };
-  const paint = () => {
-    root.innerHTML = `
-    <div class="modal-backdrop" id="modal-backdrop">
-      <div class="modal">
-        <h3>${icon("bot")} ${t("Review con IA de #{n}", { n: pr.number })}</h3>
-        <p class="muted">${t("Elige con qué revisar. Los comentarios quedan en borradores: no se publica nada hasta que tú lo digas.")}</p>
-        <div class="pf-ai-row">
-          <select id="air-model">${status.models.map((m) => `<option value="${esc(m.id)}" ${m.id === model ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select>
-          ${effortSelect()}
-        </div>
-        <div class="modal-actions">
-          <button class="btn" id="modal-cancel">${t("Cancelar")}</button>
-          <button class="btn btn-ai" id="modal-confirm">${t("Revisar")}</button>
-        </div>
-      </div>
-    </div>`;
-    $("#air-model").addEventListener("change", (event) => {
-      model = event.target.value;
-      const efforts = modelOf(model).efforts;
-      effort = efforts.includes(effort) ? effort : efforts.slice(-1)[0] || null;
-      paint();
-    });
-    $("#air-effort").addEventListener("change", (event) => { effort = event.target.value || null; });
-    $("#modal-cancel").addEventListener("click", () => (root.innerHTML = ""));
-    $("#modal-backdrop").addEventListener("click", (event) => {
-      if (event.target.id === "modal-backdrop") root.innerHTML = "";
-    });
-    $("#modal-confirm").addEventListener("click", () => {
-      generateAiReview(pr, { model, effort });
-      renderAiProgressModal(pr);
-    });
-  };
-  paint();
-}
-
-// Qué está haciendo el agente, en vivo. Cerrarlo NO cancela la review; el botón vuelve a abrirlo.
-function renderAiProgressModal(pr) {
-  const root = $("#modal-root");
-  const steps = state.aiSteps.map(stepLi).join("") || `<li class="muted tl-empty">${t("Arrancando…")}</li>`;
-  root.innerHTML = `
-    <div class="modal-backdrop" id="modal-backdrop">
-      <div class="modal">
-        <h3>${icon("bot")} ${t("Revisando #{n}…", { n: pr.number })}</h3>
-        <p class="muted">${esc(state.aiRunLabel || "")} — ${t("puedes cerrar esta ventana, la review sigue.")}</p>
-        <ul class="lr-timeline" id="air-steps">${steps}</ul>
-        <div class="modal-actions">
-          <button class="btn" id="modal-cancel">${t("Cerrar")}</button>
-        </div>
-      </div>
-    </div>`;
-  const list = $("#air-steps");
-  list.scrollTop = list.scrollHeight;
-  $("#modal-cancel").addEventListener("click", () => (root.innerHTML = ""));
-  $("#modal-backdrop").addEventListener("click", (event) => {
-    if (event.target.id === "modal-backdrop") root.innerHTML = "";
-  });
-}
-
-async function generateAiReview(pr, override) {
-  if (state.aiGenerating) return;
-  state.aiGenerating = pr.number;
-  state.aiStep = "";
-  state.aiSteps = [];
-  state.aiRunLabel = override ? `${override.model}${override.effort ? ` · ${t("esfuerzo {level}", { level: override.effort })}` : ""}` : "";
-  const offProgress = window.monstro.onReviewProgress((step) => {
-    state.aiStep = reviewStepLabel(step);
-    state.aiSteps.push(state.aiStep);
-    if (state.aiSteps.length > MAX_AI_STEPS) state.aiSteps.shift();
-    const label = document.getElementById("act-ai-step");
-    if (label) label.textContent = state.aiStep;
-    const list = document.getElementById("air-steps");
-    if (list) {
-      if (state.aiSteps.length === 1) list.innerHTML = "";
-      list.insertAdjacentHTML("beforeend", stepLi(state.aiStep));
-      list.scrollTop = list.scrollHeight;
-    }
-  });
-  renderDetail(); // pinta el botón en loading; persiste aunque cambies de pestaña
-  toast(t("Generando review con IA… esto puede tardar un par de minutos"), "");
-  const repoName = detailRepo();
-  const repoKey = `${repoName}#${pr.number}`;
-  try {
-    const files = state.selected === pr.number && state.files
-      ? state.files
-      : await window.monstro.prFiles(repoName, pr.number);
-    if (state.selected === pr.number) state.files = files;
-    const { review, backend, model, effort, deep } = await window.monstro.aiReview(repoName, pr, files, override);
-
-    const anchors = new Set();
-    for (const file of files) {
-      if (!file.patch) continue;
-      for (const line of parsePatch(file.patch)) {
-        if (line.type === "add" || line.type === "ctx") anchors.add(`${file.filename}::RIGHT::${line.new}`);
-        if (line.type === "del" || line.type === "ctx") anchors.add(`${file.filename}::LEFT::${line.old}`);
-      }
-    }
-    const newDrafts = [];
-    const orphaned = [];
-    for (const comment of review.comments) {
-      if (anchors.has(`${comment.path}::${comment.side}::${comment.line}`)) {
-        newDrafts.push({
-          id: `ai-${Date.now()}-${newDrafts.length}`,
-          createdAt: new Date().toISOString(),
-          kind: "inline",
-          ai: true,
-          aiModel: model,
-          aiEffort: effort || null,
-          severity: comment.severity,
-          path: comment.path,
-          side: comment.side,
-          line: comment.line,
-          body: comment.body,
-        });
-      } else {
-        orphaned.push(comment);
-      }
-    }
-    const summaryParts = [];
-    if (review.summary) summaryParts.push(review.summary);
-    if (orphaned.length) {
-      summaryParts.push(
-        `${t("Comentarios que no se pudieron anclar a una línea del diff:")}\n` +
-          orphaned.map((c) => `- **${c.path}:${c.line}** — ${SEVERITIES[c.severity]?.dot || ""} ${c.body}`).join("\n"),
-      );
-    }
-    if (summaryParts.length) {
-      newDrafts.push({
-        id: `ai-${Date.now()}-summary`,
-        createdAt: new Date().toISOString(),
-        kind: "general",
-        ai: true,
-        aiModel: model,
-        aiEffort: effort || null,
-        // El resumen no es un hallazgo: la burbuja más baja para que no compita con los bloqueantes.
-        severity: "nit",
-        body: summaryParts.join("\n\n---\n\n"),
-      });
-    }
-
-    // Guarda en la PR que pidió la review, aunque ya estés mirando otra.
-    if (state.selected === pr.number) {
-      state.drafts.push(...newDrafts);
-      await saveDrafts();
-      state.detailTab = "changes";
-      // Lo primero que ves es lo que se publicaría, para revisarlo y retocarlo antes de nada.
-      openDraftsViewer();
-    } else {
-      const existing = await window.monstro.draftsList(repoKey);
-      await window.monstro.draftsSave(repoKey, [...existing, ...newDrafts]);
-      state.draftKeys = new Set(await window.monstro.draftsKeys());
-      renderList();
-    }
-    const how = deep ? t("revisado contra el código en local") : t("solo con el diff");
-    toast(`${t("IA")} (${backend} · ${model}${effort ? ` · ${effort}` : ""} · ${how}): ${t("{n} comentario(s) en línea + resumen, en borradores de #{num}", { n: newDrafts.length - (summaryParts.length ? 1 : 0), num: pr.number })}`, "ok");
-  } catch (err) {
-    toast(t("Review con IA falló: {err}", { err: String(err.message || err) }), "err");
-  } finally {
-    offProgress();
-    state.aiGenerating = null;
-    state.aiStep = "";
-    state.aiSteps = [];
-    // Si el modal de progreso está abierto, se cierra solo: el trabajo ya terminó.
-    if ($("#air-steps")) $("#modal-root").innerHTML = "";
-    // re-render solo si sigues mirando esa PR (puede haber cambiado mientras generaba)
-    if (state.selected === pr.number && state.detailPR) renderDetail();
-  }
 }
 
 function wireDraftCards(container) {
@@ -348,7 +134,7 @@ function confirmPublishSingle(draft) {
       <div class="modal">
         <h3>${icon("send")} ${t("Publicar este borrador")}</h3>
         <p class="muted">${esc(where)} — ${t("se publica como comentario (sin veredicto). El resto de borradores no se tocan.")}</p>
-        <div class="draft-card ${draft.ai ? "ai" : ""}" style="max-height:180px;overflow-y:auto"><div class="draft-body">${esc(publishBody(draft))}</div></div>
+        <div class="draft-card" style="max-height:180px;overflow-y:auto"><div class="draft-body">${esc(publishBody(draft))}</div></div>
         <div class="modal-actions">
           <button class="btn" id="modal-cancel">${t("Cancelar")}</button>
           <button class="btn btn-primary" id="modal-confirm">${t("Publicar en GitHub")}</button>
@@ -467,7 +253,7 @@ function openDraftsViewer() {
         <p class="muted">${t("Revísalos y edítalos a tu gusto. Nada sale de tu Mac hasta que pulses Publicar.")}</p>
         <div class="drafts-viewer">
           ${drafts.map((d) => {
-            const where = `${severityBubble(d)} ${d.ai ? icon("bot") : icon("file-pen-line")} ${d.kind === "inline"
+            const where = `${severityBubble(d)} ${icon("file-pen-line")} ${d.kind === "inline"
               ? `<code>${esc(d.path)}</code>:${d.line} <span class="muted">(${d.side === "LEFT" ? t("anterior") : t("nueva")})</span>`
               : `<span class="muted">${t("comentario general")}</span>`}`;
             if (state.editingDraftId === d.id) {

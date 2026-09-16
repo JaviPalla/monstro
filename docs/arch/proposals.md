@@ -27,6 +27,15 @@ Un *app registration* en Azure AD marcado como **public client** ("Allow public 
 con el permiso **delegado** `Mail.ReadWrite`. El `clientId`, el `tenant` y la carpeta se configuran
 en Ajustes → Bandeja de propuestas. Sin `clientId` la vista solo muestra el aviso de configuración.
 
+El `tenant` es **obligatorio** si la app es de un solo inquilino (la opción por defecto del portal):
+contra `common` u `organizations` Azure responde AADSTS50059, y `postForm` lo traduce a un aviso que
+manda a Ajustes. `common` solo vale para apps registradas como multiinquilino.
+
+Sin «Permitir flujos de cliente público», `/devicecode` **sí funciona** y el polling devuelve
+`authorization_pending` con normalidad: el fallo solo llega cuando el usuario ya ha autorizado y
+`/token` canjea de verdad — AADSTS7000218 (pide `client_secret`). Engaña porque todo parece ir bien
+hasta el último paso.
+
 Los seis pasos del portal de Azure están **dentro de la app**, en el `<details>` de esa misma
 tarjeta, con un botón que abre el deep link a *App registrations*
 (`--selftest-route=ajustes-propuestas` los captura). Si cambian los menús del portal, ese es el
@@ -64,7 +73,10 @@ El `projectPath` de cada tarea va como **`enum` en el schema** con los proyectos
 - `config:set` solo acepta `clientId`, `tenant` y `folder`. El `refreshToken` lo escribe `mail.js`.
 - La creación de tareas es **secuencial y no atómica**, como el resto de mutaciones batch de GitLab:
   si la Epic falla no se sigue; cada tarea se reporta por separado en `results`.
-- `folderId()` solo resuelve carpetas de **primer nivel**. Para una subcarpeta habría que recorrer
-  `/childFolders`.
+- Las carpetas son rutas `Padre/Hija` con **un solo nivel** de subcarpetas (`$expand=childFolders`,
+  que no anida más). `mailFolders()` alimenta tanto el desplegable de Ajustes (`mail:folders`) como
+  `folderId()`. Para ir más hondo habría que recorrer `/childFolders` a mano.
+- `folderId()` busca primero por ruta y solo después prueba el nombre como well-known de Graph
+  (`inbox`…): así una carpeta propia en minúsculas no se confunde con una well-known.
 - Al ser una sección nueva, las instalaciones con `config.sections` ya guardado **no la ven** hasta
   activarla en Ajustes → Apartados del menú.

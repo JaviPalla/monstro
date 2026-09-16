@@ -113,7 +113,7 @@ function openSettings() {
           <ol>
             <li>${t("Abre el portal de Azure → Microsoft Entra ID → Registros de aplicaciones → Nuevo registro.")}</li>
             <li>${t("Ponle nombre (p.ej. Monstro) y deja el Redirect URI VACÍO: el flujo por código de dispositivo no usa ninguno.")}</li>
-            <li>${t("Tras registrar, copia el «Id. de aplicación (cliente)» → ese es el Client ID. El «Id. de directorio (inquilino)» es el Tenant (o deja «common»).")}</li>
+            <li>${t("Tras registrar, copia el «Id. de aplicación (cliente)» → ese es el Client ID, y el «Id. de directorio (inquilino)» → ese es el Tenant. Es obligatorio salvo que registres la app como multiinquilino: con «common» falla (AADSTS50059).")}</li>
             <li>${t("Permisos de API → Agregar permiso → Microsoft Graph → Permisos delegados → Mail.ReadWrite.")}</li>
             <li>${t("Autenticación → Configuración avanzada → «Permitir flujos de cliente público» = Sí. Sin esto el código de dispositivo falla.")}</li>
             <li>${t("Si tu organización lo exige, pide a un administrador que conceda el consentimiento.")}</li>
@@ -122,8 +122,17 @@ function openSettings() {
         </details>
         <div class="add-repo">
           <input type="text" id="mail-client-id" placeholder="${t("Client ID de Azure")}" value="${esc(cfg.mail?.clientId || "")}" />
+          <label for="mail-client-id" class="muted" style="align-self:center;flex:0 0 14em">${t("Client ID = «Id. de aplicación (cliente)»")}</label>
+        </div>
+        <div class="add-repo">
           <input type="text" id="mail-tenant" placeholder="${t("Tenant (common)")}" value="${esc(cfg.mail?.tenant || "")}" />
+          <label for="mail-tenant" class="muted" style="align-self:center;flex:0 0 14em">${t("Tenant = «Id. de directorio (inquilino)»")}</label>
+        </div>
+        <div class="add-repo">
           <input type="text" id="mail-folder" placeholder="${t("Carpeta (inbox)")}" value="${esc(cfg.mail?.folder || "")}" />
+          <label for="mail-folder" class="muted" style="align-self:center;flex:0 0 14em">${t("Carpeta del buzón")}</label>
+        </div>
+        <div class="add-repo">
           <button class="btn" id="save-mail">${t("Guardar")}</button>
         </div>
       </div>` : ""}
@@ -262,6 +271,22 @@ function openSettings() {
     });
     toast(t("Bandeja de propuestas guardada"), "ok");
   });
+  // Con sesión de Outlook, la carpeta pasa a ser un desplegable con las carpetas reales del buzón.
+  // Mismo id, así el guardado no cambia; sin sesión (o si Graph falla) se queda como texto libre.
+  if ($("#mail-folder")) {
+    window.monstro
+      .mailStatus()
+      .then((s) => (s.connected ? window.monstro.mailFolders() : []))
+      .then((paths) => {
+        const input = $("#mail-folder");
+        if (!input || !paths.length) return;
+        const current = input.value.trim() || "inbox";
+        const selected = paths.find((p) => p.toLowerCase() === current.toLowerCase()) || current;
+        const options = paths.includes(selected) ? paths : [selected, ...paths];
+        input.outerHTML = `<select id="mail-folder">${options.map((p) => `<option ${p === selected ? "selected" : ""}>${esc(p)}</option>`).join("")}</select>`;
+      })
+      .catch(() => {});
+  }
   // Repos sugeridos por el token — el mismo picker del onboarding, para no teclear paths a mano.
   // Perezoso (viewerRepos pega a la API) y con la lista viva en state.config: cada clic guarda.
   const renderRepoSuggestions = (suggestions) => {
@@ -650,8 +675,8 @@ async function renderWelcome() {
         <div>
           <b>${t("Conecta Claude")}</b> <span class="chip ${aiOk ? "chip-open" : "chip-draft"}">${aiOk ? t("listo") : t("opcional")}</span>
           <p class="muted">${aiOk
-            ? t("Detectado: {detail} — el botón {icon} Review con IA ya funciona.", { detail: esc(aiStatus.detail), icon: icon("bot") })
-            : `${t("Para el botón {icon} Review con IA: instala", { icon: icon("bot") })} <a href="#" data-ext="https://claude.com/claude-code">Claude Code</a> ${t("y ábrelo una vez para autenticarte (Monstro usará tu sesión), o exporta")} <code>ANTHROPIC_API_KEY</code>.`}</p>
+            ? t("Detectado: {detail} — las funciones de IA de Monstro (resúmenes, propuestas…) ya funcionan.", { detail: esc(aiStatus.detail) })
+            : `${t("Para las funciones de IA de Monstro (resúmenes, propuestas…): instala")} <a href="#" data-ext="https://claude.com/claude-code">Claude Code</a> ${t("y ábrelo una vez para autenticarte (Monstro usará tu sesión), o exporta")} <code>ANTHROPIC_API_KEY</code>.`}</p>
         </div>
       </div>
 

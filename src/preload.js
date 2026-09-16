@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld("monstro", {
   mailPollLogin: (deviceCode) => ipcRenderer.invoke("mail:pollLogin", { deviceCode }),
   mailLogout: () => ipcRenderer.invoke("mail:logout"),
   mailList: () => ipcRenderer.invoke("mail:list"),
+  mailFolders: () => ipcRenderer.invoke("mail:folders"),
   mailPropose: (email) => ipcRenderer.invoke("mail:propose", { email }),
   mailCreate: (payload) => ipcRenderer.invoke("mail:create", payload),
   localSearchIssues: (query) => ipcRenderer.invoke("local:searchIssues", { query }),
@@ -87,17 +88,6 @@ contextBridge.exposeInMainWorld("monstro", {
     ipcRenderer.invoke("pr:updateDraftNote", { repo, number, draftNoteId, body }),
   deleteDraftNote: (repo, number, draftNoteId) => ipcRenderer.invoke("pr:deleteDraftNote", { repo, number, draftNoteId }),
   publishDraftNotes: (repo, number) => ipcRenderer.invoke("pr:publishDraftNotes", { repo, number }),
-  aiReview: (repo, pr, files, override) =>
-    ipcRenderer.invoke("ai:review", {
-      repo,
-      title: pr.title,
-      body: pr.body || "",
-      sourceBranch: pr.headRefName,
-      targetBranch: pr.baseRefName,
-      files,
-      model: override?.model || null,
-      effort: override?.effort || null,
-    }),
   aiStatus: () => ipcRenderer.invoke("ai:status"),
   aiPing: () => ipcRenderer.invoke("ai:ping"),
   draftsList: (key) => ipcRenderer.invoke("drafts:list", { key }),
@@ -138,12 +128,6 @@ contextBridge.exposeInMainWorld("monstro", {
     const listener = (_e, percent) => cb(percent);
     ipcRenderer.on("update:progress", listener);
     return () => ipcRenderer.removeListener("update:progress", listener);
-  },
-  // Paso actual de la review con IA ({tool, target}) mientras el agente lee el repo. De-suscriptor.
-  onReviewProgress: (cb) => {
-    const listener = (_e, step) => cb(step);
-    ipcRenderer.on("ai:review-progress", listener);
-    return () => ipcRenderer.removeListener("ai:review-progress", listener);
   },
   notify: (title, body, sessionId = null) => ipcRenderer.invoke("notify", { title, body, sessionId }),
   // Click en el aviso de una sesión de Agents (src/ipc/system.js). Devuelve un de-suscriptor.
