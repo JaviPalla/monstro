@@ -63,6 +63,60 @@ function approvalFaces(pr) {
     </span>`;
 }
 
+/* ---------- repo, sesión y conflictos de una fila ---------- */
+
+// Nombre del proyecto SIN el grupo, con su icono: la inicial sobre un color derivado del nombre, igual que
+// hace GitLab cuando el proyecto no tiene avatar.
+// ponytail: avatar real no — los uploads de un proyecto privado piden cookie de sesión, no el token, así que
+// la <img> daría 401; haría falta proxiarlos por main a dataURL.
+function repoPill(pr) {
+  const full = pr.repository?.nameWithOwner || state.repo || "";
+  const name = full.split("/").pop();
+  if (!name) return "";
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) % 360;
+  return `<span class="label-pill repo-pill" title="${esc(full)}"><span class="repo-ico" style="background:hsl(${hash} 55% 45%)">${esc(name[0].toUpperCase())}</span>${esc(name)}</span>`;
+}
+
+const prKey = (pr) => `${pr.repository?.nameWithOwner || state.repo}#${pr.number}`;
+const hasDrafts = (pr) => state.draftKeys.has(prKey(pr));
+
+// Sesión de agente enlazada con esta MR (el panel de Agents las cruza por proyecto + iid).
+function sessionFor(pr) {
+  const repo = pr.repository?.nameWithOwner || state.repo;
+  return (sessionsUi.data || []).find((s) =>
+    s.links.some((l) => (l.kind === "mr" || l.kind === "pr") && l.project === repo && l.iid === pr.number),
+  );
+}
+
+function sessionBadge(pr) {
+  const s = sessionFor(pr);
+  if (!s) return "";
+  // Solo el icono: el título de la sesión va en el tooltip para no comerle ancho al de la MR.
+  const label = s.review ? t("Review de un agente") : t("Agente");
+  return `<button class="pr-agent" data-session="${esc(s.sessionId)}" title="${esc(`${label}: ${s.title}`)}">${icon("bot")}</button>`;
+}
+
+const hasConflicts = (pr) => pr.state === "OPEN" && (pr.mergeable === "CONFLICTING" || pr.mergeStateStatus === "DIRTY");
+
+function conflictButton(pr) {
+  if (!hasConflicts(pr)) return "";
+  return `<button class="pr-fix" data-fix="${esc(pr.url)}">${icon("wrench")} ${t("Solucionar conflictos")}</button>`;
+}
+
+async function launchConflictFix(url, btn) {
+  btn.disabled = true;
+  try {
+    await window.monstro.sessionsLaunch(url, "conflicts");
+    toast(t("Agente abierto en Ghostty sobre un worktree de la rama"), "ok");
+    setTimeout(loadSessions, 4000);
+  } catch (err) {
+    toast(ipcMessage(err), "err");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function labelPills(pr) {
   return (pr.labels?.nodes || [])
     .map((l) => `<span class="label-pill" style="background:#${l.color}22;color:#${l.color}">${esc(l.name)}</span>`)
@@ -84,7 +138,8 @@ function renderCounts() {
 
 function renderList() {
   if (state.view !== "prs") return;
-  const prs = searchFilter(state.prs);
+  // Las que tienen comentarios en borrador sin publicar, primero.
+  const prs = searchFilter(state.prs).slice().sort((a, b) => hasDrafts(b) - hasDrafts(a));
   if (state.loading) {
     list.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>`;
     return;
@@ -100,9 +155,10 @@ function renderList() {
       <article class="pr-row ${state.selected === pr.number ? "selected" : ""}" data-number="${pr.number}" data-repo="${esc(pr.repository?.nameWithOwner || state.repo)}">
         <img class="avatar" src="${esc(pr.author?.avatarUrl || "")}" alt="" />
         <div class="pr-title-line">
-          ${state.repo === ALL_REPOS ? `<span class="label-pill repo-pill">${esc(pr.repository?.nameWithOwner || "")}</span>` : ""}
+          ${state.repo === ALL_REPOS ? repoPill(pr) : ""}
           <span class="pr-title">${esc(pr.title)} <span class="pr-number">#${pr.number}</span></span>
           ${labelPills(pr)}
+          ${sessionBadge(pr)}
         </div>
         <div class="pr-right">
           ${approvalFaces(pr)} ${checksIcon(pr)} ${reviewChip(pr)} ${mergeStateChip(pr)} ${stateChip(pr)}
@@ -113,13 +169,24 @@ function renderList() {
             <span class="arrow">${icon("arrow-right")}</span>
             <span class="branch" title="${esc(pr.baseRefName)}">${esc(pr.baseRefName)}</span>
           </span>
-          <span class="meta-mini">${esc(pr.author?.login || "?")} · ${timeAgo(pr.updatedAt)} · <span class="checks-success">+${pr.additions ?? 0}</span>/<span class="checks-failure">−${pr.deletions ?? 0}</span> · ${icon("message-square")} ${pr.comments?.totalCount ?? 0}${state.draftKeys.has(`${pr.repository?.nameWithOwner || state.repo}#${pr.number}`) ? ` · ${icon("file-pen-line")} ${t("borradores")}` : ""}</span>
+          <span class="meta-mini">${esc(pr.author?.login || "?")} · ${timeAgo(pr.updatedAt)} · <span class="checks-success">+${pr.additions ?? 0}</span>/<span class="checks-failure">−${pr.deletions ?? 0}</span> · ${icon("message-square")} ${pr.comments?.totalCount ?? 0}${hasDrafts(pr) ? ` · ${icon("file-pen-line")} ${t("borradores")}` : ""}</span>
+          ${conflictButton(pr)}
         </div>
       </article>`,
     )
     .join("");
   list.querySelectorAll(".pr-row").forEach((row) =>
-    row.addEventListener("click", () => openDetail(Number(row.dataset.number), "conv", row.dataset.repo)),
+    row.addEventListener("click", (ev) => {
+      const agent = ev.target.closest("[data-session]");
+      if (agent) {
+        if (!sessionsOpen()) toggleSessionsPane(true);
+        if (viewingId() !== agent.dataset.session) openSessionView(agent.dataset.session);
+        return;
+      }
+      const fix = ev.target.closest("[data-fix]");
+      if (fix) return launchConflictFix(fix.dataset.fix, fix);
+      openDetail(Number(row.dataset.number), "conv", row.dataset.repo);
+    }),
   );
 
   if (IS_SELFTEST && !state.selftestOpenedDetail && prs.length && (["list", "changes"].includes(SELFTEST_ROUTE) || SELFTEST_ROUTE.startsWith("review"))) {

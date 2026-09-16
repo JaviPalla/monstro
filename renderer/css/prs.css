@@ -418,3 +418,20 @@
 /* con la barra de borradores locales (también pegada abajo) se sube para no taparla */
 .detail-inner:has(.drafts-bar) .comment-nav { bottom: 78px; }
 
+
+/* Repo (sin grupo) con el icono del proyecto, badge de la sesión de agente y "Solucionar conflictos". */
+.repo-pill { display: inline-flex; align-items: center; gap: 6px; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 0 auto; }
+.repo-ico {
+  width: 16px; height: 16px; border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 10px; font-weight: 700;
+}
+.pr-agent, .pr-fix {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: transparent; color: var(--text-muted);
+  padding: 2px 9px; font-size: 11px; white-space: nowrap; flex: 0 0 auto; cursor: pointer;
+}
+.pr-agent:hover, .pr-fix:hover { border-color: var(--accent); color: var(--accent); }
+.pr-fix { color: var(--red); }
+.pr-fix[disabled] { opacity: 0.5; cursor: default; }

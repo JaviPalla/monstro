@@ -58,6 +58,7 @@ function loadSessions() {
       sessionsUi.pending = null;
       renderSessions();
       renderSessionView();
+      renderList(); // los badges de agente de la lista de MRs salen de estos datos
     });
   return sessionsUi.pending;
 }
@@ -588,6 +589,9 @@ $("#sessions-btn").addEventListener("click", () => toggleSessionsPane());
 window.monstro.onNotifySession((id) => {
   if (!sessionsOpen()) toggleSessionsPane(true);
   if (viewingId() !== id) openSessionView(id);
+  // Y te deja donde está abierto el agente: viva y con host conocido, su app al frente (como el botón Abrir).
+  const s = (sessionsUi.data || []).find((x) => x.sessionId === id);
+  if (s?.live && HOST_APP_KEY[s.host]) window.monstro.sessionsFocus(id).catch(() => {});
 });
 
 // Botones del panel y de la ficha; el resto de una tarjeta (no su formulario) abre su ficha.

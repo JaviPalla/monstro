@@ -211,7 +211,7 @@ function linkScope(cfg) {
 // (lo entregado se prueba). Las descartadas se devuelven igual: "no hay MRs" y "están todas fusionadas" no
 // son lo mismo para quien pega el link.
 async function launchTargets(url, action) {
-  if (action !== "review" && action !== "tests") throw new Error("Acción desconocida.");
+  if (!["review", "tests", "conflicts"].includes(action)) throw new Error("Acción desconocida.");
   const link = sessions.parseLink(url);
   if (!link || !["mr", "issue", "epic"].includes(link.kind)) throw new Error("Pega el link de una MR, una tarea o una epic de GitLab.");
   const found = link.kind === "mr"
@@ -239,6 +239,20 @@ function agentFor(action, target) {
   if (action === "review") return { name: `Review !${target.iid}`, prompt: `/mr-review-gitlab ${target.mrUrl}` };
   // Comando integrado de Claude Code: revisa los cambios de la rama ACTUAL (se lanza en un worktree de la MR).
   if (action === "security") return { name: `Seguridad !${target.iid}`, prompt: "/security-review" };
+  // Conflictos: también en un worktree de la rama de la MR. Rebase, nunca merge de la base (regla del producto).
+  if (action === "conflicts") {
+    return {
+      name: `Conflictos !${target.iid}`,
+      prompt: [
+        `Esta MR tiene conflictos con su rama base: ${target.mrUrl}`,
+        `Estás en un worktree de su rama ${target.sourceBranch} (no toques el clon del usuario).`,
+        `1. git fetch origin y rebase de esta rama sobre origin/${target.targetBranch}.`,
+        "2. Resuelve cada conflicto entendiendo los DOS lados (git log/diff de ambos); no descartes un lado sin mirarlo.",
+        "3. Compila o pasa los tests del proyecto si los hay.",
+        "4. Enséñame el resumen de lo resuelto y ESPERA mi OK antes de hacer push --force-with-lease.",
+      ].join("\n"),
+    };
+  }
   return { name: `Pruebas !${target.iid}`, prompt: `/${QA_SKILL} ${target.mrUrl}${target.taskUrl ? ` ${target.taskUrl}` : ""}` };
 }
 
@@ -386,7 +400,17 @@ function register(ctx) {
     // Se resuelve otra vez aquí: el renderer solo manda el link, nunca rutas.
     const targets = (await launchTargets(url, action)).filter((t) => !t.skip);
     if (!targets.length) throw new Error("Ninguna de esas MRs tiene un clon local donde lanzar el agente.");
-    for (const t of targets) await openInGhostty(t.dir, sessions.claudeCommand(agentFor(action, t)));
+    for (const t of targets) {
+      // Conflictos: worktree de la rama de la MR (reutiliza el que ya haya), como /security-review.
+      let dir = t.dir;
+      if (action === "conflicts") {
+        const pr = await provider.current().prDetail(t.project, t.iid);
+        if (!pr.headRefName) throw new Error("Esa MR no tiene rama de origen.");
+        Object.assign(t, { sourceBranch: pr.headRefName, targetBranch: pr.baseRefName });
+        dir = await local.branchWorktree(t.dir, pr.headRefName);
+      }
+      await openInGhostty(dir, sessions.claudeCommand(agentFor(action, t)));
+    }
     return { launched: targets.length };
   });
   ipcMain.handle("sessions:pickDir", async () => {
