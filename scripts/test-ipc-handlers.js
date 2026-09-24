@@ -55,6 +55,7 @@ const STUBBED = new Set([
   "electron",
   "../agents",
   "../ai",
+  "../cognito",
   "../config",
   "../drafts",
   "../health",
@@ -99,6 +100,9 @@ const PROJECT = {
 
 const PAYLOAD = {
   version: "072026",
+  poolId: "eu-central-1_Abc123",
+  q: "alguien@ejemplo.es",
+  username: "alguien",
   sourceBranch: "development",
   targetBranch: "development",
   newBranch: "feat/x",

@@ -101,8 +101,18 @@ function register(ctx) {
     if (Array.isArray(partial.sections)) {
       // Espejo de MENU_SECTIONS (renderer/app/core.js). Si añades una sección allí y no aquí, se
       // descarta en silencio al guardar — lo vigila scripts/test-sections-sync.js.
-      const SECTION_KEYS = ["prs", "historial", "historico", "milestones", "soporte", "releases", "entornos", "local", "propuestas"];
+      const SECTION_KEYS = ["prs", "historial", "historico", "milestones", "soporte", "releases", "entornos", "local", "propuestas", "usuarios"];
       allowed.sections = partial.sections.filter((s) => SECTION_KEYS.includes(s));
+    }
+    if (partial.cognito && typeof partial.cognito === "object") {
+      const c = partial.cognito;
+      const next = { ...current.cognito };
+      if (typeof c.profile === "string" && /^[\w.@-]{1,64}$/.test(c.profile)) next.profile = c.profile;
+      else if (c.profile === null) next.profile = null;
+      if (typeof c.region === "string" && /^[a-z]{2}-[a-z]+-\d$/.test(c.region)) next.region = c.region;
+      if (typeof c.poolId === "string" && /^[a-z]{2}-[a-z]+-\d_[A-Za-z0-9]+$/.test(c.poolId)) next.poolId = c.poolId;
+      else if (c.poolId === null) next.poolId = null;
+      allowed.cognito = next;
     }
     if (partial.cherryPick && typeof partial.cherryPick === "object") {
       const cp = partial.cherryPick;

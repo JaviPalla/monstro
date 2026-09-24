@@ -83,6 +83,7 @@ function paletteEntriesSections() {
   add("local", t("Trabajo local · Vincular tarea"), t("vincular local a una tarea existente"), () => enterLocal("vincular"));
   add("local", t("Trabajo local · Histórico"), t("trabajos creados desde Monstro"), () => enterLocal("historico"));
   add("propuestas", t("Propuestas"), t("correos de propuestas → Epic"), () => enterProposals());
+  add("usuarios", t("Usuarios"), t("usuarios de Cognito por email o id"), () => enterCognito());
 
   const bucketSection = (b) => (["merged", "closed"].includes(b) ? "historial" : "prs");
   const buckets = [

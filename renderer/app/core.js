@@ -76,6 +76,7 @@ const state = {
   // Vista de Entornos (solo GitLab): matriz proyecto × entorno. `data` = path de proyecto → entornos
   // (capa 1, GitLab). `health` = "path|entorno" → resultado de la sonda HTTP (capa 2, bajo demanda).
   environments: { projects: [], selected: new Set(), seeded: false, loading: false, data: new Map(), health: new Map(), probing: false },
+  cognito: { profiles: [], pools: [], poolId: null, q: "", users: null, selected: null, user: null, userError: null, error: null, loading: false },
   prSnapshot: null, // nº → {reviewDecision, checks, reviewMe} para detectar cambios y notificar
   cursor: -1, // selección con teclado (j/k) en la lista
   draftKeys: new Set(), // "owner/repo#n" con borradores guardados → badge 📝 en la lista
@@ -124,6 +125,7 @@ const MENU_SECTIONS = {
   releases:   { label: "Releases",           icon: "git-branch",       navId: "nav-releases-section",   gitlabOnly: true },
   entornos:   { label: "Entornos",           icon: "thermometer",      navId: "nav-entornos-section",   gitlabOnly: true },
   soporte:    { label: "Soporte",            icon: "activity",         navId: "nav-support-section",    gitlabOnly: true },
+  usuarios:   { label: "Usuarios (Cognito)", icon: "users",            navId: "nav-usuarios-section",   gitlabOnly: false },
 };
 
 // Claves de sección válidas para el proveedor actual, en orden de menú (las GitLab-only se caen en GitHub).

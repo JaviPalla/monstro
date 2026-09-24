@@ -159,6 +159,7 @@ function wireIpc() {
   require("./ipc/milestones").register(ctx);
   require("./ipc/releases").register(ctx);
   require("./ipc/env").register(ctx);
+  require("./ipc/cognito").register(ctx);
   require("./ipc/mail").register(ctx);
   require("./ipc/system").register(ctx);
   require("./ipc/sessions").register(ctx);

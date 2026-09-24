@@ -141,6 +141,12 @@ const DEFAULTS = {
       "OpenSaludGroup/dashboard": { "staging-mx": "staging" },
     },
   },
+  // Vista de Usuarios (Cognito): pools de la cuenta de AWS a través del `aws` CLI del Mac.
+  cognito: {
+    profile: null, // perfil de ~/.aws (null = el que use el CLI por defecto)
+    region: "eu-west-1", // la vista ofrece eu-west-1 (Irlanda, las pools de OpenSalud) y us-east-1
+    poolId: null, // última pool elegida
+  },
   // Trabajo local → GitLab (OPE-19): publicar trabajo de ramas/worktrees locales como Issues/Epics + MRs.
   local: {
     // Directorio raíz donde conviven todos los clones de GitLab (un nivel). null = sin configurar.
@@ -170,6 +176,7 @@ function load() {
     cfg.local = { ...DEFAULTS.local, ...(parsed.local || {}) };
     cfg.support = { ...DEFAULTS.support, ...(parsed.support || {}) };
     cfg.mail = { ...DEFAULTS.mail, ...(parsed.mail || {}) };
+    cfg.cognito = { ...DEFAULTS.cognito, ...(parsed.cognito || {}) };
     return cfg;
   } catch {
     return { ...DEFAULTS };
