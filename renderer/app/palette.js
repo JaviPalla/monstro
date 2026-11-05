@@ -115,7 +115,7 @@ async function paletteCheckUpdates() {
   try {
     const r = await window.monstro.checkUpdates();
     if (r.error) return toast(t("No se pudo comprobar: {detail}", { detail: r.error }), "err");
-    if (r.newer) return toast(t("Hay una versión nueva: {v}", { v: `v${r.latest}` }), "ok", () => window.monstro.openExternal(r.url));
+    if (r.newer) return toast(t("Versión nueva disponible: v{v} — pulsa para actualizar", { v: r.latest }), "ok", () => startUpdate(r));
     toast(t("Ya tienes la última versión (v{v})", { v: r.latest || r.current }), "ok");
   } catch (err) {
     toast(t("No se pudo comprobar: {detail}", { detail: String(err.message || err) }), "err");

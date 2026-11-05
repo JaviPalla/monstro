@@ -387,9 +387,15 @@ function openSettings() {
     try {
       const r = await window.monstro.checkUpdates();
       if (r.error) line.textContent = t("No se pudo comprobar: {detail}", { detail: r.error });
-      else if (r.newer) line.innerHTML = `${icon("sparkles")} ${t("Hay una versión nueva: {v}", { v: `v${esc(r.latest)}` })} — <a href="#" id="update-link">${t("descargar")} ${icon("external-link")}</a>`;
+      // Mismo camino que el toast del arranque (startUpdate en boot.js): Windows instala y reinicia,
+      // macOS baja el .dmg, lo abre y cierra Monstro. La página de la release queda como «novedades».
+      else if (r.newer) line.innerHTML = `${icon("sparkles")} ${t("Hay una versión nueva: {v}", { v: `v${esc(r.latest)}` })} <button class="btn btn-primary" id="update-now">${t("Actualizar ahora")}</button> <a href="#" id="update-link">${t("ver novedades")} ${icon("external-link")}</a>`;
       else line.textContent = t("Ya tienes la última versión (v{v})", { v: r.latest || r.current });
       $("#update-link")?.addEventListener("click", (e) => { e.preventDefault(); window.monstro.openExternal(r.url); });
+      $("#update-now")?.addEventListener("click", (e) => {
+        e.currentTarget.disabled = true;
+        startUpdate(r);
+      });
     } finally {
       btn.disabled = false;
       btn.textContent = t("Buscar actualizaciones ahora");

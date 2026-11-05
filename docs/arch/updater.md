@@ -3,7 +3,7 @@
 Read this when touching `src/updater.js`, `update:*` IPC, the boot toast, or the release
 pipeline (`.github/workflows/release.yml`, `build.publish` in package.json).
 
-**Self-update** (`src/updater.js`, toast at boot in `boot.js` → `startUpdate`): checks the app's own **public** GitHub releases (no token, independent of `config.provider`); `config.checkUpdates` gates it, selftest never fires it.
+**Self-update** (`src/updater.js`, toast at boot in `boot.js` → `startUpdate`; Ajustes «Actualizar ahora» and the ⌘P check go through the same `startUpdate`, never a "download" link): checks the app's own **public** GitHub releases (no token, independent of `config.provider`); `config.checkUpdates` gates it, selftest never fires it.
 
 **Hybrid by platform, and NOT by choice**: on **Windows** it's a real update via electron-updater (NSIS); on **macOS** it downloads the `.dmg`, opens it and then **quits the app** — macOS refuses to replace a *running* app, so leaving Monstro alive makes the drag to Applications fail right after a 115 MB download. The Finder is a separate process and keeps the mounted `.dmg` after the quit; the 1200 ms delay is the same margin `installWindows` uses so the invoke can answer and the renderer paint the toast before the process dies.
 
