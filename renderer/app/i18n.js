@@ -74,7 +74,6 @@ const I18N_EN = {
   "Descargando v{v}…{extra}": "Downloading v{v}…{extra}",
   "Actualizada — reiniciando…": "Updated — restarting…",
   "v{v} descargada — cerrando Monstro, arrástrala a Aplicaciones": "v{v} downloaded — quitting Monstro, drag it to Applications",
-  "descargar": "download",
   "No se pudo actualizar: {e}": "Could not update: {e}",
   "error desconocido": "unknown error",
 };
@@ -888,6 +887,8 @@ Object.assign(I18N_EN, {
   "Comprobando actualizaciones…": "Checking for updates…",
   "No se pudo comprobar: {detail}": "Could not check: {detail}",
   "Hay una versión nueva: {v}": "A new version is available: {v}",
+  "Actualizar ahora": "Update now",
+  "ver novedades": "see what’s new",
   "Ya tienes la última versión (v{v})": "You already have the latest version (v{v})",
   "Tema: Por defecto": "Theme: Default",
   "Tema: Liquid Glass": "Theme: Liquid Glass",
