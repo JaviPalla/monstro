@@ -469,6 +469,26 @@ async function validationAct() {
   throw new Error("El tablero de Validación solo está disponible en GitLab.");
 }
 
+async function pruebasBoard() {
+  throw new Error("La sección Pruebas solo está disponible en GitLab.");
+}
+
+async function pruebasTask() {
+  throw new Error("La sección Pruebas solo está disponible en GitLab.");
+}
+
+async function pruebasAct() {
+  throw new Error("La sección Pruebas solo está disponible en GitLab.");
+}
+
+async function pruebasNewPipeline() {
+  throw new Error("La sección Pruebas solo está disponible en GitLab.");
+}
+
+async function pruebasRunMrPipeline() {
+  throw new Error("La sección Pruebas solo está disponible en GitLab.");
+}
+
 async function createSnippet() {
   throw new Error("Publicar el resumen como snippet solo está disponible en GitLab.");
 }
@@ -609,6 +629,11 @@ module.exports = {
   playJob,
   validationBoard,
   validationAct,
+  pruebasBoard,
+  pruebasTask,
+  pruebasAct,
+  pruebasNewPipeline,
+  pruebasRunMrPipeline,
   createSnippet,
   saveMilestoneSummary,
   createIssue,
