@@ -26,7 +26,7 @@ const SELFTEST_ROUTE = (process.argv.find((a) => a.startsWith("--selftest-route=
 const SELFTEST_TIMEOUT_MS =
   SELFTEST_ROUTE === "milestones-summary"
     ? 240000
-    : SELFTEST_ROUTE.startsWith("releases") || SELFTEST_ROUTE.startsWith("local") || SELFTEST_ROUTE === "entornos" || SELFTEST_ROUTE.startsWith("validacion")
+    : SELFTEST_ROUTE.startsWith("releases") || SELFTEST_ROUTE.startsWith("local") || SELFTEST_ROUTE === "entornos" || SELFTEST_ROUTE === "pruebas" || SELFTEST_ROUTE.startsWith("validacion")
       ? 60000
       : 20000;
 
@@ -160,6 +160,7 @@ function wireIpc() {
   require("./ipc/releases").register(ctx);
   require("./ipc/env").register(ctx);
   require("./ipc/validation").register(ctx);
+  require("./ipc/pruebas").register(ctx);
   require("./ipc/cognito").register(ctx);
   require("./ipc/mail").register(ctx);
   require("./ipc/system").register(ctx);

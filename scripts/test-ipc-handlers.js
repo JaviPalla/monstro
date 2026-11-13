@@ -119,6 +119,12 @@ const PAYLOAD = {
   tag: "2026.07.0",
   branch: "development",
   jobId: "1",
+  // Sección Pruebas: proyecto del flujo, acción, motivo, epic y MRs que pasan sus validaciones.
+  project: 12,
+  kind: "play",
+  motivo: "m",
+  epicIid: 1,
+  mrs: [{ projectId: 12, iid: 1 }],
   milestones: ["2026.07"],
   milestoneId: 1,
   labels: ["l"],

@@ -16,8 +16,9 @@ const issues = require("./gitlab/issues");
 const environments = require("./gitlab/environments");
 const releases = require("./gitlab/releases");
 const validation = require("./gitlab/validation");
+const pruebas = require("./gitlab/pruebas");
 
-const all = { ...core, ...prs, ...issues, ...environments, ...releases, ...validation };
+const all = { ...core, ...prs, ...issues, ...environments, ...releases, ...validation, ...pruebas };
 
 module.exports = {
   resolveToken: all.resolveToken,
@@ -78,6 +79,11 @@ module.exports = {
   playJob: all.playJob,
   validationBoard: all.validationBoard,
   validationAct: all.validationAct,
+  pruebasBoard: all.pruebasBoard,
+  pruebasTask: all.pruebasTask,
+  pruebasAct: all.pruebasAct,
+  pruebasNewPipeline: all.pruebasNewPipeline,
+  pruebasRunMrPipeline: all.pruebasRunMrPipeline,
   createSnippet: all.createSnippet,
   saveMilestoneSummary: all.saveMilestoneSummary,
   mergeSummaryBlock: all.mergeSummaryBlock,

@@ -1078,6 +1078,64 @@ Object.assign(I18N_EN, {
   "No se ha podido abrir la pestaña: {error}": "Couldn't open the tab: {error}",
 });
 
+// Sección Pruebas (renderer/app/pruebas.js).
+Object.assign(I18N_EN, {
+  "Pruebas": "Testing",
+  "tareas por probar y su pipeline": "tasks to test and their pipeline",
+  "La vista de Pruebas solo está disponible en GitLab": "The Testing view is only available on GitLab",
+  "Tareas por probar y su pipeline en GitLab": "Tasks to test and their GitLab pipeline",
+  "Cargando tareas y pipelines…": "Loading tasks and pipelines…",
+  "Cargando pipelines {l}/{n}": "Loading pipelines {l}/{n}",
+  "No hay tareas por probar": "No tasks to test",
+  "Epics": "Epics",
+  "Tareas sin epic": "Tasks without an epic",
+  "Hotfix": "Hotfix",
+  "Pipeline de la epic": "Epic pipeline",
+  "Esta epic no tiene pipeline": "This epic has no pipeline",
+  "Sin MRs abiertas": "No open MRs",
+  "otros jobs ({n})": "other jobs ({n})",
+  "Conflicto": "Conflict",
+  "Sin pipeline": "No pipeline",
+  "Cancelado": "Canceled",
+  "Lista para probar": "Ready to test",
+  "probar-tarea falló": "probar-tarea failed",
+  "Subiendo a dev": "Deploying to dev",
+  "Desplegando en dev": "Deploying to dev",
+  "Despliegue fallido": "Deploy failed",
+  "En dev · falta validar": "On dev · validation pending",
+  "Lista para validar": "Ready to validate",
+  "Validando": "Validating",
+  "La validación falló": "Validation failed",
+  "Validada · falta mergear": "Validated · merge pending",
+  "Lista para mergear": "Ready to merge",
+  "Mergeando": "Merging",
+  "El merge falló": "Merge failed",
+  "Mergeada": "Merged",
+});
+
+// Sección Pruebas · acciones.
+Object.assign(I18N_EN, {
+  "Reintentar job": "Retry job",
+  "Lanzado: {job}": "Started: {job}",
+  "Reintentado: {job}": "Retried: {job}",
+  "Nuevo pipeline": "New pipeline",
+  "Run pipeline": "Run pipeline",
+  "Pipeline lanzado en !{iid}": "Pipeline started on !{iid}",
+  "Confirmar": "Confirm",
+  "Mergear la tarea": "Merge the task",
+  "Mergea todas las MRs de la epic, back-ends primero. Solo funciona si eres Maintainer en todos los proyectos y no es atómico.": "Merges every MR of the epic, back-ends first. Only works if you are a Maintainer in all projects and it is not atomic.",
+  "Devolver la tarea": "Return the task",
+  "La epic pasa a needs fixing, se revocan los Approves y las MRs pasan a Draft.": "The epic moves to needs fixing, Approves are revoked and the MRs go back to Draft.",
+  "Validar sin dev": "Validate without dev",
+  "Esta MR no ha pasado por dev. Solo un Maintainer puede validarla así y queda registrado como «Validado SIN dev».": "This MR has not been through dev. Only a Maintainer can validate it this way and it is logged as “Validated WITHOUT dev”.",
+  "Motivo (opcional): qué hay que arreglar": "Reason (optional): what needs fixing",
+  "Pipeline creado para la epic #{n}: clic para abrirlo y pulsar ▶ probar-tarea": "Pipeline created for epic #{n}: click to open it and press ▶ probar-tarea",
+  "La epic #{n} ya tiene un pipeline vigente: clic para abrirlo": "Epic #{n} already has an active pipeline: click to open it",
+  "Filtrar por etiqueta": "Filter by label",
+  "Quitar filtro": "Clear filter",
+  "Ninguna tarea con esas etiquetas": "No tasks with those labels",
+});
+
 // Tablero de Validación (renderer/app/validation.js).
 Object.assign(I18N_EN, {
   "Validación": "Validation",
