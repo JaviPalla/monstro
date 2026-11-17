@@ -128,6 +128,17 @@ contextBridge.exposeInMainWorld("monstro", {
     return () => ipcRenderer.removeListener("validation:progress", listener);
   },
   validationAct: (repo, iid, kind, jobId) => ipcRenderer.invoke("validation:act", { repo, iid, kind, jobId }),
+  pruebasBoard: (runId) => ipcRenderer.invoke("pruebas:board", { runId }),
+  // Tableros parciales mientras cargan los pipelines. Devuelve un de-suscriptor.
+  onPruebasProgress: (cb) => {
+    const listener = (_e, board) => cb(board);
+    ipcRenderer.on("pruebas:progress", listener);
+    return () => ipcRenderer.removeListener("pruebas:progress", listener);
+  },
+  pruebasTask: (epicIid, mrs) => ipcRenderer.invoke("pruebas:task", { epicIid, mrs }),
+  pruebasAct: (project, jobId, kind, motivo) => ipcRenderer.invoke("pruebas:act", { project, jobId, kind, motivo }),
+  pruebasNewPipeline: (epicIid) => ipcRenderer.invoke("pruebas:newPipeline", { epicIid }),
+  pruebasRunMrPipeline: (projectId, iid) => ipcRenderer.invoke("pruebas:runMrPipeline", { projectId, iid }),
   cognitoProfiles: () => ipcRenderer.invoke("cognito:profiles"),
   cognitoPools: () => ipcRenderer.invoke("cognito:pools"),
   cognitoUsers: (poolId, q) => ipcRenderer.invoke("cognito:users", { poolId, q }),

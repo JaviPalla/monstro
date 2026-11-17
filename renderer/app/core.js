@@ -78,6 +78,8 @@ const state = {
   environments: { projects: [], selected: new Set(), seeded: false, loading: false, data: new Map(), health: new Map(), probing: false },
   // Tablero de Validación (solo GitLab): tarjetas (tarea + sus MRs) con su columna; `selected` = key de la tarjeta.
   validation: { cards: null, errors: [], loading: false, selected: null, mode: "popover", tab: null },
+  // Sección Pruebas (solo GitLab): tareas por probar con su pipeline; `busy` = ids de job con una acción en curso.
+  pruebas: { tasks: null, errors: [], labels: [], loading: false, progress: null, busy: new Set(), labelFilter: [] },
   cognito: { profiles: [], pools: [], poolId: null, q: "", users: null, selected: null, user: null, userError: null, error: null, loading: false },
   prSnapshot: null, // nº → {reviewDecision, checks, reviewMe} para detectar cambios y notificar
   cursor: -1, // selección con teclado (j/k) en la lista
@@ -120,6 +122,7 @@ const BRANCH_RE = /^[\w./-]{1,200}$/;
 const MENU_SECTIONS = {
   prs:        { label: "Merge requests",     icon: "git-pull-request", navId: "nav-prs-section",        gitlabOnly: false },
   validacion: { label: "Validación",         icon: "badge-check",      navId: "nav-validacion-section", gitlabOnly: true },
+  pruebas:    { label: "Pruebas",            icon: "flask-conical",    navId: "nav-pruebas-section",    gitlabOnly: true },
   historial:  { label: "Historial",          icon: "history",          navId: "nav-historial-section",  gitlabOnly: false },
   historico:  { label: "Histórico (grafo)",  icon: "git-graph",        navId: "nav-repo-section",       gitlabOnly: false },
   local:      { label: "Trabajo local",      icon: "chart-bar",        navId: "nav-local-section",      gitlabOnly: true },
