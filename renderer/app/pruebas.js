@@ -339,7 +339,7 @@ function wirePruebas() {
 
 const PRU_CONFIRM = {
   merge: ["Mergear la tarea", "Mergea todas las MRs de la epic, back-ends primero. Solo funciona si eres Maintainer en todos los proyectos y no es atómico."],
-  return: ["Devolver la tarea", "La epic pasa a needs fixing, se revocan los Approves y las MRs pasan a Draft."],
+  return: ["Devolver la tarea", "La epic pasa a needs fixing, se revocan los Approves, cada MR recibe un pipeline nuevo y pasa a Draft."],
   "no-dev": ["Validar sin dev", "Esta MR no ha pasado por dev. Solo un Maintainer puede validarla así y queda registrado como «Validado SIN dev»."],
 };
 

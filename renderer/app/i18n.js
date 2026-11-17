@@ -1125,7 +1125,7 @@ Object.assign(I18N_EN, {
   "Mergear la tarea": "Merge the task",
   "Mergea todas las MRs de la epic, back-ends primero. Solo funciona si eres Maintainer en todos los proyectos y no es atómico.": "Merges every MR of the epic, back-ends first. Only works if you are a Maintainer in all projects and it is not atomic.",
   "Devolver la tarea": "Return the task",
-  "La epic pasa a needs fixing, se revocan los Approves y las MRs pasan a Draft.": "The epic moves to needs fixing, Approves are revoked and the MRs go back to Draft.",
+  "La epic pasa a needs fixing, se revocan los Approves, cada MR recibe un pipeline nuevo y pasa a Draft.": "The epic moves to needs fixing, Approves are revoked, each MR gets a new pipeline and goes back to Draft.",
   "Validar sin dev": "Validate without dev",
   "Esta MR no ha pasado por dev. Solo un Maintainer puede validarla así y queda registrado como «Validado SIN dev».": "This MR has not been through dev. Only a Maintainer can validate it this way and it is logged as “Validated WITHOUT dev”.",
   "Motivo (opcional): qué hay que arreglar": "Reason (optional): what needs fixing",

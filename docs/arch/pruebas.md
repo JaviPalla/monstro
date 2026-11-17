@@ -57,7 +57,8 @@ quitarla. Si falla la petición de etiquetas del grupo, la barra sale solo de la
 ## Qué hace cada botón
 
 El main decora cada job (`decorateJob`): `manual` → ▶ (`play`), `failed`/`canceled` → ↻ (`retry`), nada en un
-pipeline cancelado. `mergear-tarea` y `devolver-tarea` piden confirmación (devolver admite `MOTIVO`, solo en ▶);
+pipeline cancelado. `mergear-tarea` y `devolver-tarea` piden confirmación (devolver admite `MOTIVO`, solo en ▶; el job crea además un pipeline
+de MR nuevo en cada MR de la tarea, así que Monstro NO lo crea: saldrían dos);
 `validar-tarea-para-mergear` la pide si `probar-tarea-en-desarrollo` no está en éxito («Validar sin dev»).
 Crear un pipeline vive **dentro de cada tarea** (no hay botón global):
 - **Epic** → «Nuevo pipeline» en la cabecera del bloque de la epic, siempre visible: `POST projects/62/pipeline` con
